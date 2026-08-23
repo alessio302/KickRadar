@@ -53,12 +53,17 @@ src/db/supabaseClient.js    Supabase client factory
 src/football-api/           football-data.org adapter + club/fixture sync scripts
 src/news/
   sources/*.js               One module per outlet (tuttomercatoweb, kicker, skysports, rmcsport)
-  rssSource.js / htmlSource.js  Shared factories: RSS parsing / HTML scraping
-  classify.js                 Per-source official-vs-rumor keyword rules
-  extract.js                  Best-effort player/from-club/to-club extraction from headlines
-  playerProfileResolver.js    Resolves + caches transfermarkt.de profile links
-  runNewsScraper.js           Orchestrates all four sources, upserts into `transfers`
+  rssSource.js / htmlSource.js / sitemapSource.js  Shared factories: RSS / HTML scraping / Google News sitemap
+  relevance.js                 Per-source keyword gate: is this item transfer news at all?
+  classify.js                  Per-source official-vs-rumor keyword rules (only runs on relevant items)
+  extract.js                   Best-effort player/from-club/to-club extraction from headlines
+  playerProfileResolver.js     Resolves + caches transfermarkt.de profile links
+  runNewsScraper.js            Orchestrates all four sources, upserts into `transfers`
 ```
+
+Pipeline per item: fetch (source-scoped to football, not necessarily transfers only)
+→ `relevance.js` (keyword gate: is this even about a transfer?) → `classify.js`
+(official vs. rumor) → `extract.js` (best-effort player/club names) → upsert.
 
 ## Known limitations / things to verify with real internet access
 
@@ -70,36 +75,33 @@ src/news/
   would need to be swapped back.
 
 This backend was scaffolded in a sandboxed environment without general
-internet access (only GitHub/npm reachable), so a few things are
-best-effort guesses that should be checked once the GitHub Actions runner
-(which has full internet access) actually executes them:
+internet access (only GitHub/npm reachable), so a few things needed live
+iteration against the real GitHub Actions runner (which does have full
+internet access) to get right:
 
-- **RSS feed URLs** for tuttomercatoweb, kicker.de, and Sky Sports
-  (`src/news/sources/*.js`) are plausible defaults, not confirmed. If a
-  feed 404s or parses oddly, override its URL via the corresponding env var
-  (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_RSS_URL`) — no
-  code change needed. kicker.de and Sky Sports were confirmed working live
-  (via GitHub Actions) on the first try.
-- **tuttomercatoweb returns 403 from GitHub Actions** even with a correct
-  feed URL and a full browser-like header set (confirmed: the URL itself is
-  valid, Safari recognizes it as a real RSS feed). This looks like bot
-  protection blocking non-browser clients (possibly a Cloudflare
-  JS/TLS-fingerprint challenge), which no HTTP header combination can pass.
-  If the extra headers in `rssSource.js` don't fix it, the remaining
-  options are: fetch it via a headless browser (Playwright) in the GitHub
-  Actions workflow instead of a plain HTTP request, route it through an RSS
-  proxy service, or accept Serie A running without an automated news source
-  for now. Worth a decision with the project owner rather than guessing further.
-- **RMC Sport HTML selectors** (no reliable RSS) are a first guess at the
-  site's DOM structure. Override via `RMCSPORT_LIST_URL` /
-  `RMCSPORT_ITEM_SELECTOR` / `RMCSPORT_TITLE_SELECTOR` /
-  `RMCSPORT_LINK_SELECTOR` once you've inspected the live page.
+- **Sources are scoped to "football" or "this outlet's best transfer
+  section," not guaranteed "transfers only."** Confirmed live: Sky Sports'
+  RSS feed IDs we initially tried (11095, 12040) turned out to be
+  all-sports feeds (pulled in golf/rugby/darts/F1), and even tuttomercatoweb's
+  plain feed mixed in match reports and interviews. Rather than chase an
+  exact "transfers-only" URL per outlet (some may not expose one), each
+  source now pulls the best available football-scoped feed and
+  `relevance.js` filters for transfer-shaped keywords before anything is
+  classified or stored. Confirmed working live: tuttomercatoweb
+  (`?s=calciomercato` section), kicker.de (`/news/bundesliga`), Sky Sports
+  (`sitemap_news_football.xml`, football-only by construction), RMC Sport
+  (`/football/transferts/`). Override any of them via env var
+  (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_SITEMAP_URL`,
+  `RMCSPORT_LIST_URL`) if the site structure changes — no code change needed.
 - **Player/club extraction from headlines** (`src/news/extract.js`) is a
   language-agnostic heuristic, not NLP. It degrades gracefully: on a miss,
   `player_name`/`from_club`/`to_club` stay `null` and the raw headline is
   still stored in `summary`, so no news item is ever dropped — only the
-  structured fields may be incomplete. Worth revisiting once real headlines
-  from each source are visible.
+  structured fields may be incomplete. Confirmed live on real headlines that
+  a run of 4+ capitalized words is almost always noise (headline roundups,
+  unrelated proper nouns in Italian/French sentence-case text), not a
+  truncatable name — those runs are now discarded rather than kept, since
+  real player names are essentially never longer than 3 words.
 - **Transfermarkt profile resolution** (`playerProfileResolver.js`) scrapes
   the public "Schnellsuche" (quick search) results page for the first
   player-profile link. If transfermarkt.de changes that page's markup, the

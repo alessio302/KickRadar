@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
 import { classifyOfficial } from './classify.js';
+import { isTransferRelevant } from './relevance.js';
 import { extractTransferInfo } from './extract.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 
@@ -35,9 +36,16 @@ async function scrapeLeague(supabase, league) {
 
   const items = await source.fetchLatest();
   let inserted = 0;
+  let skipped = 0;
 
   for (const item of items) {
     const text = `${item.title} ${item.summary || ''}`;
+
+    if (!isTransferRelevant(league.newsSource, text)) {
+      skipped += 1;
+      continue;
+    }
+
     const isOfficial = classifyOfficial(league.newsSource, text);
     const { playerName, fromClub, toClub } = extractTransferInfo(item.title, clubs, league.newsSource);
 
@@ -77,7 +85,7 @@ async function scrapeLeague(supabase, league) {
     inserted += 1;
   }
 
-  return inserted;
+  return { inserted, skipped };
 }
 
 export async function runNewsScraper() {
