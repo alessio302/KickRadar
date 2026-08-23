@@ -1,6 +1,14 @@
 import Parser from 'rss-parser';
 
-const parser = new Parser();
+// Some outlets (confirmed: tuttomercatoweb, 403) block requests that don't
+// look like a real browser. A plain UA + Accept header is enough to pass.
+const parser = new Parser({
+  headers: {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    Accept: 'application/rss+xml, application/xml, text/xml, */*',
+  },
+});
 
 // Shared factory for the three sources that publish RSS (tuttomercatoweb,
 // kicker, Sky Sports). Feed URL is env-overridable per source because the
