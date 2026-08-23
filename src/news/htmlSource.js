@@ -25,7 +25,12 @@ export function createHtmlSource({
       const linkSelector = process.env[linkSelectorEnvVar] || defaultLinkSelector;
 
       const res = await fetch(listUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KickRadarBot/1.0)' },
+        headers: {
+          // A bot-labeled UA gets blocked by some sites (confirmed on
+          // tuttomercatoweb's RSS endpoint), so use a real browser UA here too.
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        },
       });
       if (!res.ok) {
         throw new Error(`Failed to fetch ${listUrl}: ${res.status} ${res.statusText}`);

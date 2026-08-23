@@ -8,9 +8,9 @@ import { createHtmlSource } from '../htmlSource.js';
 export default createHtmlSource({
   sourceKey: 'rmcsport',
   listUrlEnvVar: 'RMCSPORT_LIST_URL',
-  defaultListUrl: 'https://rmcsport.bfmtv.com/football/mercato/',
+  defaultListUrl: 'https://rmcsport.bfmtv.com/football/transferts/',
   itemSelectorEnvVar: 'RMCSPORT_ITEM_SELECTOR',
-  defaultItemSelector: 'article a.article-link, article a[href*="/football/"]',
+  defaultItemSelector: 'article a[href*="/football/"], a[href*="/transferts/"]',
   titleSelectorEnvVar: 'RMCSPORT_TITLE_SELECTOR',
   defaultTitleSelector: '',
   linkSelectorEnvVar: 'RMCSPORT_LINK_SELECTOR',
