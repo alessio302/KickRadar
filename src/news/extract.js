@@ -77,8 +77,14 @@ function assignDirection(title, clubHits, sourceKey) {
   return { fromClub, toClub };
 }
 
-// Very rough player-name guess: the longest run of capitalized words in the
-// title that isn't part of a recognized club name.
+// Very rough player-name guess: the longest run of capitalized words (2-3
+// words) in the title that isn't part of a recognized club name. Runs
+// longer than 3 words are discarded rather than truncated -- a 4+ word
+// capitalized run is almost always sentence-case noise (headline roundups,
+// unrelated proper nouns), not a truncatable name; real player names are
+// essentially never longer than 3 words.
+const MAX_NAME_WORDS = 3;
+
 function guessPlayerName(title, clubHits) {
   const clubSpans = clubHits.map((h) => normalize(h.club.name));
   const words = title.split(/\s+/);
@@ -86,7 +92,7 @@ function guessPlayerName(title, clubHits) {
   let current = [];
 
   const flush = () => {
-    if (current.length > best.length) best = current;
+    if (current.length > best.length && current.length <= MAX_NAME_WORDS) best = current;
     current = [];
   };
 
