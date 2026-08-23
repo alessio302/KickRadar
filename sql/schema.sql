@@ -9,7 +9,7 @@ create table if not exists leagues (
   slug text unique not null,           -- 'serie-a' | 'bundesliga' | 'premier-league' | 'ligue-1'
   name text not null,
   country text not null,
-  api_football_id int not null,
+  external_competition_id int not null, -- football-data.org competition id
   news_source text not null            -- key into src/news/sources/*
 );
 
@@ -19,7 +19,7 @@ create table if not exists clubs (
   league_id int not null references leagues(id) on delete cascade,
   name text not null,
   short_code text not null,            -- e.g. 'JUV', 'BVB' -- used for the badge in the UI
-  api_football_id int,
+  external_team_id int,                -- football-data.org team id
   aliases text[] not null default '{}', -- alternate spellings seen in news text, for matching
   unique (league_id, short_code)
 );
@@ -66,7 +66,7 @@ create table if not exists fixtures (
   status text not null default 'scheduled', -- 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled'
   home_score int,
   away_score int,
-  api_football_fixture_id bigint unique not null,
+  external_fixture_id bigint unique not null, -- football-data.org match id
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_fixtures_league_matchday on fixtures(league_id, matchday);
@@ -100,10 +100,11 @@ create table if not exists push_subscriptions (
   updated_at timestamptz not null default now()
 );
 
--- Seed the four leagues. api_football_id values are API-Football's standard league IDs.
-insert into leagues (slug, name, country, api_football_id, news_source) values
-  ('serie-a', 'Serie A', 'Italy', 135, 'tuttomercatoweb'),
-  ('bundesliga', 'Bundesliga', 'Germany', 78, 'kicker'),
-  ('premier-league', 'Premier League', 'England', 39, 'skysports'),
-  ('ligue-1', 'Ligue 1', 'France', 61, 'rmcsport')
+-- Seed the four leagues. external_competition_id values are football-data.org's
+-- numeric competition ids.
+insert into leagues (slug, name, country, external_competition_id, news_source) values
+  ('serie-a', 'Serie A', 'Italy', 2019, 'tuttomercatoweb'),
+  ('bundesliga', 'Bundesliga', 'Germany', 2002, 'kicker'),
+  ('premier-league', 'Premier League', 'England', 2021, 'skysports'),
+  ('ligue-1', 'Ligue 1', 'France', 2015, 'rmcsport')
 on conflict (slug) do nothing;

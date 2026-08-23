@@ -8,7 +8,9 @@ project briefing for full product scope; this repo covers the backend only
 ## Stack
 
 - **Database**: Postgres via [Supabase](https://supabase.com) (free tier)
-- **Fixtures/clubs**: [API-Football](https://api-sports.io) (free tier, 100 req/day)
+- **Fixtures/clubs**: [football-data.org](https://www.football-data.org) (free tier, 10 req/min,
+  current season included — API-Football's free plan was tried first but
+  blocks the current season entirely, see "Known limitations")
 - **News scraping**: RSS where available, HTML scraping otherwise, per source
 - **Scheduling**: GitHub Actions cron (no server to run)
 
@@ -16,11 +18,13 @@ project briefing for full product scope; this repo covers the backend only
 
 1. **Create a Supabase project**, then run `sql/schema.sql` against it (SQL
    Editor in the Supabase dashboard, or `psql`). This creates all tables and
-   seeds the four leagues.
-2. **Get an API-Football key** at [api-sports.io](https://dashboard.api-football.com/register)
-   (free plan is enough for this project's request volume).
+   seeds the four leagues. If you had already run an older version of this
+   schema (with API-Football columns), run `sql/002_switch_to_football_data_org.sql`
+   afterwards instead of re-running `schema.sql`.
+2. **Get a football-data.org key** at [football-data.org/client/register](https://www.football-data.org/client/register)
+   (free tier is enough for this project's request volume).
 3. **Local development**: copy `.env.example` to `.env` and fill in
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `API_FOOTBALL_KEY`.
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`.
 4. **Install deps**: `npm install`
 5. **First-time data load** (order matters — fixtures link to clubs):
    ```
@@ -29,7 +33,7 @@ project briefing for full product scope; this repo covers the backend only
    npm run scrape:news
    ```
 6. **GitHub Actions**: add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
-   `API_FOOTBALL_KEY` as repository secrets (Settings → Secrets and
+   `FOOTBALL_DATA_API_KEY` as repository secrets (Settings → Secrets and
    variables → Actions). The three workflows in `.github/workflows/` then
    run on their own schedule:
    - `news-scraper.yml` — hourly
@@ -43,9 +47,10 @@ project briefing for full product scope; this repo covers the backend only
 
 ```
 sql/schema.sql              DB schema + league seed data
-src/config/leagues.js       Fixed league metadata (slug, API-Football id, news source key)
+sql/002_switch_to_football_data_org.sql  Migration for DBs created before the API switch
+src/config/leagues.js       Fixed league metadata (slug, football-data.org competition id, news source key)
 src/db/supabaseClient.js    Supabase client factory
-src/football-api/           API-Football adapter + club/fixture sync scripts
+src/football-api/           football-data.org adapter + club/fixture sync scripts
 src/news/
   sources/*.js               One module per outlet (tuttomercatoweb, kicker, skysports, rmcsport)
   rssSource.js / htmlSource.js  Shared factories: RSS parsing / HTML scraping
@@ -56,6 +61,13 @@ src/news/
 ```
 
 ## Known limitations / things to verify with real internet access
+
+- **API-Football's free plan blocks the current season** (confirmed live:
+  "Free plans do not have access to this season, try from 2022 to 2024").
+  Switched to football-data.org instead, which includes the current season
+  on its free tier. If you'd rather stay on API-Football, its paid "Pro"
+  plan (~€15/mo) removes that restriction — `src/football-api/client.js`
+  would need to be swapped back.
 
 This backend was scaffolded in a sandboxed environment without general
 internet access (only GitHub/npm reachable), so a few things are

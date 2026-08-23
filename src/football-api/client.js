@@ -1,13 +1,16 @@
-// Thin adapter around API-Football (api-sports.io), v3.
-// Kept small and isolated so swapping to football-data.org later only
-// means writing a second adapter with the same call() shape.
-
-const BASE_URL = process.env.API_FOOTBALL_BASE_URL || 'https://v3.football.api-sports.io';
+// Thin adapter around football-data.org's v4 API.
+//
+// Switched from API-Football: its free plan blocks the current season
+// ("Free plans do not have access to this season, try from 2022 to 2024"),
+// which makes it useless for tracking live fixtures. football-data.org's
+// free tier (10 req/min) includes the current season for all four of our
+// leagues, per the briefing's named fallback option.
+const BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://api.football-data.org/v4';
 
 async function call(path, params = {}) {
-  const apiKey = process.env.API_FOOTBALL_KEY;
+  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) {
-    throw new Error('Missing API_FOOTBALL_KEY env var.');
+    throw new Error('Missing FOOTBALL_DATA_API_KEY env var.');
   }
 
   const url = new URL(`${BASE_URL}${path}`);
@@ -16,35 +19,33 @@ async function call(path, params = {}) {
   }
 
   const res = await fetch(url, {
-    headers: { 'x-apisports-key': apiKey },
+    headers: { 'X-Auth-Token': apiKey },
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`API-Football request failed: ${res.status} ${res.statusText} ${body}`);
+    throw new Error(`football-data.org request failed: ${res.status} ${res.statusText} ${body}`);
   }
 
-  const json = await res.json();
-  if (Array.isArray(json.errors) ? json.errors.length : Object.keys(json.errors || {}).length) {
-    throw new Error(`API-Football returned errors: ${JSON.stringify(json.errors)}`);
-  }
-  return json.response;
+  return res.json();
 }
 
-export function getTeams({ leagueId, season }) {
-  return call('/teams', { league: leagueId, season });
+// Returns the current season's teams for a competition (football-data.org
+// defaults to the current season when no `season` query param is given).
+export async function getTeams({ competitionId }) {
+  const data = await call(`/competitions/${competitionId}/teams`);
+  return data.teams;
 }
 
-// `from`/`to` are 'YYYY-MM-DD'. Used to pull the upcoming-fixtures window
-// (Spiele-Tab needs "next matchday" plus a full-calendar fallback).
-export function getFixtures({ leagueId, season, from, to }) {
-  return call('/fixtures', { league: leagueId, season, from, to });
+// `dateFrom`/`dateTo` are 'YYYY-MM-DD'.
+export async function getMatches({ competitionId, dateFrom, dateTo }) {
+  const data = await call(`/competitions/${competitionId}/matches`, { dateFrom, dateTo });
+  return data.matches;
 }
 
-export function getCurrentSeason(referenceDate = new Date()) {
-  // European domestic seasons span two calendar years (Aug-May); API-Football
-  // labels a season by its starting year. Before July, assume last year's start.
-  const year = referenceDate.getUTCFullYear();
-  const month = referenceDate.getUTCMonth() + 1;
-  return month >= 7 ? year : year - 1;
+// Free tier is capped at 10 requests/minute; a small delay between
+// sequential per-league calls keeps a 4-league loop comfortably under that
+// even though 4 requests alone wouldn't hit the limit.
+export function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

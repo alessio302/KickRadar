@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getFixtures, getCurrentSeason } from './client.js';
+import { getMatches, sleep } from './client.js';
 
 const FIXTURE_WINDOW_DAYS = Number(process.env.FIXTURE_WINDOW_DAYS || 21);
 
@@ -8,32 +8,19 @@ function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
-// API-Football rounds look like "Regular Season - 5"; we only need the number.
-function parseMatchday(round) {
-  const match = /(\d+)\s*$/.exec(round || '');
-  return match ? Number(match[1]) : null;
-}
-
 const STATUS_MAP = {
-  NS: 'scheduled',
-  TBD: 'scheduled',
-  '1H': 'live',
-  HT: 'live',
-  '2H': 'live',
-  ET: 'live',
-  P: 'live',
-  LIVE: 'live',
-  FT: 'finished',
-  AET: 'finished',
-  PEN: 'finished',
-  PST: 'postponed',
-  CANC: 'cancelled',
-  ABD: 'cancelled',
-  AWD: 'finished',
-  WO: 'finished',
+  SCHEDULED: 'scheduled',
+  TIMED: 'scheduled',
+  IN_PLAY: 'live',
+  PAUSED: 'live',
+  FINISHED: 'finished',
+  POSTPONED: 'postponed',
+  SUSPENDED: 'postponed',
+  CANCELLED: 'cancelled',
+  AWARDED: 'finished',
 };
 
-export async function syncFixturesForLeague(supabase, league, season) {
+export async function syncFixturesForLeague(supabase, league) {
   const { data: dbLeague, error: leagueErr } = await supabase
     .from('leagues')
     .select('id')
@@ -43,28 +30,28 @@ export async function syncFixturesForLeague(supabase, league, season) {
 
   const { data: clubs, error: clubsErr } = await supabase
     .from('clubs')
-    .select('id, api_football_id')
+    .select('id, external_team_id')
     .eq('league_id', dbLeague.id);
   if (clubsErr) throw clubsErr;
-  const clubIdByApiId = new Map(clubs.map((c) => [c.api_football_id, c.id]));
+  const clubIdByExternalId = new Map(clubs.map((c) => [c.external_team_id, c.id]));
 
   const from = toDateString(new Date());
   const to = toDateString(new Date(Date.now() + FIXTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
 
-  const fixtures = await getFixtures({ leagueId: league.apiFootballId, season, from, to });
+  const matches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: from, dateTo: to });
 
-  const rows = fixtures
-    .filter((f) => clubIdByApiId.has(f.teams.home.id) && clubIdByApiId.has(f.teams.away.id))
-    .map((f) => ({
+  const rows = matches
+    .filter((m) => clubIdByExternalId.has(m.homeTeam.id) && clubIdByExternalId.has(m.awayTeam.id))
+    .map((m) => ({
       league_id: dbLeague.id,
-      matchday: parseMatchday(f.league.round),
-      home_club_id: clubIdByApiId.get(f.teams.home.id),
-      away_club_id: clubIdByApiId.get(f.teams.away.id),
-      kickoff_at: f.fixture.date,
-      status: STATUS_MAP[f.fixture.status.short] || 'scheduled',
-      home_score: f.goals.home,
-      away_score: f.goals.away,
-      api_football_fixture_id: f.fixture.id,
+      matchday: m.matchday,
+      home_club_id: clubIdByExternalId.get(m.homeTeam.id),
+      away_club_id: clubIdByExternalId.get(m.awayTeam.id),
+      kickoff_at: m.utcDate,
+      status: STATUS_MAP[m.status] || 'scheduled',
+      home_score: m.score?.fullTime?.home ?? null,
+      away_score: m.score?.fullTime?.away ?? null,
+      external_fixture_id: m.id,
       updated_at: new Date().toISOString(),
     }));
 
@@ -72,7 +59,7 @@ export async function syncFixturesForLeague(supabase, league, season) {
 
   const { error } = await supabase
     .from('fixtures')
-    .upsert(rows, { onConflict: 'api_football_fixture_id' });
+    .upsert(rows, { onConflict: 'external_fixture_id' });
   if (error) throw error;
 
   return rows.length;
@@ -80,10 +67,10 @@ export async function syncFixturesForLeague(supabase, league, season) {
 
 export async function syncAllFixtures() {
   const supabase = getSupabaseClient();
-  const season = getCurrentSeason();
   const results = {};
   for (const league of LEAGUES) {
-    results[league.slug] = await syncFixturesForLeague(supabase, league, season);
+    results[league.slug] = await syncFixturesForLeague(supabase, league);
+    await sleep(1500); // stay well under the free tier's 10 req/min
   }
   return results;
 }

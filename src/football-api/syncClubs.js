@@ -1,9 +1,10 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getTeams, getCurrentSeason } from './client.js';
+import { getTeams, sleep } from './client.js';
 
-// Derives a short badge code when API-Football doesn't provide `team.code`
-// (it usually does, e.g. "JUV", "BVB"). Kept deterministic, no randomness.
+// Derives a short badge code when football-data.org doesn't provide a `tla`
+// (three-letter abbreviation, e.g. "JUV", "BVB") for a team. Kept
+// deterministic, no randomness.
 function fallbackShortCode(name) {
   const words = name.replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter(Boolean);
   if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
@@ -14,8 +15,8 @@ function fallbackShortCode(name) {
     .toUpperCase();
 }
 
-export async function syncClubsForLeague(supabase, league, season) {
-  const teams = await getTeams({ leagueId: league.apiFootballId, season });
+export async function syncClubsForLeague(supabase, league) {
+  const teams = await getTeams({ competitionId: league.externalCompetitionId });
 
   const { data: dbLeague, error: leagueErr } = await supabase
     .from('leagues')
@@ -24,11 +25,11 @@ export async function syncClubsForLeague(supabase, league, season) {
     .single();
   if (leagueErr) throw leagueErr;
 
-  const rows = teams.map(({ team }) => ({
+  const rows = teams.map((team) => ({
     league_id: dbLeague.id,
     name: team.name,
-    short_code: (team.code || fallbackShortCode(team.name)).slice(0, 5),
-    api_football_id: team.id,
+    short_code: (team.tla || fallbackShortCode(team.name)).slice(0, 5),
+    external_team_id: team.id,
   }));
 
   const { error } = await supabase
@@ -41,10 +42,10 @@ export async function syncClubsForLeague(supabase, league, season) {
 
 export async function syncAllClubs() {
   const supabase = getSupabaseClient();
-  const season = getCurrentSeason();
   const results = {};
   for (const league of LEAGUES) {
-    results[league.slug] = await syncClubsForLeague(supabase, league, season);
+    results[league.slug] = await syncClubsForLeague(supabase, league);
+    await sleep(1500); // stay well under the free tier's 10 req/min
   }
   return results;
 }
