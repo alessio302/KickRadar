@@ -1,0 +1,20 @@
+{
+  "name": "kickradar-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "KickRadar backend: news scraper, football-data sync, and DB schema.",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "scrape:news": "node --env-file=.env src/news/runNewsScraper.js",
+    "sync:clubs": "node --env-file=.env src/football-api/syncClubs.js",
+    "sync:fixtures": "node --env-file=.env src/football-api/syncFixtures.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "cheerio": "^1.0.0",
+    "rss-parser": "^3.13.0"
+  }
+}
