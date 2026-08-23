@@ -78,7 +78,18 @@ best-effort guesses that should be checked once the GitHub Actions runner
   (`src/news/sources/*.js`) are plausible defaults, not confirmed. If a
   feed 404s or parses oddly, override its URL via the corresponding env var
   (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_RSS_URL`) — no
-  code change needed.
+  code change needed. kicker.de and Sky Sports were confirmed working live
+  (via GitHub Actions) on the first try.
+- **tuttomercatoweb returns 403 from GitHub Actions** even with a correct
+  feed URL and a full browser-like header set (confirmed: the URL itself is
+  valid, Safari recognizes it as a real RSS feed). This looks like bot
+  protection blocking non-browser clients (possibly a Cloudflare
+  JS/TLS-fingerprint challenge), which no HTTP header combination can pass.
+  If the extra headers in `rssSource.js` don't fix it, the remaining
+  options are: fetch it via a headless browser (Playwright) in the GitHub
+  Actions workflow instead of a plain HTTP request, route it through an RSS
+  proxy service, or accept Serie A running without an automated news source
+  for now. Worth a decision with the project owner rather than guessing further.
 - **RMC Sport HTML selectors** (no reliable RSS) are a first guess at the
   site's DOM structure. Override via `RMCSPORT_LIST_URL` /
   `RMCSPORT_ITEM_SELECTOR` / `RMCSPORT_TITLE_SELECTOR` /

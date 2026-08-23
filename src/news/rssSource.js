@@ -1,12 +1,22 @@
 import Parser from 'rss-parser';
 
-// Some outlets (confirmed: tuttomercatoweb, 403) block requests that don't
-// look like a real browser. A plain UA + Accept header is enough to pass.
+// Some outlets (confirmed: tuttomercatoweb, 403) sit behind bot protection
+// that blocks requests not looking like a real browser. UA + Accept alone
+// wasn't enough for tuttomercatoweb (still 403'd from the GitHub Actions
+// runner even with a Chrome UA) -- adding the rest of a typical browser's
+// header set in case it's a basic header-based check rather than something
+// deeper (e.g. Cloudflare's JS/TLS-fingerprint challenge, which no header
+// combination can pass -- see README if this doesn't fix it).
 const parser = new Parser({
   headers: {
     'User-Agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     Accept: 'application/rss+xml, application/xml, text/xml, */*',
+    'Accept-Language': 'en-US,en;q=0.9,it;q=0.8,de;q=0.7',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-Dest': 'document',
+    'Upgrade-Insecure-Requests': '1',
   },
 });
 
