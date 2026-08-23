@@ -85,8 +85,20 @@ function assignDirection(title, clubHits, sourceKey) {
 // essentially never longer than 3 words.
 const MAX_NAME_WORDS = 3;
 
-function guessPlayerName(title, clubHits) {
+// Section/category labels that show up capitalized right next to a real
+// name once punctuation is stripped (e.g. "Mercato: Konsa..." -> "Mercato"
+// and "Konsa" look like one 2-word run once the colon is gone) but are
+// never themselves part of a player's name. Confirmed live per source.
+const NAME_STOPWORDS = {
+  tuttomercatoweb: ['Calciomercato', 'Ufficiale'],
+  kicker: ['Transfermarkt', 'Ticker'],
+  skysports: ['Transfer', 'Centre'],
+  rmcsport: ['Mercato', 'Exclusivité', 'Info'],
+};
+
+function guessPlayerName(title, clubHits, sourceKey) {
   const clubSpans = clubHits.map((h) => normalize(h.club.name));
+  const stopwords = new Set((NAME_STOPWORDS[sourceKey] || []).map(normalize));
   const words = title.split(/\s+/);
   let best = [];
   let current = [];
@@ -100,7 +112,8 @@ function guessPlayerName(title, clubHits) {
     const clean = word.replace(/[^\p{L}'-]/gu, '');
     const isCapitalized = /^[A-ZÀ-Ý]/.test(clean);
     const isClubWord = clubSpans.some((span) => span.includes(normalize(clean)) && clean.length > 2);
-    if (isCapitalized && clean.length > 1 && !isClubWord) {
+    const isStopword = stopwords.has(normalize(clean));
+    if (isCapitalized && clean.length > 1 && !isClubWord && !isStopword) {
       current.push(clean);
     } else {
       flush();
@@ -122,7 +135,7 @@ export function extractTransferInfo(title, clubs, sourceKey) {
     toClub = clubHits[0].club.name;
   }
 
-  const playerName = guessPlayerName(title, clubHits);
+  const playerName = guessPlayerName(title, clubHits, sourceKey);
 
   return { playerName, fromClub, toClub };
 }

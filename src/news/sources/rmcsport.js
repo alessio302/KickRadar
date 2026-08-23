@@ -27,11 +27,18 @@ const base = createHtmlSource({
 //    "18/08 FootballMercato: Djibril Sidibé signe..." -- stripped so the
 //    stored summary and the name-extraction heuristic both see just the
 //    real headline.
-// 2. Section nav links ("Tout le mercato Bundesliga", "Tout le mercato
-//    Serie A", ...) match the same selector as real articles but aren't
-//    articles at all -- dropped entirely.
+// 2. Section nav links ("Tout le mercato Bundesliga", "Mercato Serie A",
+//    "Mercato LaLiga", ...) match the same selector as real articles but
+//    aren't articles at all -- dropped entirely. Real article titles from
+//    this source always contain a ':' separator ("Mercato: ...", "Paris FC
+//    / Mercato : ..."); nav links never do, which is what tells them apart
+//    (both start with the same "(Tout le )?mercato" prefix otherwise).
 const BOILERPLATE_PREFIX = /^\d{2}\/\d{2}\s*Football(?:Mercato|Info RMC Sport\.?|La)?:?\s*/i;
-const NAV_LINK_PATTERN = /^Tout le mercato\b/i;
+const NAV_LINK_PATTERN = /^(Tout le )?mercato\b/i;
+
+function isNavLink(title) {
+  return NAV_LINK_PATTERN.test(title) && !title.includes(':');
+}
 
 function cleanText(text) {
   return text.replace(BOILERPLATE_PREFIX, '').trim();
@@ -42,7 +49,7 @@ export default {
   async fetchLatest() {
     const items = await base.fetchLatest();
     return items
-      .filter((item) => !NAV_LINK_PATTERN.test(item.title))
+      .filter((item) => !isNavLink(item.title))
       .map((item) => ({
         ...item,
         title: cleanText(item.title),
