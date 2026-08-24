@@ -106,36 +106,44 @@ export default function App() {
         danger: '#B23A2E',
       };
 
-  // Fixed, not sticky: confirmed live, the bottom nav (previously sticky)
-  // would sometimes disappear while scrolling -- iOS Safari's dynamic
-  // toolbar (address bar) resizes the visual viewport as it shows/hides,
-  // which position: sticky doesn't track reliably. position: fixed anchors
-  // both bars to the actual viewport instead, immune to that. Centered
-  // independently to the same max-width as the scrolling column, since a
-  // fixed element no longer inherits width/centering from its parent.
-  // env(safe-area-inset-*): the header sits under the notch/Dynamic Island
-  // and the nav under the home indicator otherwise (viewport-fit=cover in
-  // index.html opts into content extending under both).
-  const fixedBarStyle = { maxWidth: '420px', width: '100%', left: '50%', transform: 'translateX(-50%)' };
-
+  // App-shell layout: the page itself never scrolls (html/body/#root are
+  // pinned to 100% height, see index.html), only the content area between
+  // header and bottom nav does (flex: 1, overflowY: auto below). Confirmed
+  // live: position: fixed with hand-tuned padding to compensate wasn't
+  // reliable either -- the header still disappeared on scroll. This is the
+  // standard "app shell" layout instead: header and nav are just normal
+  // flex children with fixed (shrink-proof) height, so there's nothing for
+  // scroll position to affect them at all, no padding math needed to keep
+  // content from sliding under them, and no viewport-resize interaction to
+  // account for. env(safe-area-inset-*): header sits under the notch/
+  // Dynamic Island and the nav under the home indicator otherwise
+  // (viewport-fit=cover in index.html opts into content extending under
+  // both).
   return (
-    <div style={{ background: theme.bg, minHeight: '100vh', color: theme.text, fontFamily: 'sans-serif', maxWidth: '420px', margin: '0 auto' }}>
+    <div
+      style={{
+        background: theme.bg,
+        height: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        color: theme.text,
+        fontFamily: 'sans-serif',
+        maxWidth: '420px',
+        margin: '0 auto',
+      }}
+    >
       <div
         style={{
-          ...fixedBarStyle,
-          position: 'fixed',
-          top: 0,
-          zIndex: 10,
+          flexShrink: 0,
           borderBottom: `1px solid ${theme.border}`,
           padding: '18px 16px 14px',
           paddingTop: 'calc(18px + env(safe-area-inset-top))',
-          background: theme.bg,
         }}
       >
         <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, textTransform: 'uppercase' }}>KickRadar</h1>
       </div>
 
-      <div style={{ paddingTop: 'calc(60px + env(safe-area-inset-top))' }}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {tab === 'transfers' && (
           <TransfersTab
             theme={theme}
@@ -166,7 +174,7 @@ export default function App() {
         )}
       </div>
 
-      <div style={{ ...fixedBarStyle, position: 'fixed', bottom: 0, zIndex: 10 }}>
+      <div style={{ flexShrink: 0 }}>
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} />
       </div>
     </div>

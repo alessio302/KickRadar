@@ -38,7 +38,7 @@ export default function TransfersTab({
   }, [transfers, activeFilter]);
 
   return (
-    <div style={{ padding: '14px 16px 90px' }}>
+    <div style={{ padding: '14px 16px' }}>
       <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
       <QuickFilters

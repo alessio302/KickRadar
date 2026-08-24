@@ -40,7 +40,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
   const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
 
   return (
-    <div style={{ padding: '14px 16px 90px' }}>
+    <div style={{ padding: '14px 16px' }}>
       <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
       <div

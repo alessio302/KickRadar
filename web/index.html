@@ -6,6 +6,17 @@
     <meta name="theme-color" content="#954730" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>KickRadar</title>
+    <style>
+      /* App-shell layout (see App.jsx): only the content area between
+         header and bottom nav scrolls, not the page itself. Needs
+         html/body/#root to actually fill the viewport height with no
+         default margin, or the browser's own UA stylesheet (body has an
+         8px margin by default) adds page-level scroll of its own. */
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
