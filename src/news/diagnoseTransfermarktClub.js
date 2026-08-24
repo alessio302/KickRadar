@@ -17,18 +17,36 @@ function quickSearchUrl(playerName) {
 }
 
 async function fetchHtml(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': BROWSER_UA } });
-  console.log(`GET ${url} -> ${res.status} ${res.statusText}`);
-  return res.text();
+  const res = await fetch(url, { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html' } });
+  const text = await res.text();
+  console.log(`GET ${url} -> ${res.status} ${res.statusText}, body length: ${text.length}`);
+  console.log('  headers:', JSON.stringify(Object.fromEntries(res.headers.entries())));
+  return text;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function main() {
+  console.log('Baseline fetch of the transfermarkt.de homepage (to check if a 202 is site-wide bot mitigation):');
+  await fetchHtml(TRANSFERMARKT_BASE);
+
   const playerName = 'Facundo Medina';
-  const searchHtml = await fetchHtml(quickSearchUrl(playerName));
-  const $search = cheerio.load(searchHtml);
-  const profileHref = $search('a[href*="/profil/spieler/"]').first().attr('href');
+  let searchHtml = await fetchHtml(quickSearchUrl(playerName));
+  let $search = cheerio.load(searchHtml);
+  let profileHref = $search('a[href*="/profil/spieler/"]').first().attr('href');
+
   if (!profileHref) {
-    console.log('No profile link found in search results -- dumping first 3000 chars of search page:');
+    console.log('No profile link on first try -- waiting 5s and retrying once (rule out a transient block)...');
+    await sleep(5000);
+    searchHtml = await fetchHtml(quickSearchUrl(playerName));
+    $search = cheerio.load(searchHtml);
+    profileHref = $search('a[href*="/profil/spieler/"]').first().attr('href');
+  }
+
+  if (!profileHref) {
+    console.log('Still no profile link -- dumping first 3000 chars of search page:');
     console.log(searchHtml.slice(0, 3000));
     return;
   }
