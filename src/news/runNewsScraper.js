@@ -7,6 +7,7 @@ import { extractTransferInfo } from './extract.js';
 import { llmExtractTransferInfo } from './llmExtract.js';
 import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
+import { normalize } from '../util/normalize.js';
 
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
 import kicker from './sources/kicker.js';
@@ -125,6 +126,37 @@ async function scrapeLeague(supabase, league) {
       }
     }
 
+    // Cross-check direction against football-data.org's synced squad data
+    // (see squad_memberships / syncSquads.js) -- the actual source of truth
+    // for which club a player really plays for, rather than trusting
+    // whichever of two independent articles about the same player got the
+    // direction right. Confirmed live: two RMC Sport stories had Facundo
+    // Medina going both Marseille->Leverkusen and Leverkusen->Marseille at
+    // once. Only acts when both sides already resolved to a real club and
+    // the squad lookup is unambiguous (exactly one match) -- with no clean
+    // signal, the extracted direction is left as-is rather than guessed at.
+    let resolvedFromClub = fromClub;
+    let resolvedToClub = toClub;
+    let resolvedFromMatch = fromClubMatch;
+    let resolvedToMatch = toClubMatch;
+    if (playerName && fromClubMatch && toClubMatch) {
+      const { data: squadRows, error: squadErr } = await supabase
+        .from('squad_memberships')
+        .select('club_id')
+        .eq('normalized_name', normalize(playerName))
+        .limit(2);
+      if (squadErr) {
+        console.error(`[${league.slug}] squad lookup failed:`, squadErr.message);
+      } else if (squadRows.length === 1 && squadRows[0].club_id === toClubMatch.id) {
+        // The extracted story has the player leaving for the club they're
+        // actually already at -- backwards. Flip it.
+        resolvedFromClub = toClub;
+        resolvedToClub = fromClub;
+        resolvedFromMatch = toClubMatch;
+        resolvedToMatch = fromClubMatch;
+      }
+    }
+
     const { error: upsertErr } = await supabase
       .from('transfers')
       .upsert(
@@ -132,10 +164,10 @@ async function scrapeLeague(supabase, league) {
           league_id: dbLeague.id,
           player_id: playerId,
           player_name: playerName,
-          from_club: fromClubMatch?.name ?? fromClub,
-          to_club: toClubMatch?.name ?? toClub,
-          from_club_id: fromClubMatch?.id ?? null,
-          to_club_id: toClubMatch?.id ?? null,
+          from_club: resolvedFromMatch?.name ?? resolvedFromClub,
+          to_club: resolvedToMatch?.name ?? resolvedToClub,
+          from_club_id: resolvedFromMatch?.id ?? null,
+          to_club_id: resolvedToMatch?.id ?? null,
           is_official: isOfficial,
           source: league.newsSource,
           source_url: item.link,
