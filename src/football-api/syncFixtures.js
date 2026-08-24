@@ -3,6 +3,12 @@ import { LEAGUES } from '../config/leagues.js';
 import { getMatches, sleep } from './client.js';
 
 const FIXTURE_WINDOW_DAYS = Number(process.env.FIXTURE_WINDOW_DAYS || 21);
+// A matchday can span several days (typically Fri-Mon); syncing strictly
+// from "today" forward means a game that already happened earlier in the
+// current matchday is never fetched at all -- confirmed live (Inter-Monza
+// missing from Serie A's "current matchday" view even though the rest of
+// that same round was there). Reaching a few days back covers that.
+const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 5);
 
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
@@ -35,7 +41,7 @@ export async function syncFixturesForLeague(supabase, league) {
   if (clubsErr) throw clubsErr;
   const clubIdByExternalId = new Map(clubs.map((c) => [c.external_team_id, c.id]));
 
-  const from = toDateString(new Date());
+  const from = toDateString(new Date(Date.now() - FIXTURE_PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000));
   const to = toDateString(new Date(Date.now() + FIXTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
 
   const matches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: from, dateTo: to });
