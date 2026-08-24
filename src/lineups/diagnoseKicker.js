@@ -8,9 +8,12 @@
 // community-maintained Python wrapper) -- confirmed to exist in real,
 // working code, but never exercised against the live API from here (this
 // sandbox can't reach kicker.de at all; only a GitHub Actions runner can).
-// Regex-based extraction here is deliberately crude rather than using a
-// real XML parser, since the goal is only to see the real raw shape, not
-// to build anything durable yet.
+//
+// Confirmed live (first run): the XML uses attributes, not child elements
+// (`<league id="1" longName="Bundesliga" urlName="bundesliga" ... />`),
+// and Bundesliga's currentSeasonId is "2026/27" -- which contains a slash
+// that must be URL-encoded before going into a path segment, or it splits
+// into an extra path component.
 const BASE_URL = 'https://ovsyndication.kicker.de/API/universal/3.0';
 
 async function apiGet(path) {
@@ -22,8 +25,8 @@ async function apiGet(path) {
   return { ok: res.ok, status: res.status, text };
 }
 
-function extractTag(block, tag) {
-  return block.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1];
+function attr(block, name) {
+  return block.match(new RegExp(`${name}="([^"]*)"`))?.[1];
 }
 
 async function main() {
@@ -31,31 +34,39 @@ async function main() {
   console.log('--- LeagueListHome/3 raw (first 4000 chars) ---');
   console.log(leaguesResp.text.slice(0, 4000));
 
-  const leagueBlocks = leaguesResp.text.split('<league>').slice(1);
+  const leagueBlocks = leaguesResp.text.split('<league ').slice(1);
   const bundesligaBlock = leagueBlocks.find(
-    (b) => /<longName>Bundesliga<\/longName>/i.test(b) || /<urlName>bundesliga<\/urlName>/i.test(b)
+    (b) => /longName="Bundesliga"/.test(b) || /urlName="bundesliga"/.test(b)
   );
   if (!bundesligaBlock) {
     console.log('Could not find a "Bundesliga" entry via simple text match -- inspect the raw dump above manually.');
     return;
   }
 
-  const leagueId = extractTag(bundesligaBlock, 'id');
-  const seasonId = extractTag(bundesligaBlock, 'currentSeasonId');
+  const leagueId = attr(bundesligaBlock, 'id');
+  const seasonId = attr(bundesligaBlock, 'currentSeasonId');
   console.log('Found Bundesliga entry:', {
     id: leagueId,
     currentSeasonId: seasonId,
-    longName: extractTag(bundesligaBlock, 'longName'),
-    urlName: extractTag(bundesligaBlock, 'urlName'),
+    longName: attr(bundesligaBlock, 'longName'),
+    urlName: attr(bundesligaBlock, 'urlName'),
   });
   if (!leagueId || !seasonId) return;
 
-  const seasonResp = await apiGet(`LeagueSeasonInfo/3/ligid/${leagueId}/saison/${seasonId}`);
-  console.log('--- LeagueSeasonInfo raw (first 5000 chars) ---');
-  console.log(seasonResp.text.slice(0, 5000));
+  const seasonResp = await apiGet(
+    `LeagueSeasonInfo/3/ligid/${leagueId}/saison/${encodeURIComponent(seasonId)}`
+  );
+  console.log('--- LeagueSeasonInfo raw (first 6000 chars) ---');
+  console.log(seasonResp.text.slice(0, 6000));
 
-  const firstTeamId = seasonResp.text.match(/<teams>[\s\S]*?<team>[\s\S]*?<id>(\d+)<\/id>/)?.[1];
-  console.log('First team id found in teams list:', firstTeamId);
+  const teamBlocks = seasonResp.text.split('<team ').slice(1);
+  console.log(`Found ${teamBlocks.length} <team> blocks. First 5 teams:`);
+  for (const block of teamBlocks.slice(0, 5)) {
+    console.log({ id: attr(block, 'id'), shortName: attr(block, 'shortName'), longName: attr(block, 'longName') });
+  }
+
+  const firstTeamId = teamBlocks.length > 0 ? attr(teamBlocks[0], 'id') : undefined;
+  console.log('Using first team id for MyTeamSync test:', firstTeamId);
   if (!firstTeamId) return;
 
   const syncResp = await apiGet(`MyTeamSync/3/vrnid/${firstTeamId}`);
