@@ -55,28 +55,44 @@ async function fixDirections(supabase) {
 
   console.log(`Phase 2: checking ${transfers.length} transfers with both clubs and a resolved player...`);
 
+  const { data: allClubs, error: allClubsErr } = await supabase.from('clubs').select('id, name');
+  if (allClubsErr) throw allClubsErr;
+  const clubNameById = new Map(allClubs.map((c) => [c.id, c.name]));
+
   let flipped = 0;
   let skippedNoSignal = 0;
 
   for (const t of transfers) {
     const normalizedName = t.players?.normalized_name;
-    if (!normalizedName) continue;
+    console.log(`\n#${t.id} "${t.player_name}" (normalized: "${normalizedName}"): "${t.from_club}" -> "${t.to_club}"`);
+    if (!normalizedName) {
+      console.log('  no players row linked, skipping');
+      continue;
+    }
 
     const { data: squadRows, error: squadErr } = await supabase
       .from('squad_memberships')
       .select('club_id')
       .eq('normalized_name', normalizedName)
-      .limit(2);
+      .limit(3);
     if (squadErr) {
-      console.error(`Squad lookup failed for "${t.player_name}":`, squadErr.message);
+      console.error(`  squad lookup failed:`, squadErr.message);
       continue;
     }
+    console.log(
+      `  squad match: ${squadRows.length} row(s) ->`,
+      squadRows.map((r) => clubNameById.get(r.club_id) ?? r.club_id)
+    );
     if (squadRows.length !== 1) {
       skippedNoSignal += 1; // not in any synced squad, or ambiguous -- leave as-is
       continue;
     }
 
     const actualClubId = squadRows[0].club_id;
+    if (actualClubId !== t.from_club_id && actualClubId !== t.to_club_id) {
+      console.log(`  real club is neither side of this story (a third club) -- leaving as-is, not something this pass corrects`);
+      continue;
+    }
     if (actualClubId === t.to_club_id && actualClubId !== t.from_club_id) {
       console.log(`Flipping #${t.id} ${t.player_name}: "${t.from_club} -> ${t.to_club}" becomes "${t.to_club} -> ${t.from_club}"`);
       const { error: updateErr } = await supabase
