@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { ArrowRightCircle, User, ExternalLink } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import QuickFilters from './QuickFilters.jsx';
-import ClubBadge from './ClubBadge.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
 
@@ -32,8 +31,6 @@ export default function TransfersTab({
 }) {
   const { clubs } = useClubs(league);
   const { transfers, loading } = useTransfers(league, { officialOnly });
-
-  const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
@@ -130,19 +127,9 @@ export default function TransfersTab({
             <p style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 6px' }}>{t.player_name ?? t.summary}</p>
             {(t.from_club || t.to_club) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                {t.from_club && (
-                  <>
-                    <ClubBadge club={clubsById.get(t.from_club_id)} size={20} />
-                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club}</span>
-                  </>
-                )}
-                {t.from_club && t.to_club && <ArrowRightCircle size={13} style={{ color: theme.textMuted, margin: '0 2px' }} />}
-                {t.to_club && (
-                  <>
-                    <ClubBadge club={clubsById.get(t.to_club_id)} size={20} />
-                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.to_club}</span>
-                  </>
-                )}
+                {t.from_club && <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club}</span>}
+                <ArrowRightCircle size={13} style={{ color: theme.textMuted, margin: '0 2px', flex: '0 0 auto' }} />
+                {t.to_club && <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.to_club}</span>}
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
