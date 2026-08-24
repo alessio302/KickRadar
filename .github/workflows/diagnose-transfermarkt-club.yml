@@ -1,0 +1,21 @@
+name: Diagnose transfermarkt current-club markup
+
+# One-off diagnostic (see src/news/diagnoseTransfermarktClub.js) -- manual
+# trigger only. Checks whether/how a player's transfermarkt.de profile
+# page exposes their current club, to build a more reliable
+# current-club check than football-data.org's free-tier squad data.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseTransfermarktClub.js
