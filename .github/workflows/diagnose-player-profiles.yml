@@ -1,0 +1,24 @@
+name: Diagnose player profile resolution
+
+# One-off diagnostic (see src/news/diagnosePlayerProfiles.js) -- manual
+# trigger only. Checks how many stored players actually got a real
+# transfermarkt.de profile URL vs. a search-page fallback, following up
+# on transfermarkt.de now being behind AWS WAF Bot Control.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnosePlayerProfiles.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
