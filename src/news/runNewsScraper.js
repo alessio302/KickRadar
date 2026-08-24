@@ -4,6 +4,7 @@ import { LEAGUES } from '../config/leagues.js';
 import { classifyOfficial } from './classify.js';
 import { isTransferRelevant } from './relevance.js';
 import { extractTransferInfo } from './extract.js';
+import { llmExtractTransferInfo } from './llmExtract.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
@@ -15,6 +16,22 @@ const SOURCES = { tuttomercatoweb, kicker, skysports, rmcsport };
 
 function externalIdFor(item) {
   return createHash('sha256').update(item.guid || item.link).digest('hex');
+}
+
+// LLM extraction is the primary path (see llmExtract.js for why); the regex
+// heuristic only kicks in if the API call itself fails (rate limit, outage,
+// missing key), so a bad run degrades to the old behavior instead of losing
+// the item entirely.
+async function extractInfo(item, clubs, sourceKey) {
+  try {
+    const result = await llmExtractTransferInfo(item.title, item.summary || item.title);
+    return { ...result, source: 'llm' };
+  } catch (err) {
+    console.warn(`[${sourceKey}] LLM extraction failed, falling back to regex heuristic:`, err.message);
+    const isOfficial = classifyOfficial(sourceKey, `${item.title} ${item.summary || ''}`);
+    const { playerName, fromClub, toClub } = extractTransferInfo(item.title, clubs, sourceKey);
+    return { playerName, fromClub, toClub, isOfficial, source: 'regex' };
+  }
 }
 
 async function scrapeLeague(supabase, league) {
@@ -34,20 +51,33 @@ async function scrapeLeague(supabase, league) {
     .eq('league_id', dbLeague.id);
   if (clubsErr) throw clubsErr;
 
+  // Only ever process genuinely new items -- avoids re-running the LLM call
+  // (and the relevance/player-resolution work) on the same ~150 items every
+  // hourly run just because they're still in the source's latest-20/N list.
+  const { data: existingRows, error: existingErr } = await supabase
+    .from('transfers')
+    .select('external_id')
+    .eq('source', league.newsSource);
+  if (existingErr) throw existingErr;
+  const knownIds = new Set(existingRows.map((r) => r.external_id));
+
   const items = await source.fetchLatest();
   let inserted = 0;
   let skipped = 0;
 
   for (const item of items) {
-    const text = `${item.title} ${item.summary || ''}`;
+    const externalId = externalIdFor(item);
+    if (knownIds.has(externalId)) {
+      continue; // already stored from a previous run, nothing to do
+    }
 
+    const text = `${item.title} ${item.summary || ''}`;
     if (!isTransferRelevant(league.newsSource, text)) {
       skipped += 1;
       continue;
     }
 
-    const isOfficial = classifyOfficial(league.newsSource, text);
-    const { playerName, fromClub, toClub } = extractTransferInfo(item.title, clubs, league.newsSource);
+    const { playerName, fromClub, toClub, isOfficial } = await extractInfo(item, clubs, league.newsSource);
 
     let playerId = null;
     if (playerName) {
@@ -73,7 +103,7 @@ async function scrapeLeague(supabase, league) {
           source_url: item.link,
           summary: item.summary || item.title,
           published_at: item.publishedAt,
-          external_id: externalIdFor(item),
+          external_id: externalId,
         },
         { onConflict: 'source,external_id' }
       );

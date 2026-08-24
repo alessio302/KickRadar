@@ -23,19 +23,25 @@ project briefing for full product scope; this repo covers the backend only
    afterwards instead of re-running `schema.sql`.
 2. **Get a football-data.org key** at [football-data.org/client/register](https://www.football-data.org/client/register)
    (free tier is enough for this project's request volume).
-3. **Local development**: copy `.env.example` to `.env` and fill in
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`.
-4. **Install deps**: `npm install`
-5. **First-time data load** (order matters — fixtures link to clubs):
+3. **Get an Anthropic API key** at [console.anthropic.com](https://console.anthropic.com)
+   — used by the news scraper to extract player/club names from headlines
+   (see "Why an LLM for extraction" below). Optional in the sense that the
+   scraper still runs without it (falls back to a regex heuristic), but
+   extraction quality is much better with it set.
+4. **Local development**: copy `.env.example` to `.env` and fill in
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`,
+   `ANTHROPIC_API_KEY`.
+5. **Install deps**: `npm install`
+6. **First-time data load** (order matters — fixtures link to clubs):
    ```
    npm run sync:clubs
    npm run sync:fixtures
    npm run scrape:news
    ```
-6. **GitHub Actions**: add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
-   `FOOTBALL_DATA_API_KEY` as repository secrets (Settings → Secrets and
-   variables → Actions). The three workflows in `.github/workflows/` then
-   run on their own schedule:
+7. **GitHub Actions**: add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `FOOTBALL_DATA_API_KEY`, and `ANTHROPIC_API_KEY` as repository secrets
+   (Settings → Secrets and variables → Actions). The three workflows in
+   `.github/workflows/` then run on their own schedule:
    - `news-scraper.yml` — hourly
    - `fixtures-sync.yml` — 4x/day
    - `clubs-sync.yml` — daily
@@ -55,15 +61,31 @@ src/news/
   sources/*.js               One module per outlet (tuttomercatoweb, kicker, skysports, rmcsport)
   rssSource.js / htmlSource.js / sitemapSource.js  Shared factories: RSS / HTML scraping / Google News sitemap
   relevance.js                 Per-source keyword gate: is this item transfer news at all?
-  classify.js                  Per-source official-vs-rumor keyword rules (only runs on relevant items)
-  extract.js                   Best-effort player/from-club/to-club extraction from headlines
+  llmExtract.js                 Claude Haiku structured-output extraction (player/clubs/official) -- primary path
+  classify.js / extract.js      Regex fallback for llmExtract.js (only used if the API call fails)
   playerProfileResolver.js     Resolves + caches transfermarkt.de profile links
   runNewsScraper.js            Orchestrates all four sources, upserts into `transfers`
 ```
 
 Pipeline per item: fetch (source-scoped to football, not necessarily transfers only)
-→ `relevance.js` (keyword gate: is this even about a transfer?) → `classify.js`
-(official vs. rumor) → `extract.js` (best-effort player/club names) → upsert.
+→ skip if already in the DB (by `external_id`, avoids reprocessing unchanged
+items every hourly run) → `relevance.js` (keyword gate: is this even about a
+transfer?) → `llmExtract.js` (player/clubs/official, regex fallback on
+failure) → upsert.
+
+### Why an LLM for extraction
+
+`extract.js`'s regex heuristic (player/club names via capitalized-word runs)
+hit a real ceiling in practice: reviewing live scrape output required five
+separate rounds of prefix/stopword patches for RMC Sport alone, and still
+produced garbage like `"MercatoMercato"` or missed club nicknames
+(`"Barça"`) not in the curated alias list. Free-text named-entity extraction
+across four languages is a poor fit for regex but a good fit for a small
+LLM, so `llmExtract.js` calls Claude Haiku (structured outputs via Zod) as
+the primary path, with the regex version kept only as a fallback for when
+the API call itself fails. Cost is small at this volume (only genuinely new
+items are ever processed, see the pipeline above) but not zero — keep an
+eye on usage if a source's volume grows a lot.
 
 ## Known limitations / things to verify with real internet access
 
@@ -93,15 +115,12 @@ internet access) to get right:
   (`/football/transferts/`). Override any of them via env var
   (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_SITEMAP_URL`,
   `RMCSPORT_LIST_URL`) if the site structure changes — no code change needed.
-- **Player/club extraction from headlines** (`src/news/extract.js`) is a
-  language-agnostic heuristic, not NLP. It degrades gracefully: on a miss,
-  `player_name`/`from_club`/`to_club` stay `null` and the raw headline is
-  still stored in `summary`, so no news item is ever dropped — only the
-  structured fields may be incomplete. Confirmed live on real headlines that
-  a run of 4+ capitalized words is almost always noise (headline roundups,
-  unrelated proper nouns in Italian/French sentence-case text), not a
-  truncatable name — those runs are now discarded rather than kept, since
-  real player names are essentially never longer than 3 words.
+- **Player/club extraction** now runs through `llmExtract.js` (Claude
+  Haiku) as the primary path -- see "Why an LLM for extraction" above.
+  `extract.js`'s regex heuristic still exists as the fallback when the API
+  call fails; it degrades gracefully on a miss (`player_name`/`from_club`/
+  `to_club` stay `null`, the raw headline is still stored in `summary`, so
+  no news item is ever dropped).
 - **Transfermarkt profile resolution** (`playerProfileResolver.js`) scrapes
   the public "Schnellsuche" (quick search) results page for the first
   player-profile link. If transfermarkt.de changes that page's markup, the
