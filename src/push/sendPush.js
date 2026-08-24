@@ -11,8 +11,12 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 let configured = false;
 function ensureConfigured() {
   if (configured) return;
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  // .trim(): confirmed live -- a GitHub Actions secret pasted with a
+  // trailing newline makes web-push's own validator reject it ("Vapid
+  // public key must be a URL safe Base 64"), the same class of bug already
+  // hit and fixed for the frontend's VITE_VAPID_PUBLIC_KEY.
+  const publicKey = process.env.VAPID_PUBLIC_KEY?.trim();
+  const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
   if (!publicKey || !privateKey) {
     throw new Error('Missing VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY env vars.');
   }
