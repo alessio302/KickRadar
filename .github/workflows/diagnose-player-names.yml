@@ -1,0 +1,24 @@
+name: Diagnose player names
+
+# One-off diagnostic (see src/news/diagnosePlayerNames.js) -- manual
+# trigger only. Dumps every stored player name to find the garbage
+# entries produced by the now-removed regex-fallback name-guessing
+# heuristic, for a targeted cleanup.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnosePlayerNames.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

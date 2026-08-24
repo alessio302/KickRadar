@@ -77,53 +77,17 @@ function assignDirection(title, clubHits, sourceKey) {
   return { fromClub, toClub };
 }
 
-// Very rough player-name guess: the longest run of capitalized words (2-3
-// words) in the title that isn't part of a recognized club name. Runs
-// longer than 3 words are discarded rather than truncated -- a 4+ word
-// capitalized run is almost always sentence-case noise (headline roundups,
-// unrelated proper nouns), not a truncatable name; real player names are
-// essentially never longer than 3 words.
-const MAX_NAME_WORDS = 3;
-
-// Section/category labels that show up capitalized right next to a real
-// name once punctuation is stripped (e.g. "Mercato: Konsa..." -> "Mercato"
-// and "Konsa" look like one 2-word run once the colon is gone) but are
-// never themselves part of a player's name. Confirmed live per source.
-const NAME_STOPWORDS = {
-  tuttomercatoweb: ['Calciomercato', 'Ufficiale'],
-  kicker: ['Transfermarkt', 'Ticker'],
-  skysports: ['Transfer', 'Centre'],
-  rmcsport: ['Mercato', 'Exclusivité', 'Info'],
-};
-
-function guessPlayerName(title, clubHits, sourceKey) {
-  const clubSpans = clubHits.map((h) => normalize(h.club.name));
-  const stopwords = new Set((NAME_STOPWORDS[sourceKey] || []).map(normalize));
-  const words = title.split(/\s+/);
-  let best = [];
-  let current = [];
-
-  const flush = () => {
-    if (current.length > best.length && current.length <= MAX_NAME_WORDS) best = current;
-    current = [];
-  };
-
-  for (const word of words) {
-    const clean = word.replace(/[^\p{L}'-]/gu, '');
-    const isCapitalized = /^[A-ZÀ-Ý]/.test(clean);
-    const isClubWord = clubSpans.some((span) => span.includes(normalize(clean)) && clean.length > 2);
-    const isStopword = stopwords.has(normalize(clean));
-    if (isCapitalized && clean.length > 1 && !isClubWord && !isStopword) {
-      current.push(clean);
-    } else {
-      flush();
-    }
-  }
-  flush();
-
-  return best.length > 0 ? best.join(' ') : null;
-}
-
+// No player-name guessing here anymore -- confirmed live: the old
+// "longest run of capitalized words" heuristic produced obvious garbage
+// on German headlines ("Frankfurter Abwehrnot", "Scally Gladbachs Start"),
+// since German capitalizes ordinary nouns too, not just proper names, so
+// "capitalized word run" doesn't reliably mean "person's name" the way it
+// does in English. A wrong guessed name is worse than none -- it creates
+// a fake player record and can show a nonsense name on a real transfer
+// card -- and this path only ever runs when the LLM extraction call
+// itself failed (see runNewsScraper.js), so it's rare enough that losing
+// the player name there (the club/official-flag fields still come
+// through) is a fine tradeoff for not fabricating one.
 export function extractTransferInfo(title, clubs, sourceKey) {
   const clubHits = findClubMentions(title, clubs);
 
@@ -135,7 +99,5 @@ export function extractTransferInfo(title, clubs, sourceKey) {
     toClub = clubHits[0].club.name;
   }
 
-  const playerName = guessPlayerName(title, clubHits, sourceKey);
-
-  return { playerName, fromClub, toClub };
+  return { playerName: null, fromClub, toClub };
 }

@@ -152,10 +152,10 @@ export default function TransfersTab({
                     href={t.players.transfermarkt_url}
                     target="_blank"
                     rel="noreferrer"
-                    title="Spielerprofil auf Transfermarkt"
+                    title="Spieler auf Transfermarkt suchen"
                     style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
                   >
-                    <User size={13} /> Profil
+                    <User size={13} /> Spieler suchen
                   </a>
                 )}
                 <a
