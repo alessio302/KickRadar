@@ -20,24 +20,33 @@ const parser = new Parser({
   },
 });
 
-// Shared factory for the three sources that publish RSS (tuttomercatoweb,
-// kicker, Sky Sports). Feed URL is env-overridable per source because the
-// exact feed path can only be confirmed with real internet access to the
-// site (unavailable in this sandbox) -- verify once and set the env var if
-// the default guess is wrong, no code change needed.
+// Shared factory for the RSS-based sources (tuttomercatoweb, kicker). Feed
+// URL is env-overridable per source since the exact feed path/section can
+// only be confirmed with real internet access to the site (unavailable in
+// this sandbox) -- verify once and set the env var if the default guess
+// turns out wrong, no code change needed.
 export function createRssSource({ sourceKey, feedUrlEnvVar, defaultFeedUrl }) {
   return {
     sourceKey,
     async fetchLatest() {
       const feedUrl = process.env[feedUrlEnvVar] || defaultFeedUrl;
       const feed = await parser.parseURL(feedUrl);
-      return feed.items.map((item) => ({
-        title: item.title?.trim() || '',
-        link: item.link,
-        guid: item.guid || item.link,
-        publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-        summary: (item.contentSnippet || item.summary || item.content || '').trim().slice(0, 400),
-      }));
+      return feed.items.map((item) => {
+        // Confirmed live: tuttomercatoweb's section-filtered feed
+        // (?s=calciomercato) returns "." as a description placeholder
+        // instead of leaving it empty. Treat anything that isn't real
+        // prose as empty so callers fall back to the (meaningful) title
+        // instead of storing a single dot as the summary.
+        const rawSummary = (item.contentSnippet || item.summary || item.content || '').trim();
+        const summary = rawSummary.length > 3 ? rawSummary.slice(0, 400) : '';
+        return {
+          title: item.title?.trim() || '',
+          link: item.link,
+          guid: item.guid || item.link,
+          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+          summary,
+        };
+      });
     },
   };
 }
