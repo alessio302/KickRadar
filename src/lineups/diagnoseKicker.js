@@ -33,6 +33,16 @@ const API_BASE_URL = 'https://ovsyndication.kicker.de/API/universal/3.0';
 const SITE_BASE_URL = 'https://www.kicker.de';
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const BROWSER_HEADERS = {
+  'User-Agent': BROWSER_UA,
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+};
 
 async function apiGet(path) {
   const res = await fetch(`${API_BASE_URL}/${path}`, {
@@ -73,17 +83,14 @@ function parseMatches(xml) {
 
 async function tryFetchPage(url) {
   try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html' },
-      redirect: 'manual',
-    });
+    const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: 'manual' });
     const text = await res.text();
     const location = res.headers.get('location');
     console.log(`  ${res.status} ${res.statusText}${location ? ` -> redirect: ${location}` : ''} (${url})`);
-    if (res.status === 200) {
-      const hasAufstellung = /ufstellung/i.test(text);
-      console.log(`    contains "ufstellung": ${hasAufstellung}, length: ${text.length}`);
-    }
+    console.log('    headers:', JSON.stringify(Object.fromEntries(res.headers.entries())));
+    const hasAufstellung = /ufstellung/i.test(text);
+    console.log(`    contains "ufstellung": ${hasAufstellung}, length: ${text.length}`);
+    console.log('    body snippet:', text.slice(0, 800).replace(/\s+/g, ' '));
   } catch (err) {
     console.log(`  fetch failed for ${url}: ${err.message}`);
   }
@@ -139,6 +146,9 @@ async function main() {
     `${SITE_BASE_URL}/${home}-gegen-${guest}-${matchId}/aufstellung`,
     `${SITE_BASE_URL}/${home}-gegen-${guest}-${seasonStartYear}-${league}-${matchId}`,
   ];
+  console.log('Baseline fetch of the kicker.de homepage (to check if 202 is site-wide bot mitigation):');
+  await tryFetchPage(SITE_BASE_URL);
+
   console.log('Trying candidate URLs:');
   for (const url of candidates) {
     await tryFetchPage(url);
