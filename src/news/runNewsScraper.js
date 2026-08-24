@@ -55,12 +55,19 @@ async function scrapeLeague(supabase, league) {
   // Only ever process genuinely new items -- avoids re-running the LLM call
   // (and the relevance/player-resolution work) on the same ~150 items every
   // hourly run just because they're still in the source's latest-20/N list.
-  const { data: existingRows, error: existingErr } = await supabase
-    .from('transfers')
+  //
+  // Tracked via seen_news_items, not the transfers table: an item that gets
+  // extracted but then rejected (e.g. neither club belongs to this league,
+  // see 005) never becomes a transfers row, so checking transfers alone
+  // meant a rejected item would be re-fetched and re-run through the LLM on
+  // every future run forever -- confirmed live, this is what made a run
+  // balloon past 11 minutes after a batch of bad rows got cleaned up.
+  const { data: seenRows, error: seenErr } = await supabase
+    .from('seen_news_items')
     .select('external_id')
     .eq('source', league.newsSource);
-  if (existingErr) throw existingErr;
-  const knownIds = new Set(existingRows.map((r) => r.external_id));
+  if (seenErr) throw seenErr;
+  const knownIds = new Set(seenRows.map((r) => r.external_id));
 
   const items = await source.fetchLatest();
   let inserted = 0;
@@ -79,6 +86,14 @@ async function scrapeLeague(supabase, league) {
     }
 
     const { playerName, fromClub, toClub, isOfficial } = await extractInfo(item, clubs, league.newsSource);
+
+    // Mark as seen right after paying the LLM cost, regardless of what
+    // happens below -- an item rejected for an unrelated league (or a
+    // failed transfers upsert) must never be re-extracted on the next run.
+    const { error: markSeenErr } = await supabase
+      .from('seen_news_items')
+      .upsert({ source: league.newsSource, external_id: externalId }, { onConflict: 'source,external_id' });
+    if (markSeenErr) console.error(`[${league.slug}] failed to record seen item:`, markSeenErr.message);
 
     // Resolve to our curated club table when possible -- normalizes naming
     // ("OM" and "Olympique de Marseille" both become the same canonical
