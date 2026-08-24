@@ -1,5 +1,27 @@
 import { normalize } from '../util/normalize.js';
 
+// Casual media references routinely drop a club's founding-year/number
+// token even when it sits in the middle of the name, not just at the end
+// ("Bayer Leverkusen" for official "Bayer 04 Leverkusen") -- confirmed
+// live: this broke plain substring matching in both directions (neither
+// string contains the other once "04" sits between "bayer" and
+// "leverkusen"), which meant Facundo Medina's Bundesliga side never
+// resolved to a club_id at all. Stripping standalone number tokens before
+// a second comparison pass tolerates that without loosening the actual
+// word-boundary matching.
+function stripNumbers(text) {
+  return text.replace(/\b\d+\b/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function namesMatch(candidate, candidateNoNum, normName) {
+  if (candidate === normName || candidate.includes(normName) || normName.includes(candidate)) {
+    return true;
+  }
+  const normNameNoNum = stripNumbers(normName);
+  if (candidateNoNum.length < 3 || normNameNoNum.length < 3) return false;
+  return candidateNoNum === normNameNoNum || candidateNoNum.includes(normNameNoNum) || normNameNoNum.includes(candidateNoNum);
+}
+
 // Resolves a free-text club name (from LLM/regex extraction) against the
 // league's curated `clubs` table, so from_club/to_club can carry a real FK
 // (badges, filtering) instead of being free-standing text that's
@@ -15,13 +37,14 @@ export function resolveClub(candidateName, clubs) {
   if (!candidateName) return null;
   const candidate = normalize(candidateName);
   if (candidate.length < 3) return null; // too short to match safely (e.g. "OM")
+  const candidateNoNum = stripNumbers(candidate);
 
   for (const club of clubs) {
     const names = [club.name, ...(club.aliases || [])];
     for (const name of names) {
       const normName = normalize(name);
       if (normName.length < 3) continue;
-      if (candidate === normName || candidate.includes(normName) || normName.includes(candidate)) {
+      if (namesMatch(candidate, candidateNoNum, normName)) {
         return club;
       }
     }
