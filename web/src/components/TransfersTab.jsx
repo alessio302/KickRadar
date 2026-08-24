@@ -127,9 +127,21 @@ export default function TransfersTab({
             <p style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 6px' }}>{t.player_name ?? t.summary}</p>
             {(t.from_club || t.to_club) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                {t.from_club && <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club}</span>}
-                <ArrowRightCircle size={13} style={{ color: theme.textMuted, margin: '0 2px', flex: '0 0 auto' }} />
-                {t.to_club && <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.to_club}</span>}
+                {/* Arrow only when both sides are known -- confirmed live that a
+                    lone club can be misdirected by the extraction (a "sale"
+                    story mislabels the player's *current* club as the
+                    destination), so asserting a direction from one club alone
+                    can actively mislead. A bare, arrow-less name is neutral
+                    context instead of a (possibly wrong) directional claim. */}
+                {t.from_club && t.to_club ? (
+                  <>
+                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club}</span>
+                    <ArrowRightCircle size={13} style={{ color: theme.textMuted, margin: '0 2px', flex: '0 0 auto' }} />
+                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.to_club}</span>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club ?? t.to_club}</span>
+                )}
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
