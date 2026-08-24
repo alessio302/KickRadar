@@ -25,12 +25,14 @@ const RESPONSE_SCHEMA = {
     fromClub: {
       type: Type.STRING,
       nullable: true,
-      description: 'The club the player is leaving, or null if not stated/unclear.',
+      description:
+        "The player's current club (the one they'd be leaving), or null if not stated/unclear. This includes \"club X wants to sell/is open to selling player\" stories with no named buyer -- that's still fromClub = X, toClub = null, NOT toClub = X.",
     },
     toClub: {
       type: Type.STRING,
       nullable: true,
-      description: 'The club the player is joining, or null if not stated/unclear.',
+      description:
+        'The new/destination club the player would join, or null if no specific destination is named. Never the club the player is already at.',
     },
     isOfficial: {
       type: Type.BOOLEAN,
@@ -40,7 +42,9 @@ const RESPONSE_SCHEMA = {
   required: ['playerName', 'fromClub', 'toClub', 'isOfficial'],
 };
 
-const SYSTEM_INSTRUCTION = `You extract structured data from a single football (soccer) transfer-market news headline and summary, written in Italian, German, English, or French. Use the names as they commonly appear in football media (don't translate them). If the story isn't really about one specific player's transfer (e.g. it's a roundup of several players, a match report, an interview with no transfer content), set playerName, fromClub, and toClub to null and isOfficial to false.`;
+const SYSTEM_INSTRUCTION = `You extract structured data from a single football (soccer) transfer-market news headline and summary, written in Italian, German, English, or French. Use the names as they commonly appear in football media (don't translate them). If the story isn't really about one specific player's transfer (e.g. it's a roundup of several players, a match report, an interview with no transfer content), set playerName, fromClub, and toClub to null and isOfficial to false.
+
+Be careful with direction: when a headline is about a club selling, being open to selling, or trying to offload a player -- with no specific buying club named -- that club is fromClub, never toClub, even though it's the only club mentioned. toClub is exclusively the destination the player would move to.`;
 
 let client;
 function getClient() {
