@@ -10,6 +10,14 @@ const PAGE_SIZE = 50;
 // constraint name to disambiguate in an embedded select. Resolving the club
 // objects client-side against an already-fetched clubs list (see useClubs)
 // avoids depending on that.
+//
+// Only rows with a resolved player_name are shown: confirmed live, without
+// this filter the feed fills up with roundup/commentary articles the
+// backend correctly left player_name null for (no single identifiable
+// transfer) -- e.g. daily mercato roundups, transfer-ticker hub pages,
+// team-analysis pieces mentioning several players. Those aren't "a
+// transfer", so they don't belong in a transfer feed even though the
+// relevance filter (deliberately broad, backend-side) let them through.
 export function useTransfers(leagueSlug, { officialOnly } = {}) {
   const leagueId = useLeagueId(leagueSlug);
   const [transfers, setTransfers] = useState([]);
@@ -26,6 +34,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
         'id, player_name, from_club, to_club, from_club_id, to_club_id, is_official, source, source_url, summary, published_at, players(transfermarkt_url)'
       )
       .eq('league_id', leagueId)
+      .not('player_name', 'is', null)
       .order('published_at', { ascending: false })
       .limit(PAGE_SIZE);
 
