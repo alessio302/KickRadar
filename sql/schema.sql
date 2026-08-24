@@ -43,6 +43,8 @@ create table if not exists transfers (
   player_name text,                     -- best-effort extraction from the headline, nullable
   from_club text,
   to_club text,
+  from_club_id int references clubs(id), -- set when from_club matched a curated club, else null
+  to_club_id int references clubs(id),   -- set when to_club matched a curated club, else null
   is_official boolean not null default false,
   source text not null,                 -- 'tuttomercatoweb' | 'kicker' | 'skysports' | 'rmcsport'
   source_url text not null,
@@ -54,6 +56,8 @@ create table if not exists transfers (
 );
 create index if not exists idx_transfers_league_published on transfers(league_id, published_at desc);
 create index if not exists idx_transfers_official on transfers(league_id, is_official);
+create index if not exists idx_transfers_from_club on transfers(from_club_id);
+create index if not exists idx_transfers_to_club on transfers(to_club_id);
 
 -- Upcoming fixtures, synced from the football data API.
 create table if not exists fixtures (

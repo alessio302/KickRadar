@@ -64,6 +64,7 @@ src/news/
   relevance.js                 Per-source keyword gate: is this item transfer news at all?
   llmExtract.js                 Gemini structured-output extraction (player/clubs/official) -- primary path
   classify.js / extract.js      Regex fallback for llmExtract.js (only used if the API call fails)
+  clubMatch.js                  Resolves extracted from_club/to_club against the curated `clubs` table (sets from_club_id/to_club_id when matched)
   playerProfileResolver.js     Resolves + caches transfermarkt.de profile links
   runNewsScraper.js            Orchestrates all four sources, upserts into `transfers`
 ```
@@ -147,6 +148,18 @@ internet access) to get right:
   player-profile link. If transfermarkt.de changes that page's markup, the
   resolver falls back to linking the search results page itself, per the
   briefing's fallback requirement.
+- **Club matching is not authoritative and deliberately conservative**
+  (`clubMatch.js`). Neither `player_name` nor `from_club`/`to_club` are
+  checked against any ground-truth source -- there's no free API with
+  reliable full squad/player data to verify against, so extraction quality
+  ultimately rests on the LLM. What `clubMatch.js` *does* fix: resolving
+  `from_club`/`to_club` against the league's curated `clubs` table when the
+  extracted name is an exact or substring match, so the same club doesn't
+  end up as two different strings across articles (confirmed live: "OM"
+  vs. "Olympique de Marseille"). It intentionally does *not* attempt
+  fuzzy/acronym matching ("OM", "PSG") -- a wrong match (confusing two
+  different clubs) would be worse than an unmatched raw string, so those
+  stay as plain text with `from_club_id`/`to_club_id` left `null`.
 
 ## Not yet built
 

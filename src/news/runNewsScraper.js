@@ -5,6 +5,7 @@ import { classifyOfficial } from './classify.js';
 import { isTransferRelevant } from './relevance.js';
 import { extractTransferInfo } from './extract.js';
 import { llmExtractTransferInfo } from './llmExtract.js';
+import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
@@ -79,6 +80,13 @@ async function scrapeLeague(supabase, league) {
 
     const { playerName, fromClub, toClub, isOfficial } = await extractInfo(item, clubs, league.newsSource);
 
+    // Resolve to our curated club table when possible -- normalizes naming
+    // ("OM" and "Olympique de Marseille" both become the same canonical
+    // record) and gives the frontend a real FK for badges/filtering instead
+    // of free-standing text. A miss just keeps the raw extracted string.
+    const fromClubMatch = resolveClub(fromClub, clubs);
+    const toClubMatch = resolveClub(toClub, clubs);
+
     let playerId = null;
     if (playerName) {
       try {
@@ -96,8 +104,10 @@ async function scrapeLeague(supabase, league) {
           league_id: dbLeague.id,
           player_id: playerId,
           player_name: playerName,
-          from_club: fromClub,
-          to_club: toClub,
+          from_club: fromClubMatch?.name ?? fromClub,
+          to_club: toClubMatch?.name ?? toClub,
+          from_club_id: fromClubMatch?.id ?? null,
+          to_club_id: toClubMatch?.id ?? null,
           is_official: isOfficial,
           source: league.newsSource,
           source_url: item.link,
