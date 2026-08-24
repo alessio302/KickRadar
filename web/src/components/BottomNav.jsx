@@ -11,11 +11,10 @@ export default function BottomNav({ tab, onSelectTab, theme }) {
   return (
     <div
       style={{
-        position: 'sticky',
-        bottom: 0,
         display: 'flex',
         justifyContent: 'space-around',
         padding: '10px 0',
+        paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
         background: theme.surface,
         borderTop: `1px solid ${theme.border}`,
       }}

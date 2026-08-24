@@ -106,42 +106,69 @@ export default function App() {
         danger: '#B23A2E',
       };
 
+  // Fixed, not sticky: confirmed live, the bottom nav (previously sticky)
+  // would sometimes disappear while scrolling -- iOS Safari's dynamic
+  // toolbar (address bar) resizes the visual viewport as it shows/hides,
+  // which position: sticky doesn't track reliably. position: fixed anchors
+  // both bars to the actual viewport instead, immune to that. Centered
+  // independently to the same max-width as the scrolling column, since a
+  // fixed element no longer inherits width/centering from its parent.
+  // env(safe-area-inset-*): the header sits under the notch/Dynamic Island
+  // and the nav under the home indicator otherwise (viewport-fit=cover in
+  // index.html opts into content extending under both).
+  const fixedBarStyle = { maxWidth: '420px', width: '100%', left: '50%', transform: 'translateX(-50%)' };
+
   return (
     <div style={{ background: theme.bg, minHeight: '100vh', color: theme.text, fontFamily: 'sans-serif', maxWidth: '420px', margin: '0 auto' }}>
-      <div style={{ borderBottom: `1px solid ${theme.border}`, padding: '18px 16px 14px' }}>
+      <div
+        style={{
+          ...fixedBarStyle,
+          position: 'fixed',
+          top: 0,
+          zIndex: 10,
+          borderBottom: `1px solid ${theme.border}`,
+          padding: '18px 16px 14px',
+          paddingTop: 'calc(18px + env(safe-area-inset-top))',
+          background: theme.bg,
+        }}
+      >
         <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, textTransform: 'uppercase' }}>KickRadar</h1>
       </div>
 
-      {tab === 'transfers' && (
-        <TransfersTab
-          theme={theme}
-          league={league}
-          onSelectLeague={selectLeague}
-          favoriteClub={favoriteClub}
-          quickFilters={quickFilters}
-          activeFilter={activeFilter}
-          onSelectFilter={selectFilter}
-          onAddQuickFilter={addQuickFilter}
-          onRemoveQuickFilter={removeQuickFilter}
-          officialOnly={officialOnly}
-          onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
-        />
-      )}
-      {tab === 'spiele' && <FixturesTab theme={theme} league={league} onSelectLeague={selectLeague} />}
-      {tab === 'aufstellungen' && <LineupsTab theme={theme} league={league} />}
-      {tab === 'einstellungen' && (
-        <SettingsTab
-          theme={theme}
-          darkModeSetting={darkModeSetting}
-          onSetDarkModeSetting={setDarkModeSetting}
-          favoriteClub={favoriteClub}
-          onSetFavoriteClub={setFavoriteClub}
-          quickFilters={quickFilters}
-          onRemoveQuickFilter={removeQuickFilter}
-        />
-      )}
+      <div style={{ paddingTop: 'calc(60px + env(safe-area-inset-top))' }}>
+        {tab === 'transfers' && (
+          <TransfersTab
+            theme={theme}
+            league={league}
+            onSelectLeague={selectLeague}
+            favoriteClub={favoriteClub}
+            quickFilters={quickFilters}
+            activeFilter={activeFilter}
+            onSelectFilter={selectFilter}
+            onAddQuickFilter={addQuickFilter}
+            onRemoveQuickFilter={removeQuickFilter}
+            officialOnly={officialOnly}
+            onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
+          />
+        )}
+        {tab === 'spiele' && <FixturesTab theme={theme} league={league} onSelectLeague={selectLeague} />}
+        {tab === 'aufstellungen' && <LineupsTab theme={theme} league={league} />}
+        {tab === 'einstellungen' && (
+          <SettingsTab
+            theme={theme}
+            darkModeSetting={darkModeSetting}
+            onSetDarkModeSetting={setDarkModeSetting}
+            favoriteClub={favoriteClub}
+            onSetFavoriteClub={setFavoriteClub}
+            quickFilters={quickFilters}
+            onRemoveQuickFilter={removeQuickFilter}
+          />
+        )}
+      </div>
 
-      <BottomNav tab={tab} onSelectTab={setTab} theme={theme} />
+      <div style={{ ...fixedBarStyle, position: 'fixed', bottom: 0, zIndex: 10 }}>
+        <BottomNav tab={tab} onSelectTab={setTab} theme={theme} />
+      </div>
     </div>
   );
 }
