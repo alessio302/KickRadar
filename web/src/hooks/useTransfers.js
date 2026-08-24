@@ -18,6 +18,14 @@ const PAGE_SIZE = 50;
 // team-analysis pieces mentioning several players. Those aren't "a
 // transfer", so they don't belong in a transfer feed even though the
 // relevance filter (deliberately broad, backend-side) let them through.
+//
+// Also requires both from_club and to_club: a single-sided entry is
+// usually an earlier, less complete article about the same saga as a
+// later one that names both clubs (confirmed live: the "Alvarez"
+// single-club card was redundant with a fuller "Julian Alvarez,
+// Atletico Madrid -> Arsenal" card already in the feed) -- keeping only
+// complete rows removes that duplication instead of just softening how
+// the incomplete ones are displayed.
 export function useTransfers(leagueSlug, { officialOnly } = {}) {
   const leagueId = useLeagueId(leagueSlug);
   const [transfers, setTransfers] = useState([]);
@@ -35,6 +43,8 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
       )
       .eq('league_id', leagueId)
       .not('player_name', 'is', null)
+      .not('from_club', 'is', null)
+      .not('to_club', 'is', null)
       .order('published_at', { ascending: false })
       .limit(PAGE_SIZE);
 
