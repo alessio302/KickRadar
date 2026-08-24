@@ -1,9 +1,9 @@
 # KickRadar Backend
 
-Backend for **KickRadar**, a PWA tracking transfer news, fixtures, and
-lineups across Serie A, Bundesliga, Premier League, and Ligue 1. See the
-project briefing for full product scope; this repo covers the backend only
-(DB schema, football-data sync, news scraper, GitHub Actions cron jobs).
+**KickRadar** is a PWA tracking transfer news, fixtures, and lineups across
+Serie A, Bundesliga, Premier League, and Ligue 1. This README covers the
+backend (DB schema, football-data sync, news scraper, GitHub Actions cron
+jobs) at the repo root; the frontend lives in `web/` (see `web/README.md`).
 
 ## Stack
 
@@ -170,5 +170,6 @@ internet access) to get right:
 - Web Push sending: `push_subscriptions` table exists to store
   subscriptions, but the actual push-sending logic (triggered when a
   lineup is confirmed) is a later step per the briefing's open next steps.
-- Frontend: this repo is backend-only. The existing `transferticker.jsx`
-  prototype (mock data) still needs to be wired up to this backend's data.
+- Frontend: now wired up (`web/`, a Vite React PWA) to real transfers/
+  fixtures data -- see `web/README.md` for setup and what's still
+  mock/placeholder there (lineups tab, push toggle).

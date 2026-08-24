@@ -112,3 +112,23 @@ insert into leagues (slug, name, country, external_competition_id, news_source) 
   ('premier-league', 'Premier League', 'England', 2021, 'skysports'),
   ('ligue-1', 'Ligue 1', 'France', 2015, 'rmcsport')
 on conflict (slug) do nothing;
+
+-- Row Level Security: the anon/publishable key (which the frontend ships
+-- in its public JS bundle) otherwise has full unrestricted CRUD by
+-- default. Backend scripts use the service_role key, which bypasses RLS,
+-- so this doesn't affect them.
+alter table leagues enable row level security;
+alter table clubs enable row level security;
+alter table players enable row level security;
+alter table transfers enable row level security;
+alter table fixtures enable row level security;
+alter table lineups enable row level security;
+alter table push_subscriptions enable row level security;
+
+create policy "Public read access" on leagues for select using (true);
+create policy "Public read access" on clubs for select using (true);
+create policy "Public read access" on players for select using (true);
+create policy "Public read access" on transfers for select using (true);
+create policy "Public read access" on fixtures for select using (true);
+create policy "Public read access" on lineups for select using (true);
+-- push_subscriptions gets no policy yet -- see sql/004_enable_rls.sql.
