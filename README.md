@@ -167,6 +167,16 @@ internet access) to get right:
   club + confirmed flag + free-form `players` jsonb), but the tab itself
   is explicitly unspecified in the briefing — sourcing and content need to
   be defined before a scraper/sync script can be written.
+  Investigated kicker.de as a Bundesliga proof-of-concept source
+  (`ovsyndication.kicker.de`'s unofficial "universal" app API gives real
+  match ids/team slugs via `MyTeamSync`, confirmed live), but the actual
+  kicker.de match pages (where lineups would be scraped from) sit behind
+  AWS WAF Bot Control with a JS challenge (`x-amzn-waf-action: challenge`
+  on every request, including the homepage) — not a URL-guessing problem,
+  a hard block on non-browser access. Deliberately not building a
+  challenge-solving scraper around that. Paused; revisit with a different
+  source (an API with a real lineups endpoint, or a site without this
+  protection) before picking this back up.
 - Web Push sending: `push_subscriptions` table exists to store
   subscriptions, but the actual push-sending logic (triggered when a
   lineup is confirmed) is a later step per the briefing's open next steps.
