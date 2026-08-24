@@ -1,0 +1,24 @@
+name: Diagnose Serie A news pipeline
+
+# One-off diagnostic (see src/news/diagnoseSerieA.js) -- manual trigger
+# only. Dumps raw tuttomercatoweb items plus each pipeline stage's output
+# to find why Serie A has produced almost no stored transfers.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseSerieA.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
