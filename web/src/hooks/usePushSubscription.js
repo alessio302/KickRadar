@@ -53,7 +53,12 @@ export function usePushSubscription() {
         return;
       }
 
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      // .trim(): a stray trailing newline/space in the env var value (easy
+      // to introduce via copy-paste into a dashboard's env var field) makes
+      // atob() throw "The string contains invalid characters" -- confirmed
+      // live -- since atob is far stricter about whitespace than most other
+      // base64 decoders.
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY?.trim();
       if (!vapidPublicKey) throw new Error('Missing VITE_VAPID_PUBLIC_KEY.');
 
       const registration = await navigator.serviceWorker.ready;
