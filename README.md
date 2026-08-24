@@ -132,8 +132,16 @@ internet access) to get right:
   configured now. If Google renames/retires models again, every call will
   silently fall back to the regex heuristic (logged as a warning per item)
   rather than failing the whole scrape -- worth checking the Actions logs
-  occasionally for a wall of "LLM extraction failed" warnings, which is
-  exactly what a stale model ID looks like.
+  occasionally for a wall of "LLM extraction failed" warnings. Also
+  confirmed live: the free tier caps `gemini-3.5-flash-lite` at 15
+  requests/minute, and RMC Sport alone can have 60+ new items on a big
+  backlog run -- firing them all back-to-back 429'd on essentially every
+  call (a different failure mode than the 404 above, but the same
+  symptom: a wall of "LLM extraction failed" warnings). `llmExtract.js`
+  now throttles itself to stay under that cap, which is why a large
+  backlog run can take several minutes (see the `timeout-minutes: 20` on
+  the news-scraper workflow) -- steady-state hourly runs, which only ever
+  see genuinely new items, aren't affected.
 - **Transfermarkt profile resolution** (`playerProfileResolver.js`) scrapes
   the public "Schnellsuche" (quick search) results page for the first
   player-profile link. If transfermarkt.de changes that page's markup, the

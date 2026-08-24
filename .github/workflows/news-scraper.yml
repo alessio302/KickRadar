@@ -9,7 +9,11 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20 min: the Gemini free-tier throttle (15 req/min) means a large
+    # backlog of new items -- e.g. after a `truncate table transfers` --
+    # can take several minutes to clear. Steady-state hourly runs (only
+    # genuinely new items get processed) finish in well under a minute.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
