@@ -1,6 +1,7 @@
 import { Bell, X } from 'lucide-react';
 import ClubBadge from './ClubBadge.jsx';
 import { useAllClubs } from '../hooks/useAllClubs.js';
+import { usePushSubscription } from '../hooks/usePushSubscription.js';
 
 const THEME_OPTIONS = [
   ['system', 'System'],
@@ -18,6 +19,7 @@ export default function SettingsTab({
   onRemoveQuickFilter,
 }) {
   const { byLeague } = useAllClubs();
+  const { supported: pushSupported, subscribed: pushSubscribed, loading: pushLoading, error: pushError, subscribe, unsubscribe } = usePushSubscription();
 
   return (
     <div style={{ padding: '16px' }}>
@@ -119,6 +121,58 @@ export default function SettingsTab({
       <p style={{ fontSize: '12px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px' }}>
         Benachrichtigungen
       </p>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: theme.surface,
+          borderRadius: '10px',
+          padding: '12px',
+          border: `1px solid ${theme.border}`,
+          marginBottom: '8px',
+          opacity: pushSupported ? 1 : 0.6,
+        }}
+      >
+        <span style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Bell size={14} /> Push bei neuen Transfers
+        </span>
+        {!pushSupported ? (
+          <span style={{ fontSize: '11px', color: theme.textMuted }}>nicht unterstützt</span>
+        ) : (
+          <button
+            onClick={() => (pushSubscribed ? unsubscribe() : subscribe())}
+            disabled={pushLoading}
+            aria-label="Push bei neuen Transfers umschalten"
+            style={{
+              width: '40px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              cursor: pushLoading ? 'default' : 'pointer',
+              background: pushSubscribed ? theme.accent : theme.border,
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: theme.surface,
+                position: 'absolute',
+                top: '3px',
+                left: pushSubscribed ? '21px' : '3px',
+                transition: 'left 0.15s',
+              }}
+            />
+          </button>
+        )}
+      </div>
+      {pushError && (
+        <p style={{ fontSize: '12px', color: theme.accent, margin: '0 0 8px' }}>{pushError}</p>
+      )}
+
       <div
         style={{
           display: 'flex',

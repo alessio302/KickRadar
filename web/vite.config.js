@@ -7,9 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Web Push sending isn't built yet (see backend README "Not yet
-      // built") -- this only covers the installable/offline-shell part of
-      // "PWA", not push notifications.
+      // injectManifest (a custom src/sw.js, precache manifest injected into
+      // it) instead of the default generateSW: receiving/showing push
+      // notifications needs a real `push` event listener, which
+      // generateSW's auto-generated Workbox service worker has no hook for.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       manifest: {
         name: 'KickRadar',
         short_name: 'KickRadar',

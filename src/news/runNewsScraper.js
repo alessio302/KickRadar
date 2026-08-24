@@ -8,6 +8,7 @@ import { llmExtractTransferInfo } from './llmExtract.js';
 import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 import { normalize } from '../util/normalize.js';
+import { sendPushToAll } from '../push/sendPush.js';
 
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
 import kicker from './sources/kicker.js';
@@ -80,6 +81,7 @@ async function scrapeLeague(supabase, league) {
   const items = await source.fetchLatest();
   let inserted = 0;
   let skipped = 0;
+  const notifiable = [];
 
   for (const item of items) {
     const externalId = externalIdFor(item);
@@ -196,22 +198,70 @@ async function scrapeLeague(supabase, league) {
       continue;
     }
     inserted += 1;
+    // Only worth notifying about if it would actually show as a card (see
+    // useTransfers.js's own player_name/from_club/to_club filter) --
+    // notifying about a roundup story with no single identifiable player
+    // would just be confusing.
+    if (playerName) {
+      notifiable.push({
+        playerName,
+        fromClub: resolvedFromMatch?.name ?? resolvedFromClub,
+        toClub: resolvedToMatch?.name ?? resolvedToClub,
+        league: league.name,
+      });
+    }
   }
 
-  return { inserted, skipped };
+  return { inserted, skipped, notifiable };
+}
+
+// A single run can insert anywhere from 0 to dozens of transfers (a big
+// backlog catch-up run once inserted 63 in one go for Ligue 1 alone) -- one
+// push per transfer would be a notification storm. Sent as a single
+// notification per run instead: the specific transfer when there's exactly
+// one, otherwise a count summary.
+function buildNotificationPayload(notifiable) {
+  if (notifiable.length === 0) return null;
+  if (notifiable.length === 1) {
+    const [t] = notifiable;
+    const body = t.fromClub && t.toClub ? `${t.fromClub} → ${t.toClub} (${t.league})` : `${t.toClub ?? t.fromClub} (${t.league})`;
+    return { title: `Neuer Transfer: ${t.playerName}`, body, url: '/' };
+  }
+  const countByLeague = new Map();
+  for (const t of notifiable) {
+    countByLeague.set(t.league, (countByLeague.get(t.league) || 0) + 1);
+  }
+  const body = [...countByLeague.entries()].map(([league, count]) => `${league} (${count})`).join(', ');
+  return { title: `${notifiable.length} neue Transfer-Meldungen`, body, url: '/' };
 }
 
 export async function runNewsScraper() {
   const supabase = getSupabaseClient();
   const results = {};
+  const allNotifiable = [];
   for (const league of LEAGUES) {
     try {
-      results[league.slug] = await scrapeLeague(supabase, league);
+      const result = await scrapeLeague(supabase, league);
+      results[league.slug] = { inserted: result.inserted, skipped: result.skipped };
+      allNotifiable.push(...result.notifiable);
     } catch (err) {
       console.error(`[${league.slug}] scrape failed:`, err.message);
       results[league.slug] = { error: err.message };
     }
   }
+
+  const payload = buildNotificationPayload(allNotifiable);
+  if (payload) {
+    try {
+      const pushResult = await sendPushToAll(payload);
+      results.push = pushResult;
+    } catch (err) {
+      // Missing/misconfigured VAPID keys or a send failure shouldn't fail
+      // the whole scrape run -- the transfers are already stored either way.
+      console.error('Push notification send failed:', err.message);
+    }
+  }
+
   return results;
 }
 
