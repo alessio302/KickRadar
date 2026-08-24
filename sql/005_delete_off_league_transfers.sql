@@ -1,0 +1,14 @@
+-- One-off cleanup for a bug where every transfer scraped from a league's
+-- news source was tagged with that league's id regardless of whether either
+-- club in the story actually belonged to it (news outlets cover transfers
+-- well beyond their "home" league -- confirmed live: RMC Sport stories
+-- about Atletico Madrid -> Arsenal and Chelsea -> Crystal Palace were
+-- showing up under the Ligue 1 filter). The scraper (src/news/
+-- runNewsScraper.js) now requires at least one resolved club before storing
+-- a transfer under a league; this deletes the rows inserted before that fix.
+--
+-- from_club_id/to_club_id are both null exactly when neither side resolved
+-- to a club in that row's own league (club lookup was already scoped to
+-- the transfer's league_id when these rows were inserted), so this matches
+-- the new gating condition precisely.
+delete from transfers where from_club_id is null and to_club_id is null;

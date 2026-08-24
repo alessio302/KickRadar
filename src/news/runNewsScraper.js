@@ -87,6 +87,19 @@ async function scrapeLeague(supabase, league) {
     const fromClubMatch = resolveClub(fromClub, clubs);
     const toClubMatch = resolveClub(toClub, clubs);
 
+    // News sources cover transfers well beyond their "home" league (RMC
+    // Sport writes about Chelsea-to-Crystal-Palace just as much as
+    // Ligue 1) -- confirmed live: filtering the frontend by Ligue 1 showed
+    // Alvarez (Atletico -> Arsenal) and Disasi (Chelsea -> Crystal Palace),
+    // neither of which has anything to do with France. league_id was being
+    // set to "whichever league's scraper found this article" regardless of
+    // the actual clubs involved. Require at least one side to actually be a
+    // club in this league before keeping the story under its tab.
+    if (!fromClubMatch && !toClubMatch) {
+      skipped += 1;
+      continue;
+    }
+
     let playerId = null;
     if (playerName) {
       try {
