@@ -23,14 +23,15 @@ project briefing for full product scope; this repo covers the backend only
    afterwards instead of re-running `schema.sql`.
 2. **Get a football-data.org key** at [football-data.org/client/register](https://www.football-data.org/client/register)
    (free tier is enough for this project's request volume).
-3. **Get an Anthropic API key** at [console.anthropic.com](https://console.anthropic.com)
-   — used by the news scraper to extract player/club names from headlines
-   (see "Why an LLM for extraction" below). Optional in the sense that the
+3. **Get a Gemini API key** (free, no credit card) at
+   [aistudio.google.com/apikey](https://aistudio.google.com/apikey) — used
+   by the news scraper to extract player/club names from headlines (see
+   "Why an LLM for extraction" below). Optional in the sense that the
    scraper still runs without it (falls back to a regex heuristic), but
    extraction quality is much better with it set.
 4. **Local development**: copy `.env.example` to `.env` and fill in
    `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`,
-   `ANTHROPIC_API_KEY`.
+   `GEMINI_API_KEY`.
 5. **Install deps**: `npm install`
 6. **First-time data load** (order matters — fixtures link to clubs):
    ```
@@ -39,7 +40,7 @@ project briefing for full product scope; this repo covers the backend only
    npm run scrape:news
    ```
 7. **GitHub Actions**: add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `FOOTBALL_DATA_API_KEY`, and `ANTHROPIC_API_KEY` as repository secrets
+   `FOOTBALL_DATA_API_KEY`, and `GEMINI_API_KEY` as repository secrets
    (Settings → Secrets and variables → Actions). The three workflows in
    `.github/workflows/` then run on their own schedule:
    - `news-scraper.yml` — hourly
@@ -61,7 +62,7 @@ src/news/
   sources/*.js               One module per outlet (tuttomercatoweb, kicker, skysports, rmcsport)
   rssSource.js / htmlSource.js / sitemapSource.js  Shared factories: RSS / HTML scraping / Google News sitemap
   relevance.js                 Per-source keyword gate: is this item transfer news at all?
-  llmExtract.js                 Claude Haiku structured-output extraction (player/clubs/official) -- primary path
+  llmExtract.js                 Gemini structured-output extraction (player/clubs/official) -- primary path
   classify.js / extract.js      Regex fallback for llmExtract.js (only used if the API call fails)
   playerProfileResolver.js     Resolves + caches transfermarkt.de profile links
   runNewsScraper.js            Orchestrates all four sources, upserts into `transfers`
@@ -81,11 +82,16 @@ separate rounds of prefix/stopword patches for RMC Sport alone, and still
 produced garbage like `"MercatoMercato"` or missed club nicknames
 (`"Barça"`) not in the curated alias list. Free-text named-entity extraction
 across four languages is a poor fit for regex but a good fit for a small
-LLM, so `llmExtract.js` calls Claude Haiku (structured outputs via Zod) as
-the primary path, with the regex version kept only as a fallback for when
-the API call itself fails. Cost is small at this volume (only genuinely new
-items are ever processed, see the pipeline above) but not zero — keep an
-eye on usage if a source's volume grows a lot.
+LLM, so `llmExtract.js` calls the Gemini API (`gemini-2.5-flash-lite`,
+native JSON-schema structured output) as the primary path, with the regex
+version kept only as a fallback for when the API call itself fails.
+**Chosen specifically to keep the project free**: Gemini's free tier
+(aistudio.google.com) needs no credit card and its daily quota comfortably
+covers this project's volume (only genuinely new items are ever processed,
+see the pipeline above — typically well under 100/day across all four
+sources). If volume ever grows past the free quota, `GEMINI_MODEL` is
+env-overridable to switch models, or the whole approach reverts to the
+regex-only fallback with no code change (just remove `GEMINI_API_KEY`).
 
 ## Known limitations / things to verify with real internet access
 
@@ -115,8 +121,8 @@ internet access) to get right:
   (`/football/transferts/`). Override any of them via env var
   (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_SITEMAP_URL`,
   `RMCSPORT_LIST_URL`) if the site structure changes — no code change needed.
-- **Player/club extraction** now runs through `llmExtract.js` (Claude
-  Haiku) as the primary path -- see "Why an LLM for extraction" above.
+- **Player/club extraction** now runs through `llmExtract.js` (Gemini,
+  free tier) as the primary path -- see "Why an LLM for extraction" above.
   `extract.js`'s regex heuristic still exists as the fallback when the API
   call fails; it degrades gracefully on a miss (`player_name`/`from_club`/
   `to_club` stay `null`, the raw headline is still stored in `summary`, so

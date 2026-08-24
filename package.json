@@ -13,10 +13,9 @@
     "sync:fixtures": "node --env-file=.env src/football-api/syncFixtures.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.120.0",
+    "@google/genai": "^2.18.0",
     "@supabase/supabase-js": "^2.45.4",
     "cheerio": "^1.0.0",
-    "rss-parser": "^3.13.0",
-    "zod": "^3.24.1"
+    "rss-parser": "^3.13.0"
   }
 }
