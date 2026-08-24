@@ -143,7 +143,13 @@ export default function App() {
         <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, textTransform: 'uppercase' }}>KickRadar</h1>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      {/* Doesn't scroll itself: each tab manages its own internal split
+          between a pinned sub-header (league switcher, quick filters,
+          toggles -- confirmed live these should stay visible too, not
+          just the outer "KickRadar" title bar) and its own scrolling list.
+          minHeight: 0 is required here for that nested flex:1 scroll area
+          to size correctly instead of overflowing its flex parent. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {tab === 'transfers' && (
           <TransfersTab
             theme={theme}

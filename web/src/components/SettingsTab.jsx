@@ -22,7 +22,7 @@ export default function SettingsTab({
   const { supported: pushSupported, subscribed: pushSubscribed, loading: pushLoading, error: pushError, subscribe, unsubscribe } = usePushSubscription();
 
   return (
-    <div style={{ padding: '16px' }}>
+    <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px', boxSizing: 'border-box' }}>
       <p style={{ fontSize: '12px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px' }}>
         Darstellung
       </p>

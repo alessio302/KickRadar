@@ -40,49 +40,51 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
   const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
 
   return (
-    <div style={{ padding: '14px 16px' }}>
-      <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
+        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 2px',
-          borderTop: `1px solid ${theme.border}`,
-          borderBottom: `1px solid ${theme.border}`,
-          marginBottom: '12px',
-        }}
-      >
-        <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur aktueller Spieltag</span>
-        <button
-          onClick={() => setCurrentMatchdayOnly((v) => !v)}
-          aria-label="Nur aktuellen Spieltag anzeigen umschalten"
+        <div
           style={{
-            width: '40px',
-            height: '22px',
-            borderRadius: '999px',
-            border: 'none',
-            cursor: 'pointer',
-            background: currentMatchdayOnly ? theme.accent : theme.border,
-            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 2px',
+            borderTop: `1px solid ${theme.border}`,
+            borderBottom: `1px solid ${theme.border}`,
           }}
         >
-          <div
+          <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur aktueller Spieltag</span>
+          <button
+            onClick={() => setCurrentMatchdayOnly((v) => !v)}
+            aria-label="Nur aktuellen Spieltag anzeigen umschalten"
             style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              background: theme.surface,
-              position: 'absolute',
-              top: '3px',
-              left: currentMatchdayOnly ? '21px' : '3px',
-              transition: 'left 0.15s',
+              width: '40px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              cursor: 'pointer',
+              background: currentMatchdayOnly ? theme.accent : theme.border,
+              position: 'relative',
             }}
-          />
-        </button>
+          >
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: theme.surface,
+                position: 'absolute',
+                top: '3px',
+                left: currentMatchdayOnly ? '21px' : '3px',
+                transition: 'left 0.15s',
+              }}
+            />
+          </button>
+        </div>
       </div>
 
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 14px' }}>
       {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>Lädt…</p>}
       {!loading && visible.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
@@ -150,6 +152,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

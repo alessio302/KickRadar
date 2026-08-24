@@ -38,60 +38,62 @@ export default function TransfersTab({
   }, [transfers, activeFilter]);
 
   return (
-    <div style={{ padding: '14px 16px' }}>
-      <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
+        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
-      <QuickFilters
-        theme={theme}
-        clubs={clubs}
-        favoriteClub={favoriteClub}
-        quickFilters={quickFilters}
-        activeFilterId={activeFilter?.id ?? null}
-        onSelectFilter={onSelectFilter}
-        onAddQuickFilter={onAddQuickFilter}
-        onRemoveQuickFilter={onRemoveQuickFilter}
-      />
+        <QuickFilters
+          theme={theme}
+          clubs={clubs}
+          favoriteClub={favoriteClub}
+          quickFilters={quickFilters}
+          activeFilterId={activeFilter?.id ?? null}
+          onSelectFilter={onSelectFilter}
+          onAddQuickFilter={onAddQuickFilter}
+          onRemoveQuickFilter={onRemoveQuickFilter}
+        />
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 2px',
-          borderTop: `1px solid ${theme.border}`,
-          borderBottom: `1px solid ${theme.border}`,
-          marginBottom: '12px',
-        }}
-      >
-        <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur offizielle Transfers</span>
-        <button
-          onClick={onToggleOfficialOnly}
-          aria-label="Nur offizielle Transfers umschalten"
+        <div
           style={{
-            width: '40px',
-            height: '22px',
-            borderRadius: '999px',
-            border: 'none',
-            cursor: 'pointer',
-            background: officialOnly ? theme.accent : theme.border,
-            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 2px',
+            borderTop: `1px solid ${theme.border}`,
+            borderBottom: `1px solid ${theme.border}`,
           }}
         >
-          <div
+          <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur offizielle Transfers</span>
+          <button
+            onClick={onToggleOfficialOnly}
+            aria-label="Nur offizielle Transfers umschalten"
             style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              background: theme.surface,
-              position: 'absolute',
-              top: '3px',
-              left: officialOnly ? '21px' : '3px',
-              transition: 'left 0.15s',
+              width: '40px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              cursor: 'pointer',
+              background: officialOnly ? theme.accent : theme.border,
+              position: 'relative',
             }}
-          />
-        </button>
+          >
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: theme.surface,
+                position: 'absolute',
+                top: '3px',
+                left: officialOnly ? '21px' : '3px',
+                transition: 'left 0.15s',
+              }}
+            />
+          </button>
+        </div>
       </div>
 
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 14px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>Lädt…</p>
@@ -171,6 +173,7 @@ export default function TransfersTab({
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

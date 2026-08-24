@@ -8,7 +8,7 @@ import { leagueBySlug } from '../lib/leagues.js';
 export default function LineupsTab({ theme, league }) {
   const currentLeague = leagueBySlug(league);
   return (
-    <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+    <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '60px 24px', textAlign: 'center', boxSizing: 'border-box' }}>
       <Users size={28} style={{ color: theme.textMuted, marginBottom: '10px' }} />
       <p style={{ fontSize: '14px', color: theme.textMuted, margin: 0 }}>
         Voraussichtliche Aufstellungen für {currentLeague?.label} folgen hier, sobald angebunden.
