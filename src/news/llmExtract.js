@@ -55,7 +55,7 @@ function getClient() {
 
 export async function llmExtractTransferInfo(title, summary) {
   const ai = getClient();
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
   const response = await ai.models.generateContent({
     model,

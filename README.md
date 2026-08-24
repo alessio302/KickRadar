@@ -82,7 +82,7 @@ separate rounds of prefix/stopword patches for RMC Sport alone, and still
 produced garbage like `"MercatoMercato"` or missed club nicknames
 (`"Barça"`) not in the curated alias list. Free-text named-entity extraction
 across four languages is a poor fit for regex but a good fit for a small
-LLM, so `llmExtract.js` calls the Gemini API (`gemini-2.5-flash-lite`,
+LLM, so `llmExtract.js` calls the Gemini API (`gemini-3.5-flash-lite`,
 native JSON-schema structured output) as the primary path, with the regex
 version kept only as a fallback for when the API call itself fails.
 **Chosen specifically to keep the project free**: Gemini's free tier
@@ -126,7 +126,14 @@ internet access) to get right:
   `extract.js`'s regex heuristic still exists as the fallback when the API
   call fails; it degrades gracefully on a miss (`player_name`/`from_club`/
   `to_club` stay `null`, the raw headline is still stored in `summary`, so
-  no news item is ever dropped).
+  no news item is ever dropped). Confirmed live: `gemini-2.5-flash-lite`
+  returns a 404 ("no longer available to new users") -- Google's own error
+  message named the replacement, `gemini-3.5-flash-lite`, which is what's
+  configured now. If Google renames/retires models again, every call will
+  silently fall back to the regex heuristic (logged as a warning per item)
+  rather than failing the whole scrape -- worth checking the Actions logs
+  occasionally for a wall of "LLM extraction failed" warnings, which is
+  exactly what a stale model ID looks like.
 - **Transfermarkt profile resolution** (`playerProfileResolver.js`) scrapes
   the public "Schnellsuche" (quick search) results page for the first
   player-profile link. If transfermarkt.de changes that page's markup, the
