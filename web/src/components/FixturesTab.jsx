@@ -11,13 +11,33 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }
 
+// The "current" matchday is the round containing the next upcoming/live
+// game -- not just "the lowest matchday number in the data" (that gets
+// stuck on an already-finished round once no future game of it remains)
+// and not just "the next fixture's round" alone (that would exclude
+// already-played games earlier in the same round, which should still show
+// with their result). Falls back to the most recent round if every synced
+// fixture is already in the past (e.g. right after a round finished and
+// the next one hasn't synced in yet).
+function pickCurrentMatchday(matchdays) {
+  if (matchdays.length === 0) return null;
+  const now = Date.now();
+  for (const group of matchdays) {
+    if (group.games.some((g) => new Date(g.kickoff_at).getTime() >= now)) {
+      return group;
+    }
+  }
+  return matchdays[matchdays.length - 1];
+}
+
 export default function FixturesTab({ theme, league, onSelectLeague }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading } = useFixtures(league);
-  const [nextMatchdayOnly, setNextMatchdayOnly] = useState(true);
+  const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
-  const visible = nextMatchdayOnly ? matchdays.slice(0, 1) : matchdays;
+  const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
+  const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
 
   return (
     <div style={{ padding: '14px 16px 90px' }}>
@@ -34,17 +54,17 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur nächster Spieltag</span>
+        <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur aktueller Spieltag</span>
         <button
-          onClick={() => setNextMatchdayOnly((v) => !v)}
-          aria-label="Nur nächsten Spieltag anzeigen umschalten"
+          onClick={() => setCurrentMatchdayOnly((v) => !v)}
+          aria-label="Nur aktuellen Spieltag anzeigen umschalten"
           style={{
             width: '40px',
             height: '22px',
             borderRadius: '999px',
             border: 'none',
             cursor: 'pointer',
-            background: nextMatchdayOnly ? theme.accent : theme.border,
+            background: currentMatchdayOnly ? theme.accent : theme.border,
             position: 'relative',
           }}
         >
@@ -56,7 +76,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
               background: theme.surface,
               position: 'absolute',
               top: '3px',
-              left: nextMatchdayOnly ? '21px' : '3px',
+              left: currentMatchdayOnly ? '21px' : '3px',
               transition: 'left 0.15s',
             }}
           />
@@ -66,7 +86,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
       {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>Lädt…</p>}
       {!loading && visible.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
-          Keine anstehenden Spiele im Kalender.
+          Keine Spiele im Kalender.
         </p>
       )}
 
