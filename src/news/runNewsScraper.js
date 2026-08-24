@@ -47,10 +47,17 @@ async function scrapeLeague(supabase, league) {
     .single();
   if (leagueErr) throw leagueErr;
 
-  const { data: clubs, error: clubsErr } = await supabase
-    .from('clubs')
-    .select('id, name, aliases')
-    .eq('league_id', dbLeague.id);
+  // Not scoped to this league: a transfer story routinely involves a club
+  // from a different one of our four tracked leagues (Ligue 1's RMC Sport
+  // covering a Bundesliga<->Ligue 1 move, say), and resolving only against
+  // this league's clubs meant the other side could never get a club_id at
+  // all -- confirmed live, this is why Facundo Medina's Marseille/
+  // Leverkusen saga never had both sides resolved, which in turn meant the
+  // squad-based direction check (needs both sides) never had anything to
+  // work with. league_id is carried along so the "does this story actually
+  // involve a club from *this* league" gate below can still tell resolved
+  // clubs apart by which league they're really in.
+  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, aliases, league_id');
   if (clubsErr) throw clubsErr;
 
   // Only ever process genuinely new items -- avoids re-running the LLM call
@@ -86,7 +93,7 @@ async function scrapeLeague(supabase, league) {
       continue;
     }
 
-    const { playerName, fromClub, toClub, isOfficial } = await extractInfo(item, clubs, league.newsSource);
+    const { playerName, fromClub, toClub, isOfficial } = await extractInfo(item, allClubs, league.newsSource);
 
     // Mark as seen right after paying the LLM cost, regardless of what
     // happens below -- an item rejected for an unrelated league (or a
@@ -100,8 +107,11 @@ async function scrapeLeague(supabase, league) {
     // ("OM" and "Olympique de Marseille" both become the same canonical
     // record) and gives the frontend a real FK for badges/filtering instead
     // of free-standing text. A miss just keeps the raw extracted string.
-    const fromClubMatch = resolveClub(fromClub, clubs);
-    const toClubMatch = resolveClub(toClub, clubs);
+    // Matched against all four leagues' clubs (see allClubs above), so a
+    // cross-league story gets a real club_id on both sides, not just the
+    // side that happens to belong to this scraper's own league.
+    const fromClubMatch = resolveClub(fromClub, allClubs);
+    const toClubMatch = resolveClub(toClub, allClubs);
 
     // News sources cover transfers well beyond their "home" league (RMC
     // Sport writes about Chelsea-to-Crystal-Palace just as much as
@@ -110,8 +120,11 @@ async function scrapeLeague(supabase, league) {
     // neither of which has anything to do with France. league_id was being
     // set to "whichever league's scraper found this article" regardless of
     // the actual clubs involved. Require at least one side to actually be a
-    // club in this league before keeping the story under its tab.
-    if (!fromClubMatch && !toClubMatch) {
+    // club in *this* league specifically -- now that matches can come from
+    // any league, checking that a match merely exists isn't enough anymore.
+    const fromInThisLeague = fromClubMatch?.league_id === dbLeague.id;
+    const toInThisLeague = toClubMatch?.league_id === dbLeague.id;
+    if (!fromInThisLeague && !toInThisLeague) {
       skipped += 1;
       continue;
     }
