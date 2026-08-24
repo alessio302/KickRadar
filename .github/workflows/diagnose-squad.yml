@@ -1,0 +1,23 @@
+name: Diagnose football-data.org squad data
+
+# One-off diagnostic (see src/football-api/diagnoseSquad.js) -- manual
+# trigger only. Checks whether the free tier's GET /teams/{id} endpoint
+# includes real squad (player -> current club) data, needed to resolve
+# transfer direction from an authoritative source instead of guessing.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/diagnoseSquad.js
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
