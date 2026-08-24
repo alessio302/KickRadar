@@ -20,9 +20,29 @@ function useDarkMode(mode) {
   return mode === 'dark';
 }
 
+const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1'];
+
 export default function App() {
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
+
+  // Tapping a push notification about a specific league's transfer should
+  // land on that league, not whatever was last open -- the persisted
+  // league selection would otherwise silently override it. Confirmed live:
+  // a Serie A push opened the app on a different, previously-selected
+  // league, with the new transfers nowhere visible without manually
+  // switching. Read once on mount (the URL is what the notification's
+  // navigate()/openWindow() sets it to); doesn't fight the persisted value
+  // on normal, non-notification opens where there's no query param.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedLeague = params.get('league');
+    if (requestedLeague && LEAGUE_SLUGS.includes(requestedLeague)) {
+      setLeague(requestedLeague);
+      setTab('transfers');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [officialOnly, setOfficialOnly] = usePersistedState('kickradar.officialOnly', false);
   const [activeFilter, setActiveFilter] = useState(null);
 

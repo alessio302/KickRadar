@@ -208,6 +208,7 @@ async function scrapeLeague(supabase, league) {
         fromClub: resolvedFromMatch?.name ?? resolvedFromClub,
         toClub: resolvedToMatch?.name ?? resolvedToClub,
         league: league.name,
+        leagueSlug: league.slug,
       });
     }
   }
@@ -215,24 +216,35 @@ async function scrapeLeague(supabase, league) {
   return { inserted, skipped, notifiable };
 }
 
-// A single run can insert anywhere from 0 to dozens of transfers (a big
-// backlog catch-up run once inserted 63 in one go for Ligue 1 alone) -- one
-// push per transfer would be a notification storm. Sent as a single
-// notification per run instead: the specific transfer when there's exactly
-// one, otherwise a count summary.
-function buildNotificationPayload(notifiable) {
-  if (notifiable.length === 0) return null;
-  if (notifiable.length === 1) {
-    const [t] = notifiable;
+// One notification per transfer, naming the player, so tapping it (or
+// just reading it) tells you which card to look for -- confirmed live:
+// a grouped "3 neue Transfers" notification didn't say who, and opening
+// the app landed on a different, previously-selected league besides,
+// so the new transfers weren't even visible without knowing to switch.
+// url carries the league so the app can jump straight to it (see sw.js's
+// notificationclick and App.jsx's read of the ?league= param).
+//
+// Capped: a big backlog catch-up run once inserted 63 transfers in a
+// single go for Ligue 1 alone -- one push per transfer beyond a handful
+// would be a notification storm, so a run past the cap falls back to one
+// summary notification instead (steady-state hourly runs stay well under
+// it in practice).
+const MAX_INDIVIDUAL_NOTIFICATIONS = 8;
+
+function buildNotificationPayloads(notifiable) {
+  if (notifiable.length === 0) return [];
+  if (notifiable.length > MAX_INDIVIDUAL_NOTIFICATIONS) {
+    const countByLeague = new Map();
+    for (const t of notifiable) {
+      countByLeague.set(t.league, (countByLeague.get(t.league) || 0) + 1);
+    }
+    const body = [...countByLeague.entries()].map(([league, count]) => `${league} (${count})`).join(', ');
+    return [{ title: `${notifiable.length} neue Transfer-Meldungen`, body, url: '/' }];
+  }
+  return notifiable.map((t) => {
     const body = t.fromClub && t.toClub ? `${t.fromClub} → ${t.toClub} (${t.league})` : `${t.toClub ?? t.fromClub} (${t.league})`;
-    return { title: `Neuer Transfer: ${t.playerName}`, body, url: '/' };
-  }
-  const countByLeague = new Map();
-  for (const t of notifiable) {
-    countByLeague.set(t.league, (countByLeague.get(t.league) || 0) + 1);
-  }
-  const body = [...countByLeague.entries()].map(([league, count]) => `${league} (${count})`).join(', ');
-  return { title: `${notifiable.length} neue Transfer-Meldungen`, body, url: '/' };
+    return { title: `Neuer Transfer: ${t.playerName}`, body, url: `/?league=${t.leagueSlug}` };
+  });
 }
 
 export async function runNewsScraper() {
@@ -250,16 +262,19 @@ export async function runNewsScraper() {
     }
   }
 
-  const payload = buildNotificationPayload(allNotifiable);
-  if (payload) {
-    try {
-      const pushResult = await sendPushToAll(payload);
-      results.push = pushResult;
-    } catch (err) {
-      // Missing/misconfigured VAPID keys or a send failure shouldn't fail
-      // the whole scrape run -- the transfers are already stored either way.
-      console.error('Push notification send failed:', err.message);
+  const payloads = buildNotificationPayloads(allNotifiable);
+  if (payloads.length > 0) {
+    const pushResults = [];
+    for (const payload of payloads) {
+      try {
+        pushResults.push(await sendPushToAll(payload));
+      } catch (err) {
+        // Missing/misconfigured VAPID keys or a send failure shouldn't fail
+        // the whole scrape run -- the transfers are already stored either way.
+        console.error('Push notification send failed:', err.message);
+      }
     }
+    results.push = pushResults;
   }
 
   return results;
