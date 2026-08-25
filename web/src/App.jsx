@@ -172,6 +172,7 @@ export default function App() {
             letterSpacing: '0.02em',
             margin: 0,
             textTransform: 'uppercase',
+            textAlign: 'center',
           }}
         >
           KickRadar
