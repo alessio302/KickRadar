@@ -3,10 +3,20 @@ import { getMatches, getLineups } from './highlightlyClient.js';
 // Read-only smoke test, no DB writes. Doesn't wait for one of our 4
 // leagues' next kickoff -- Highlightly covers 950+ leagues worldwide, so
 // there's almost always SOME match live or about to kick off somewhere.
-// This finds whichever match is closest to "now" globally (today's date,
-// no country filter, first page) and checks its lineup -- if the free
-// plan populates real lineup data close to kickoff at all, this proves
-// the mechanism works well before our own leagues' next match on 2026-08-28.
+// This finds a match closest to "now" globally and checks its lineup --
+// if the free plan populates real lineup data close to kickoff at all for
+// a genuine first-division league, that's a strong proxy for what to
+// expect from our own leagues before 2026-08-28.
+//
+// First live run (0 min filtering by competition tier): the 3 closest
+// live/recent matches were an Armenian cup tie and two English U21
+// development-league games, all ~2h post-kickoff and still completely
+// empty. That's a real result, but minor/youth/reserve competitions are
+// known to have worse lineup coverage industry-wide -- not conclusive
+// about what a real first-division league like Bundesliga would get.
+// Filter those out and prefer senior first-division football specifically.
+const EXCLUDE_LEAGUE_PATTERN = /\b(U1[5-9]|U2[0-3]|Youth|Development|Reserve|Women|Cup|Trophy|Friendl(y|ies)|Qualif|Playoffs?)\b|(?:^|\s)II(?:\s|$)/i;
+
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -25,6 +35,12 @@ async function fetchAllPages(dateStr) {
   return all;
 }
 
+function isEmpty(lineups) {
+  const home = lineups?.homeTeam;
+  const away = lineups?.awayTeam;
+  return (!home?.initialLineup || home.initialLineup.length === 0) && (!away?.initialLineup || away.initialLineup.length === 0);
+}
+
 async function run() {
   const now = new Date();
   const dateStr = toDateString(now);
@@ -36,36 +52,41 @@ async function run() {
     .filter((m) => m.date)
     .map((m) => ({ m, minutesFromNow: (new Date(m.date) - now) / 60000 }));
 
-  // Prefer something already under way or about to start (lineups should
-  // be confirmed by kickoff) over something merely "today" -- sort by
-  // absolute closeness to now, but bias toward matches that have already
-  // kicked off (negative minutesFromNow, up to 2h into the match) since
-  // those are the surest bet for populated data if the endpoint works at
-  // all.
-  const live = withDelta.filter((x) => x.minutesFromNow <= 0 && x.minutesFromNow > -120);
-  const soon = withDelta.filter((x) => x.minutesFromNow > 0 && x.minutesFromNow <= 45);
-  const candidates = [...live, ...soon].sort((a, b) => a.minutesFromNow - b.minutesFromNow);
+  // -105..0: still plausibly in-play (a full match + stoppage rarely
+  // exceeds ~100 min) through kickoff itself; 0..45: about to start.
+  const inWindow = withDelta.filter((x) => x.minutesFromNow > -105 && x.minutesFromNow <= 45);
+  const seniorFirstDivision = inWindow.filter((x) => !EXCLUDE_LEAGUE_PATTERN.test(x.m.league?.name || ''));
+  const candidates = seniorFirstDivision.length > 0 ? seniorFirstDivision : inWindow;
+  candidates.sort((a, b) => a.minutesFromNow - b.minutesFromNow);
+
+  console.log(`\n${inWindow.length} matches within the window, ${seniorFirstDivision.length} look like senior first-division football:`);
+  for (const { m, minutesFromNow } of candidates.slice(0, 15)) {
+    console.log(`  ${Math.round(minutesFromNow)} min: ${m.league?.name} (${m.country?.name}) ${m.homeTeam?.name} vs ${m.awayTeam?.name} (id ${m.id})`);
+  }
 
   if (candidates.length === 0) {
-    console.log('\nNothing live or kicking off within 45 min across all of today\'s matches. Closest matches found:');
+    console.log('\nNothing in the -105..+45 min window at all today. Closest matches found:');
     withDelta
       .sort((a, b) => Math.abs(a.minutesFromNow) - Math.abs(b.minutesFromNow))
       .slice(0, 5)
       .forEach(({ m, minutesFromNow }) => console.log(`  ${Math.round(minutesFromNow)} min: ${m.league?.name} ${m.homeTeam?.name} vs ${m.awayTeam?.name} (id ${m.id})`));
-    console.log('\nRe-run closer to one of those, or in a bit if kickoffs are clustered a few hours out.');
     return;
   }
 
-  console.log(`\n${candidates.length} live/imminent candidates, trying up to 3:`);
-  for (const { m, minutesFromNow } of candidates.slice(0, 3)) {
+  for (const { m, minutesFromNow } of candidates.slice(0, 5)) {
     console.log(`\n=== GET /lineups/${m.id} (${m.league?.name}: ${m.homeTeam?.name} vs ${m.awayTeam?.name}, ${Math.round(minutesFromNow)} min from now) ===`);
     try {
       const lineups = await getLineups(m.id);
       console.log(JSON.stringify(lineups, null, 2).slice(0, 3000));
+      if (!isEmpty(lineups)) {
+        console.log('\n>>> Populated response found, stopping here.');
+        return;
+      }
     } catch (err) {
       console.error('failed:', err.message);
     }
   }
+  console.log('\nAll tried candidates came back empty.');
 }
 
 run()
