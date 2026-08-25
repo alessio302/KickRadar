@@ -40,6 +40,22 @@
       html, body {
         overscroll-behavior: none;
       }
+
+      /* Static pre-hydration fallback for the same gap App.jsx's effect
+         fixes at runtime (a bottom-safe-area sliver falling back to the
+         browser's default white before React has mounted) -- matches
+         resolved theme via the OS preference since darkModeSetting's own
+         "system" default isn't known this early. App.jsx's effect
+         immediately overrides this once mounted, including for an
+         explicit light/dark choice that disagrees with the OS. */
+      html, body {
+        background: #F5F5F2;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body {
+          background: #0B0D10;
+        }
+      }
     </style>
   </head>
   <body>

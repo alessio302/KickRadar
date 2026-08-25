@@ -116,6 +116,18 @@ export default function App() {
   useEffect(() => {
     document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', isDark ? 'black-translucent' : 'default');
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.bg);
+    // Confirmed live: a second, separate gap showed up at the *bottom*
+    // safe area (the home-indicator zone on notch-less-home-button
+    // iPhones) -- unlike the status bar, there's no OS chrome or meta tag
+    // for that; it's just html/body's own background showing through
+    // wherever the app's own 100dvh div doesn't perfectly cover it (a
+    // known dvh-vs-actual-visual-viewport rounding gap in iOS standalone
+    // PWAs). html/body had no background set at all, so any such gap
+    // fell back to the browser's default white. Belt-and-suspenders fix:
+    // keep them in sync with the resolved theme too, so nothing white can
+    // ever peek through regardless of the exact geometry.
+    document.documentElement.style.background = theme.bg;
+    document.body.style.background = theme.bg;
   }, [isDark, theme.bg]);
 
   // App-shell layout: the page itself never scrolls (html/body/#root are
