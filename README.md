@@ -1,7 +1,8 @@
 # KickRadar Backend
 
 **KickRadar** is a PWA tracking transfer news, fixtures, and lineups across
-Serie A, Bundesliga, Premier League, and Ligue 1. This README covers the
+the "big 5" -- Serie A, Bundesliga, Premier League, Ligue 1, and La Liga.
+This README covers the
 backend (DB schema, football-data sync, news scraper, GitHub Actions cron
 jobs) at the repo root; the frontend lives in `web/` (see `web/README.md`).
 
@@ -18,9 +19,10 @@ jobs) at the repo root; the frontend lives in `web/` (see `web/README.md`).
 
 1. **Create a Supabase project**, then run `sql/schema.sql` against it (SQL
    Editor in the Supabase dashboard, or `psql`). This creates all tables and
-   seeds the four leagues. If you had already run an older version of this
+   seeds the five leagues. If you had already run an older version of this
    schema (with API-Football columns), run `sql/002_switch_to_football_data_org.sql`
-   afterwards instead of re-running `schema.sql`.
+   afterwards instead of re-running `schema.sql`. If your DB predates La
+   Liga, run `sql/010_add_la_liga.sql` to add it.
 2. **Get a football-data.org key** at [football-data.org/client/register](https://www.football-data.org/client/register)
    (free tier is enough for this project's request volume).
 3. **Get a Gemini API key** (free, no credit card) at
@@ -68,14 +70,14 @@ src/config/leagues.js       Fixed league metadata (slug, football-data.org compe
 src/db/supabaseClient.js    Supabase client factory
 src/football-api/           football-data.org adapter + club/fixture sync scripts
 src/news/
-  sources/*.js               One module per outlet (tuttomercatoweb, kicker, skysports, rmcsport)
+  sources/*.js               One module per outlet (tuttomercatoweb, kicker, skysports, rmcsport, marca)
   rssSource.js / htmlSource.js / sitemapSource.js  Shared factories: RSS / HTML scraping / Google News sitemap
   relevance.js                 Per-source keyword gate: is this item transfer news at all?
   llmExtract.js                 Gemini structured-output extraction (player/clubs/official) -- primary path
   classify.js / extract.js      Regex fallback for llmExtract.js (only used if the API call fails)
   clubMatch.js                  Resolves extracted from_club/to_club against the curated `clubs` table (sets from_club_id/to_club_id when matched)
   playerProfileResolver.js     Resolves + caches transfermarkt.de profile links
-  runNewsScraper.js            Orchestrates all four sources, upserts into `transfers`
+  runNewsScraper.js            Orchestrates all five sources, upserts into `transfers`
 ```
 
 Pipeline per item: fetch (source-scoped to football, not necessarily transfers only)
@@ -128,9 +130,13 @@ internet access) to get right:
   classified or stored. Confirmed working live: tuttomercatoweb
   (`?s=calciomercato` section), kicker.de (`/news/bundesliga`), Sky Sports
   (`sitemap_news_football.xml`, football-only by construction), RMC Sport
-  (`/football/transferts/`). Override any of them via env var
+  (`/football/transferts/`), Marca (`/futbol/mercado-fichajes.html`, HTML
+  scrape of `.ue-c-cover-content__link` teasers -- see marca.js for the
+  live-confirmed selector and why the more generic guess tried first
+  picked up junk duplicate items). Override any of them via env var
   (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_SITEMAP_URL`,
-  `RMCSPORT_LIST_URL`) if the site structure changes — no code change needed.
+  `RMCSPORT_LIST_URL`, `MARCA_LIST_URL`/`MARCA_ITEM_SELECTOR`) if the site
+  structure changes — no code change needed.
 - **Player/club extraction** now runs through `llmExtract.js` (Gemini,
   free tier) as the primary path -- see "Why an LLM for extraction" above.
   `extract.js`'s regex heuristic still exists as the fallback when the API

@@ -36,12 +36,19 @@ const RELEVANCE_KEYWORDS = {
     'mercato', 'transfert', 'signe', "s'engage", 'prêt', 'officialise',
     'rumeur', 'piste', 'intérêt', 'contrat', 'recrue', 'transferts',
   ],
-  marca: [
-    'fichaje', 'fichajes', 'ficha por', 'traspaso', 'cesion', 'cedido',
-    'firma', 'firma por', 'nuevo jugador', 'refuerzo', 'acuerdo', 'negocia',
-    'oferta', 'interes', 'pretende', 'rumor', 'mercado de fichajes',
-    'contrato', 'renovacion', 'sondea', 'opcion de compra',
-  ],
+  // marca has no entry here on purpose, same reasoning as tuttomercatoweb
+  // above: its feed is already the site's own "Mercado de Fichajes"
+  // section, not a general football feed, so a second keyword gate is
+  // redundant -- and confirmed live (diagnoseMarca.js) actively harmful.
+  // A first-draft Spanish keyword list here was dropping real transfer
+  // stories wholesale: "El Barça ficha a Livakovic" (bare "ficha", not
+  // "ficha por"), "Sivera renueva hasta 2030" ("renueva" vs. the listed
+  // "renovacion"), "El Mallorca apuntala la delantera con... Buksa"
+  // ("apuntala" not listed at all) -- the same "idioms too varied for a
+  // fixed list" problem, just in Spanish this time. The LLM extraction
+  // step right after this filter already reliably rejects genuine
+  // non-transfer items on its own (evergreen live-blog hub pages etc.),
+  // so nothing is gained by pre-filtering here, only stories lost.
 };
 
 // Diacritic-insensitive on both sides -- confirmed live: kicker's feed

@@ -28,4 +28,24 @@ const base = createHtmlSource({
   baseUrl: 'https://www.marca.com',
 });
 
-export default base;
+// Confirmed live (diagnoseMarca.js): alongside real single-story articles,
+// the section also carries Marca's own rolling roundup/live-blog pages --
+// a daily "Mercado de fichajes, en directo | Altas, bajas y última hora..."
+// live-blog (new URL each day, but same non-story shape) and per-league
+// summer-window roundups ("Mercado de fichajes de verano de 2026 en la
+// Bundesliga: altas, bajas y rumores"). Same category Sky Sports' "Live
+// updates" hub pages are (see skysports.js) -- continuously updated
+// standing pages, not a discrete event with one publish date, so they
+// don't fit the transfers table's one-row-per-story model. Titles for both
+// kinds reliably start with "Mercado de fichajes" followed by either "en
+// directo" or "altas, bajas" -- real story headlines never happen to start
+// that way.
+const HUB_PAGE_PATTERN = /^mercado de fichajes.*(en directo|altas,?\s*bajas)/i;
+
+export default {
+  sourceKey: base.sourceKey,
+  async fetchLatest() {
+    const items = await base.fetchLatest();
+    return items.filter((item) => !HUB_PAGE_PATTERN.test(item.title));
+  },
+};
