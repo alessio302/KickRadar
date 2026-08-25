@@ -36,6 +36,122 @@ function playerLabel(p) {
   );
 }
 
+// initialLineup's own row grouping (GK, then each tactical line, forwards
+// last) already *is* a formation layout -- one horizontal rank per row,
+// top to bottom -- so no separate formation-string parsing is needed to
+// place players. minHeight scales with the number of ranks so a back-5
+// formation isn't cramped into the same vertical space as a back-4 one.
+function PitchFormation({ formation, rows }) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '14px',
+        background: 'linear-gradient(180deg, #1e6b3a, #164d2a)',
+        padding: '34px 6px 22px',
+      }}
+    >
+      {formation && (
+        <span
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            fontSize: '11px',
+            fontWeight: 700,
+            color: '#fff',
+            background: 'rgba(0,0,0,0.35)',
+            padding: '3px 8px',
+            borderRadius: '999px',
+          }}
+        >
+          {formation}
+        </span>
+      )}
+
+      {/* Own goal box, open at the field boundary (top edge). */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '46%',
+          height: '15%',
+          border: '1.5px solid rgba(255,255,255,0.32)',
+          borderTop: 'none',
+          borderBottomLeftRadius: '4px',
+          borderBottomRightRadius: '4px',
+        }}
+      />
+      {/* Halfway line + center-circle arc, both clipped by the container
+          edge -- this is a half-pitch view, the other half is off-screen. */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderBottom: '1.5px solid rgba(255,255,255,0.32)' }} />
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '-70px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '150px',
+          height: '150px',
+          borderRadius: '50%',
+          border: '1.5px solid rgba(255,255,255,0.32)',
+        }}
+      />
+
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          minHeight: `${Math.max(4, rows.length) * 92}px`,
+        }}
+      >
+        {rows.map((rank, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-evenly' }}>
+            {rank.map((p) => (
+              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '60px' }}>
+                <div
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.94)',
+                    color: '#15181D',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    flexShrink: 0,
+                  }}
+                >
+                  {p.number ?? '–'}
+                </div>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: '#fff',
+                    textAlign: 'center',
+                    marginTop: '4px',
+                    lineHeight: 1.15,
+                    textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  }}
+                >
+                  {p.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LineupList({ theme, row }) {
   if (!row) {
     return (
@@ -49,27 +165,20 @@ function LineupList({ theme, row }) {
   }
 
   const players = row.players || {};
-  const starters = (players.initialLineup || []).flat();
+  const rows = players.initialLineup || [];
   const subs = players.substitutes || [];
 
   return (
     <div style={{ padding: '4px 16px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0 12px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {row.confirmed ? 'Offizielle Aufstellung' : 'Voraussichtliche Aufstellung'}
-        </span>
-        {row.formation && row.formation !== 'Unknown' && (
-          <span style={{ fontSize: '12px', fontWeight: 700, color: theme.accent }}>{row.formation}</span>
-        )}
-      </div>
+      <p style={{ fontSize: '12px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '8px 0 10px' }}>
+        {row.confirmed ? 'Offizielle Aufstellung' : 'Voraussichtliche Aufstellung'}
+      </p>
 
-      {starters.length === 0 ? (
-        <p style={{ fontSize: '13px', color: theme.textMuted, margin: 0 }}>Noch keine Spieler gemeldet.</p>
+      {rows.length === 0 ? (
+        <p style={{ fontSize: '13px', color: theme.textMuted, margin: '0 0 16px' }}>Noch keine Spieler gemeldet.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: subs.length ? '16px' : 0 }}>
-          {starters.map((p) => (
-            <div key={p.id} style={{ fontSize: '14px' }}>{playerLabel(p)}</div>
-          ))}
+        <div style={{ marginBottom: subs.length ? '16px' : 0 }}>
+          <PitchFormation formation={row.formation} rows={rows} />
         </div>
       )}
 
