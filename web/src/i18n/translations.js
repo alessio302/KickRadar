@@ -12,7 +12,7 @@
 
 const de = {
   nav: { transfers: 'Transfers', fixtures: 'Spiele', settings: 'Einstellungen' },
-  common: { loading: 'Lädt…', chooseClub: 'Verein wählen…', notSupported: 'nicht unterstützt', vs: 'vs' },
+  common: { loading: 'Lädt…', chooseClub: 'Verein wählen…', notSupported: 'nicht unterstützt', vs: 'vs', cancel: 'Abbrechen' },
   transfers: {
     officialOnly: 'Nur offizielle Transfers',
     officialOnlyToggle: 'Nur offizielle Transfers umschalten',
@@ -63,6 +63,8 @@ const de = {
   },
   quickFilters: {
     addAria: 'Quick-Filter hinzufügen',
+    confirmRemove: 'Willst du den Filter wirklich löschen?',
+    remove: 'Entfernen',
   },
   errors: {
     notificationsDenied: 'Benachrichtigungen wurden nicht erlaubt.',
@@ -71,7 +73,7 @@ const de = {
 
 const en = {
   nav: { transfers: 'Transfers', fixtures: 'Fixtures', settings: 'Settings' },
-  common: { loading: 'Loading…', chooseClub: 'Choose club…', notSupported: 'not supported', vs: 'vs' },
+  common: { loading: 'Loading…', chooseClub: 'Choose club…', notSupported: 'not supported', vs: 'vs', cancel: 'Cancel' },
   transfers: {
     officialOnly: 'Official transfers only',
     officialOnlyToggle: 'Toggle official transfers only',
@@ -122,6 +124,8 @@ const en = {
   },
   quickFilters: {
     addAria: 'Add quick filter',
+    confirmRemove: 'Do you really want to remove this filter?',
+    remove: 'Remove',
   },
   errors: {
     notificationsDenied: 'Notifications were not allowed.',
@@ -130,7 +134,7 @@ const en = {
 
 const it = {
   nav: { transfers: 'Trasferimenti', fixtures: 'Partite', settings: 'Impostazioni' },
-  common: { loading: 'Caricamento…', chooseClub: 'Scegli squadra…', notSupported: 'non supportato', vs: 'vs' },
+  common: { loading: 'Caricamento…', chooseClub: 'Scegli squadra…', notSupported: 'non supportato', vs: 'vs', cancel: 'Annulla' },
   transfers: {
     officialOnly: 'Solo trasferimenti ufficiali',
     officialOnlyToggle: 'Attiva/disattiva solo trasferimenti ufficiali',
@@ -181,6 +185,8 @@ const it = {
   },
   quickFilters: {
     addAria: 'Aggiungi filtro rapido',
+    confirmRemove: 'Vuoi davvero rimuovere questo filtro?',
+    remove: 'Rimuovi',
   },
   errors: {
     notificationsDenied: 'Le notifiche non sono state autorizzate.',
@@ -189,7 +195,7 @@ const it = {
 
 const fr = {
   nav: { transfers: 'Transferts', fixtures: 'Matchs', settings: 'Réglages' },
-  common: { loading: 'Chargement…', chooseClub: 'Choisir un club…', notSupported: 'non pris en charge', vs: 'vs' },
+  common: { loading: 'Chargement…', chooseClub: 'Choisir un club…', notSupported: 'non pris en charge', vs: 'vs', cancel: 'Annuler' },
   transfers: {
     officialOnly: 'Transferts officiels uniquement',
     officialOnlyToggle: 'Activer/désactiver transferts officiels uniquement',
@@ -240,6 +246,8 @@ const fr = {
   },
   quickFilters: {
     addAria: 'Ajouter un filtre rapide',
+    confirmRemove: 'Voulez-vous vraiment retirer ce filtre ?',
+    remove: 'Retirer',
   },
   errors: {
     notificationsDenied: "Les notifications n'ont pas été autorisées.",
@@ -248,7 +256,7 @@ const fr = {
 
 const es = {
   nav: { transfers: 'Traspasos', fixtures: 'Partidos', settings: 'Ajustes' },
-  common: { loading: 'Cargando…', chooseClub: 'Elegir club…', notSupported: 'no compatible', vs: 'vs' },
+  common: { loading: 'Cargando…', chooseClub: 'Elegir club…', notSupported: 'no compatible', vs: 'vs', cancel: 'Cancelar' },
   transfers: {
     officialOnly: 'Solo traspasos oficiales',
     officialOnlyToggle: 'Alternar solo traspasos oficiales',
@@ -299,6 +307,8 @@ const es = {
   },
   quickFilters: {
     addAria: 'Añadir filtro rápido',
+    confirmRemove: '¿Seguro que quieres eliminar este filtro?',
+    remove: 'Eliminar',
   },
   errors: {
     notificationsDenied: 'No se permitieron las notificaciones.',

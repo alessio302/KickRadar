@@ -12,9 +12,15 @@ import ClubBadge from './ClubBadge.jsx';
 // gesture. Not a full a11y substitute for that button -- long-press has
 // no reliable screen-reader equivalent -- which is exactly why that
 // Settings list stays as the accessible path.
+//
+// The long-press only opens a confirm dialog, it doesn't remove directly
+// -- per feedback, a single (if deliberate) gesture with no undo felt too
+// easy to trigger by accident. The dialog is owned by QuickFilters (one
+// instance, not per-chip) so it can render as a single centered overlay
+// above the whole row.
 const LONG_PRESS_MS = 500;
 
-function QuickFilterChip({ theme, club, isActive, onSelect, onRemove }) {
+function QuickFilterChip({ theme, club, isActive, onSelect, onLongPress }) {
   const [pressing, setPressing] = useState(false);
   const timerRef = useRef(null);
   const firedRef = useRef(false);
@@ -36,7 +42,7 @@ function QuickFilterChip({ theme, club, isActive, onSelect, onRemove }) {
       firedRef.current = true;
       setPressing(false);
       if (navigator.vibrate) navigator.vibrate(10);
-      onRemove();
+      onLongPress();
     }, LONG_PRESS_MS);
   };
 
@@ -83,6 +89,7 @@ export default function QuickFilters({
   onRemoveQuickFilter,
 }) {
   const [showAdd, setShowAdd] = useState(false);
+  const [confirmClub, setConfirmClub] = useState(null);
 
   const availableToAdd = clubs.filter(
     (c) => c.id !== favoriteClub?.id && !quickFilters.some((q) => q.id === c.id)
@@ -120,7 +127,7 @@ export default function QuickFilters({
           club={club}
           isActive={activeFilterId === club.id}
           onSelect={() => onSelectFilter(club)}
-          onRemove={() => onRemoveQuickFilter(club.id)}
+          onLongPress={() => setConfirmClub(club)}
         />
       ))}
 
@@ -175,6 +182,75 @@ export default function QuickFilters({
             </option>
           ))}
         </select>
+      )}
+
+      {confirmClub && (
+        <div
+          onClick={() => setConfirmClub(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            zIndex: 60,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: theme.surfaceRaised,
+              borderRadius: '16px',
+              padding: '22px 20px',
+              width: '100%',
+              maxWidth: '300px',
+              textAlign: 'center',
+            }}
+          >
+            <ClubBadge club={confirmClub} size={36} />
+            <p style={{ fontSize: '15px', fontWeight: 700, color: theme.text, margin: '10px 0 4px' }}>{confirmClub.name}</p>
+            <p style={{ fontSize: '14px', color: theme.textMuted, margin: '0 0 18px' }}>{t.quickFilters.confirmRemove}</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setConfirmClub(null)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '10px',
+                  border: `1px solid ${theme.border}`,
+                  background: 'transparent',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                onClick={() => {
+                  onRemoveQuickFilter(confirmClub.id);
+                  setConfirmClub(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: theme.danger,
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {t.quickFilters.remove}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
