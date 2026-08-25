@@ -111,7 +111,7 @@ insert into leagues (slug, name, country, external_competition_id, news_source) 
   ('bundesliga', 'Bundesliga', 'Germany', 2002, 'kicker'),
   ('premier-league', 'Premier League', 'England', 2021, 'skysports'),
   ('ligue-1', 'Ligue 1', 'France', 2015, 'rmcsport'),
-  ('la-liga', 'La Liga', 'Spain', 2014, 'marca')
+  ('la-liga', 'LaLiga', 'Spain', 2014, 'marca')
 on conflict (slug) do nothing;
 
 -- Row Level Security: the anon/publishable key (which the frontend ships

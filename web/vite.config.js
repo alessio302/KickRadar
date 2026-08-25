@@ -17,7 +17,7 @@ export default defineConfig({
       manifest: {
         name: 'KickRadar',
         short_name: 'KickRadar',
-        description: 'Transfermarkt-News, Spiele und Aufstellungen für Serie A, Bundesliga, Premier League, Ligue 1 und La Liga.',
+        description: 'Transfermarkt-News, Spiele und Aufstellungen für Serie A, Bundesliga, Premier League, Ligue 1 und LaLiga.',
         theme_color: '#954730',
         background_color: '#F5F5F2',
         display: 'standalone',

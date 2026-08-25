@@ -1,7 +1,7 @@
 # KickRadar Backend
 
 **KickRadar** is a PWA tracking transfer news, fixtures, and lineups across
-the "big 5" -- Serie A, Bundesliga, Premier League, Ligue 1, and La Liga.
+the "big 5" -- Serie A, Bundesliga, Premier League, Ligue 1, and LaLiga.
 This README covers the
 backend (DB schema, football-data sync, news scraper, GitHub Actions cron
 jobs) at the repo root; the frontend lives in `web/` (see `web/README.md`).

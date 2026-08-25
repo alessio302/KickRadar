@@ -34,7 +34,7 @@ export const LEAGUES = [
   },
   {
     slug: 'la-liga',
-    name: 'La Liga',
+    name: 'LaLiga',
     country: 'Spain',
     externalCompetitionId: 2014,
     newsSource: 'marca',
