@@ -1,7 +1,13 @@
-import { useState } from 'react';
-import { X, Users } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Users } from 'lucide-react';
 import ClubBadge from './ClubBadge.jsx';
 import { useLineups } from '../hooks/useLineups.js';
+
+// Drag distance past which releasing counts as "dismiss" rather than
+// "snap back" -- matches the rough feel of native bottom sheets (iOS
+// Maps, most drawer libraries) without pulling in a gesture library for
+// one interaction.
+const DISMISS_THRESHOLD_PX = 100;
 
 function formatKickoff(iso) {
   return new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -90,13 +96,40 @@ export default function FixtureDetailOverlay({ theme, fixture, homeClub, awayClu
   const activeClub = side === 'home' ? homeClub : awayClub;
   const activeRow = activeClub ? byClubId.get(activeClub.id) : null;
 
+  // Pointer capture (not window listeners) so move/up events keep routing
+  // to the handle even once the finger/cursor drifts off it -- avoids an
+  // effect just to attach/detach window-level handlers for one gesture.
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dragStartY = useRef(null);
+
+  const handlePointerDown = (e) => {
+    dragStartY.current = e.clientY;
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const handlePointerMove = (e) => {
+    if (dragStartY.current == null) return;
+    const delta = e.clientY - dragStartY.current;
+    if (delta > 0) setDragY(delta);
+  };
+  const handlePointerUp = () => {
+    if (dragY > DISMISS_THRESHOLD_PX) {
+      onClose();
+    } else {
+      setDragY(0);
+    }
+    setDragging(false);
+    dragStartY.current = null;
+  };
+
   return (
     <div
       onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: `rgba(0,0,0,${0.5 * Math.max(0, 1 - dragY / 400)})`,
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
@@ -115,26 +148,33 @@ export default function FixtureDetailOverlay({ theme, fixture, homeClub, awayClu
           display: 'flex',
           flexDirection: 'column',
           paddingBottom: 'env(safe-area-inset-bottom)',
+          transform: `translateY(${dragY}px)`,
+          transition: dragging ? 'none' : 'transform 0.2s ease',
         }}
       >
-        <div style={{ flexShrink: 0, padding: '14px 16px 10px', borderBottom: `1px solid ${theme.border}` }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
-            <button
-              onClick={onClose}
-              aria-label="Schließen"
-              style={{ border: 'none', background: 'transparent', color: theme.textMuted, cursor: 'pointer', padding: '4px' }}
-            >
-              <X size={18} />
-            </button>
+        <div style={{ flexShrink: 0, padding: '10px 16px 10px', borderBottom: `1px solid ${theme.border}` }}>
+          {/* Only the handle + match info is a drag target -- the toggle
+              buttons below need normal click/tap handling, and a pointerdown
+              there capturing into this handler would fight that. */}
+          <div
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            style={{ cursor: 'grab', touchAction: 'none' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '999px', background: theme.border }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
+              <ClubBadge club={homeClub} size={22} />
+              <span style={{ fontSize: '14px', fontWeight: 700 }}>
+                {fixture.status === 'finished' ? `${fixture.home_score} : ${fixture.away_score}` : 'vs'}
+              </span>
+              <ClubBadge club={awayClub} size={22} />
+            </div>
+            <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at)}</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
-            <ClubBadge club={homeClub} size={22} />
-            <span style={{ fontSize: '14px', fontWeight: 700 }}>
-              {fixture.status === 'finished' ? `${fixture.home_score} : ${fixture.away_score}` : 'vs'}
-            </span>
-            <ClubBadge club={awayClub} size={22} />
-          </div>
-          <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at)}</p>
 
           <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', border: `1px solid ${theme.border}` }}>
             {[['home', homeClub], ['away', awayClub]].map(([key, club]) => (
