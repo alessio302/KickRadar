@@ -1,14 +1,21 @@
-// Thin adapter around Highlightly's football API (via RapidAPI), candidate
-// source for confirmed lineups. NOT yet confirmed to actually work on the
-// free plan for our purposes -- API-Football looked just as promising on
-// paper and turned out to block the current season entirely on its free
-// tier (see src/football-api/client.js's history). Endpoint paths below
-// are best-effort from indexed docs (highlightly.net itself isn't
-// reachable from this sandbox's egress proxy) -- confirm against the
-// diagnostic run and adjust if wrong, same as any other external source
-// in this project.
-const BASE_URL = process.env.HIGHLIGHTLY_BASE_URL || 'https://football-highlights-api.p.rapidapi.com';
-const RAPIDAPI_HOST = process.env.HIGHLIGHTLY_RAPIDAPI_HOST || 'football-highlights-api.p.rapidapi.com';
+// Thin adapter around Highlightly's football API, candidate source for
+// confirmed lineups. NOT yet confirmed to actually work on the free plan
+// for our purposes -- API-Football looked just as promising on paper and
+// turned out to block the current season entirely on its free tier (see
+// src/football-api/client.js's history).
+//
+// Highlightly has two completely separate, non-interchangeable
+// distribution channels: the RapidAPI marketplace listing (its own host +
+// x-rapidapi-key/x-rapidapi-host headers) and this project's own "native"
+// platform (highlightly.net's own signup, Bearer-token auth). Confirmed
+// live: a key from the native signup got "403 You are not subscribed to
+// this API" against the RapidAPI host -- wrong channel entirely, not a
+// plan/quota issue. This client targets the native platform, matching how
+// the user actually got their key (highlightly.net's own "Get API Key").
+// Endpoint paths are still best-effort from indexed docs (highlightly.net
+// itself isn't reachable from this sandbox's egress proxy) -- confirm
+// against the diagnostic run and adjust if still wrong.
+const BASE_URL = process.env.HIGHLIGHTLY_BASE_URL || 'https://soccer.highlightly.net';
 
 async function call(path, params = {}) {
   const apiKey = process.env.HIGHLIGHTLY_API_KEY;
@@ -23,8 +30,7 @@ async function call(path, params = {}) {
 
   const res = await fetch(url, {
     headers: {
-      'x-rapidapi-key': apiKey,
-      'x-rapidapi-host': RAPIDAPI_HOST,
+      Authorization: `Bearer ${apiKey}`,
     },
   });
 
