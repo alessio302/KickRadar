@@ -14,8 +14,9 @@ import tuttomercatoweb from './sources/tuttomercatoweb.js';
 import kicker from './sources/kicker.js';
 import skysports from './sources/skysports.js';
 import rmcsport from './sources/rmcsport.js';
+import marca from './sources/marca.js';
 
-const SOURCES = { tuttomercatoweb, kicker, skysports, rmcsport };
+const SOURCES = { tuttomercatoweb, kicker, skysports, rmcsport, marca };
 
 function externalIdFor(item) {
   return createHash('sha256').update(item.guid || item.link).digest('hex');

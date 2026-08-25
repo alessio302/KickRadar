@@ -32,6 +32,13 @@ export const LEAGUES = [
     externalCompetitionId: 2015,
     newsSource: 'rmcsport',
   },
+  {
+    slug: 'la-liga',
+    name: 'La Liga',
+    country: 'Spain',
+    externalCompetitionId: 2014,
+    newsSource: 'marca',
+  },
 ];
 
 export function leagueBySlug(slug) {

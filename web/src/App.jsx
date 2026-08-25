@@ -19,7 +19,7 @@ function useDarkMode(mode) {
   return mode === 'dark';
 }
 
-const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1'];
+const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1', 'la-liga'];
 
 export default function App() {
   const [tab, setTab] = useState('transfers');

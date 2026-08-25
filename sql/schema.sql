@@ -46,7 +46,7 @@ create table if not exists transfers (
   from_club_id int references clubs(id), -- set when from_club matched a curated club, else null
   to_club_id int references clubs(id),   -- set when to_club matched a curated club, else null
   is_official boolean not null default false,
-  source text not null,                 -- 'tuttomercatoweb' | 'kicker' | 'skysports' | 'rmcsport'
+  source text not null,                 -- 'tuttomercatoweb' | 'kicker' | 'skysports' | 'rmcsport' | 'marca'
   source_url text not null,
   summary text not null,                -- short in-app summary only, never the full article (copyright)
   published_at timestamptz not null,
@@ -104,13 +104,14 @@ create table if not exists push_subscriptions (
   updated_at timestamptz not null default now()
 );
 
--- Seed the four leagues. external_competition_id values are football-data.org's
+-- Seed the five leagues (the "big 5"). external_competition_id values are football-data.org's
 -- numeric competition ids.
 insert into leagues (slug, name, country, external_competition_id, news_source) values
   ('serie-a', 'Serie A', 'Italy', 2019, 'tuttomercatoweb'),
   ('bundesliga', 'Bundesliga', 'Germany', 2002, 'kicker'),
   ('premier-league', 'Premier League', 'England', 2021, 'skysports'),
-  ('ligue-1', 'Ligue 1', 'France', 2015, 'rmcsport')
+  ('ligue-1', 'Ligue 1', 'France', 2015, 'rmcsport'),
+  ('la-liga', 'La Liga', 'Spain', 2014, 'marca')
 on conflict (slug) do nothing;
 
 -- Row Level Security: the anon/publishable key (which the frontend ships

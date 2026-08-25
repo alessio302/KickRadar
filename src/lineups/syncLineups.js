@@ -4,16 +4,20 @@ import { getMatches, getLineups } from './highlightlyClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 
-// Highlightly's own league.name for each of our 4 leagues -- confirmed
-// live via diagnoseHighlightly.js (Serie A id 115669, Bundesliga 67162,
-// Premier League 33973, Ligue 1 52695). Filtering by this (not just
-// countryName) matters: each country also returns lower divisions,
-// women's/youth competitions and cups sharing the same country.
+// Highlightly's own league.name for each of our leagues -- confirmed live
+// via diagnoseHighlightly.js for the original 4 (Serie A id 115669,
+// Bundesliga 67162, Premier League 33973, Ligue 1 52695). Filtering by
+// this (not just countryName) matters: each country also returns lower
+// divisions, women's/youth competitions and cups sharing the same country.
+// La Liga's own id/name is NOT yet confirmed live the same way -- 'La Liga'
+// is Highlightly's likely name for it (matches their pattern for the other
+// four), but needs the same live check before relying on it.
 const HIGHLIGHTLY_LEAGUE_NAME = {
   'serie-a': 'Serie A',
   bundesliga: 'Bundesliga',
   'premier-league': 'Premier League',
   'ligue-1': 'Ligue 1',
+  'la-liga': 'La Liga',
 };
 
 // Confirmed live (Kazakhstan Premier League, 2026-08-25): a real lineup

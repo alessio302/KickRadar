@@ -36,6 +36,12 @@ const RELEVANCE_KEYWORDS = {
     'mercato', 'transfert', 'signe', "s'engage", 'prêt', 'officialise',
     'rumeur', 'piste', 'intérêt', 'contrat', 'recrue', 'transferts',
   ],
+  marca: [
+    'fichaje', 'fichajes', 'ficha por', 'traspaso', 'cesion', 'cedido',
+    'firma', 'firma por', 'nuevo jugador', 'refuerzo', 'acuerdo', 'negocia',
+    'oferta', 'interes', 'pretende', 'rumor', 'mercado de fichajes',
+    'contrato', 'renovacion', 'sondea', 'opcion de compra',
+  ],
 };
 
 // Diacritic-insensitive on both sides -- confirmed live: kicker's feed

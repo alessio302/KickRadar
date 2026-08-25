@@ -7,6 +7,7 @@ export const LEAGUES = [
   { slug: 'bundesliga', label: 'Bundesliga', short: 'BL', color: '#D0132C' },
   { slug: 'premier-league', label: 'Premier League', short: 'PL', color: '#3D1560' },
   { slug: 'ligue-1', label: 'Ligue 1', short: 'L1', color: '#1A2E5A' },
+  { slug: 'la-liga', label: 'La Liga', short: 'LL', color: '#C9A227' },
 ];
 
 export function leagueBySlug(slug) {

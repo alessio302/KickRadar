@@ -26,6 +26,12 @@ const RULES = {
       'officialise', "en passe de s'engager",
     ],
   },
+  marca: {
+    official: [
+      'oficial', 'es oficial', 'ya es nuevo jugador', 'ha firmado',
+      'firma hasta', 'cierra su fichaje', 'acuerdo total', 'confirmado',
+    ],
+  },
 };
 
 export function classifyOfficial(sourceKey, text) {

@@ -19,6 +19,7 @@ const DIRECTION_KEYWORDS = {
   kicker: { from: ['von'], to: ['zu', 'nach'] },
   skysports: { from: ['from'], to: ['to', 'joins', 'signs for', 'signs with'] },
   rmcsport: { from: ['de', 'du', 'quitte'], to: ['vers', 'au', 'à', 'a rejoint'] },
+  marca: { from: ['del', 'de'], to: ['al', 'ficha por', 'al equipo del'] },
 };
 
 function findClubMentions(title, clubs) {
