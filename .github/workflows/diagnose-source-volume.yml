@@ -1,0 +1,20 @@
+name: Diagnose source volume (one-off)
+
+# Investigates the "very few new transfers for leagues other than Serie A"
+# report -- read-only, no DB writes, no secrets needed (see
+# src/news/diagnoseSourceVolume.js). Manual trigger only.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseSourceVolume.js
