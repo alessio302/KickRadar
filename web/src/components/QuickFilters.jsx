@@ -67,6 +67,16 @@ function QuickFilterChip({ theme, club, isActive, onSelect, onLongPress }) {
         border: `2px solid ${isActive ? theme.accent : theme.border}`,
         background: 'transparent',
         cursor: 'pointer',
+        // Confirmed live: without these, holding past LONG_PRESS_MS also
+        // triggered iOS's native text-selection callout on the badge's
+        // text content (the blue drag handles) -- the browser has no way
+        // to know a long touch-hold here means something app-specific,
+        // not "select this text", unless told to suppress its own
+        // built-in long-press handling entirely.
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        WebkitTapHighlightColor: 'transparent',
         transform: pressing ? 'scale(0.85)' : 'scale(1)',
         opacity: pressing ? 0.55 : 1,
         transition: pressing ? `transform ${LONG_PRESS_MS}ms ease, opacity ${LONG_PRESS_MS}ms ease` : 'transform 0.15s ease, opacity 0.15s ease',
