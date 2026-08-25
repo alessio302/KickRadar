@@ -170,6 +170,20 @@ async function scrapeLeague(supabase, league) {
         resolvedToClub = fromClub;
         resolvedFromMatch = toClubMatch;
         resolvedToMatch = fromClubMatch;
+      } else if (
+        squadRows.length === 1 &&
+        squadRows[0].club_id !== fromClubMatch.id &&
+        squadRows[0].club_id !== toClubMatch.id
+      ) {
+        // The player is confirmed at a *third* club, matching neither side
+        // of the story -- not a direction mix-up, the extraction itself
+        // got the clubs wrong. Confirmed live: "Ange-Yoan Bonny, Parma ->
+        // Fiorentina" (source URL filed under tuttomercatoweb's own
+        // /inter/ section) while squad_memberships already had him at
+        // Inter. No clean way to guess the real story from bad extraction,
+        // so drop it entirely rather than show a card that's simply wrong.
+        skipped += 1;
+        continue;
       }
     }
 
