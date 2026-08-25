@@ -52,6 +52,14 @@
         overscroll-behavior: none;
       }
 
+      /* League switcher: scrollbar-width: none (set inline, in
+         LeagueSwitcher.jsx) only covers Firefox -- Chrome/Safari need this
+         pseudo-element rule instead, which can't be expressed as a React
+         inline style. */
+      .league-scroll-row::-webkit-scrollbar {
+        display: none;
+      }
+
       /* Static pre-hydration fallback for the same gap App.jsx's effect
          fixes at runtime (a bottom-safe-area sliver falling back to the
          browser's default white before React has mounted) -- matches

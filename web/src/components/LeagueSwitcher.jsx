@@ -1,33 +1,51 @@
 import { LEAGUES } from '../lib/leagues.js';
 
+// Horizontal-scrolling pill row, not a shrink-to-fit flex row: five leagues
+// with full names ("Premier League", "1. Bundesliga") already didn't fit
+// evenly, and every additional league would only have made each one
+// narrower still (see LEAGUE_SLUGS growing to 5, more planned). Scrolling
+// instead of shrinking means new leagues just extend the row -- the header
+// never gets more cramped, and full names read at a glance instead of
+// needing "BL"/"PL"-style abbreviations decoded first. Bleeds to the
+// screen edges via negative margin matching the parent's 16px padding
+// (see TransfersTab.jsx/FixturesTab.jsx) so the row scrolls edge-to-edge
+// like a native tab bar, not just within the inset content column.
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
   return (
-    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+    <div
+      className="league-scroll-row"
+      style={{
+        display: 'flex',
+        gap: '8px',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        WebkitOverflowScrolling: 'touch',
+        margin: '0 -16px',
+        padding: '0 16px 12px',
+      }}
+    >
       {LEAGUES.map((l) => (
         <button
           key={l.slug}
           onClick={() => onSelectLeague(l.slug)}
-          title={l.label}
           style={{
-            flex: '1',
-            minWidth: 0,
+            flex: '0 0 auto',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '8px 4px',
-            borderRadius: '10px',
-            fontSize: '13px',
+            gap: '7px',
+            padding: '9px 14px',
+            borderRadius: '999px',
+            fontSize: '13.5px',
             fontWeight: league === l.slug ? 700 : 600,
-            border: 'none',
+            whiteSpace: 'nowrap',
+            border: `1px solid ${league === l.slug ? theme.accent : theme.border}`,
             cursor: 'pointer',
-            background: theme.surface,
+            background: league === l.slug ? `${theme.accent}1a` : theme.surface,
             color: league === l.slug ? theme.accent : theme.textMuted,
-            borderBottom: `2px solid ${league === l.slug ? theme.accent : 'transparent'}`,
           }}
         >
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: l.color, flex: '0 0 auto' }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.short}</span>
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: l.color, flex: '0 0 auto' }} />
+          {l.label}
         </button>
       ))}
     </div>
