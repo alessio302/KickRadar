@@ -11,18 +11,26 @@ export default function ClubBadge({ club, size = 24 }) {
   // color is (real primaries range from near-black to near-white, unlike
   // the old hash-generated fallback colors).
   const borderWidth = Math.max(1.5, size * 0.09);
-  // Most codes are 3 chars, sized for that; a couple of overrides (see
-  // clubShortCodes.js -- "ESTAC" is the only current one) run longer and
-  // would overflow a 3-char-tuned font size, so scale down past 3 chars
-  // instead of letting text spill out of the badge.
-  const fontSize = Math.max(7, (size * 0.36) * Math.min(1, 3 / (code?.length ?? 3)));
+  // Almost every code is 3 chars, and the badge is a fixed square sized
+  // for that. Confirmed live: shrinking the font to fit a longer code
+  // (e.g. "ESTAC", the one current override that isn't 3 chars, see
+  // clubShortCodes.js) into that same square either overflows it or
+  // shrinks past legibility -- there's no font size that fits 5 characters
+  // in a ~20-24px square and still reads. Past 3 chars, let the badge
+  // widen into a short pill instead of forcing the square; every
+  // ClubBadge call site is inside a flex row (never a fixed-size grid
+  // cell), so a wider badge here doesn't break any layout.
+  const isLong = (code?.length ?? 0) > 3;
+  const fontSize = isLong ? Math.max(8, size * 0.3) : Math.max(9, size * 0.36);
   return (
     <div
       title={club.name}
       aria-label={club.name}
       style={{
-        width: size,
+        width: isLong ? 'auto' : size,
+        minWidth: isLong ? size : undefined,
         height: size,
+        padding: isLong ? '0 4px' : 0,
         borderRadius: '6px',
         background: bg,
         border: `${borderWidth}px solid ${border}`,
@@ -35,6 +43,7 @@ export default function ClubBadge({ club, size = 24 }) {
         fontWeight: 800,
         flex: '0 0 auto',
         letterSpacing: '-0.02em',
+        whiteSpace: 'nowrap',
       }}
     >
       {code}

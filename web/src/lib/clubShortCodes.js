@@ -15,6 +15,11 @@
 //   club's real, universally recognized identity is "ESTAC" (their own
 //   rebrand from 2000, avoiding a naming clash with a supermarket chain)
 //   -- fits the short_code column's 5-char limit fine.
+// - FC Barcelona: synced as "FCB" -- football-data.org's own tla for it,
+//   but that's also FC Bayern München's tla (both clubs are literally
+//   "FC <name>"). Harmless today (different leagues, never shown
+//   together), but "BAR" is just as recognized for Barcelona and avoids
+//   the two clubs sharing a code at all.
 //
 // Keyed by the exact `clubs.name` string, same as clubKitColors.js.
 export const CLUB_SHORT_CODE_OVERRIDES = {
@@ -22,6 +27,7 @@ export const CLUB_SHORT_CODE_OVERRIDES = {
   'RC Strasbourg Alsace': 'RCS',
   'Nottingham Forest FC': 'NFO',
   'ES Troyes AC': 'ESTAC',
+  'FC Barcelona': 'BAR',
 };
 
 export function clubShortCode(club) {
