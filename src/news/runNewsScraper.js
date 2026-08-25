@@ -176,14 +176,19 @@ async function scrapeLeague(supabase, league) {
         squadRows[0].club_id !== toClubMatch.id
       ) {
         // The player is confirmed at a *third* club, matching neither side
-        // of the story -- not a direction mix-up, the extraction itself
-        // got the clubs wrong. Confirmed live: "Ange-Yoan Bonny, Parma ->
-        // Fiorentina" (source URL filed under tuttomercatoweb's own
-        // /inter/ section) while squad_memberships already had him at
-        // Inter. No clean way to guess the real story from bad extraction,
-        // so drop it entirely rather than show a card that's simply wrong.
-        skipped += 1;
-        continue;
+        // of the extracted story. Same principle as the flip above -- squad
+        // data is the source of truth -- applied to the other axis: correct
+        // the *from* side to where they actually play instead of discarding
+        // a plausible "to" rumor entirely. Confirmed live: "Ange-Yoan Bonny,
+        // Parma -> Fiorentina" while squad_memberships already had him at
+        // Inter -- Fiorentina interest is real, newsworthy rumor content;
+        // "Parma" was simply stale/wrong and is cheaply fixable, so fix it
+        // rather than throw the whole story away.
+        const realClub = allClubs.find((c) => c.id === squadRows[0].club_id);
+        if (realClub) {
+          resolvedFromClub = realClub.name;
+          resolvedFromMatch = realClub;
+        }
       }
     }
 
