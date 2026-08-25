@@ -223,9 +223,18 @@ async function scrapeLeague(supabase, league) {
         .select('id, published_at, is_official, from_club, from_club_id, to_club, to_club_id')
         .eq('player_id', playerId)
         .limit(20);
-      candidateQuery = resolvedFromMatch
-        ? candidateQuery.eq('from_club_id', resolvedFromMatch.id)
-        : candidateQuery.eq('from_club', resolvedFromClub);
+      // .eq('from_club', null) would NOT match real NULLs -- PostgREST reads
+      // a JS `null` value there as the literal string "null", not IS NULL --
+      // confirmed live via findDupes.js: a from_club of null is common (many
+      // "official signing" headlines only name the new club), so this needs
+      // .is() specifically or every one of those never dedupes.
+      if (resolvedFromMatch) {
+        candidateQuery = candidateQuery.eq('from_club_id', resolvedFromMatch.id);
+      } else if (resolvedFromClub) {
+        candidateQuery = candidateQuery.eq('from_club', resolvedFromClub);
+      } else {
+        candidateQuery = candidateQuery.is('from_club', null);
+      }
       const { data: candidates, error: dupErr } = await candidateQuery;
       if (dupErr) {
         console.error(`[${league.slug}] duplicate lookup failed:`, dupErr.message);
