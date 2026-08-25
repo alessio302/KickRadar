@@ -81,6 +81,7 @@ async function scrapeLeague(supabase, league) {
   const items = await source.fetchLatest();
   let inserted = 0;
   let skipped = 0;
+  let merged = 0;
   const notifiable = [];
 
   for (const item of items) {
@@ -172,6 +173,48 @@ async function scrapeLeague(supabase, league) {
       }
     }
 
+    // Multiple articles (often the same outlet, different days) reporting
+    // the exact same rumor produce visually identical cards -- confirmed
+    // live: "Rafael Leão, AC Milan -> Aston Villa" showed up twice, a few
+    // hours apart. Two cards are only a legitimate pair when they disagree
+    // on the destination (a player linked to two different clubs is real
+    // news); the *same* player+from+to combination is the same story, not
+    // two. Only checked once both clubs and the player are resolved to real
+    // ids -- without that there's no reliable key to match duplicates on,
+    // so it falls through to a normal insert like before.
+    let duplicateOf = null;
+    if (playerId && resolvedFromMatch && resolvedToMatch) {
+      const { data: existing, error: dupErr } = await supabase
+        .from('transfers')
+        .select('id, published_at, is_official')
+        .eq('player_id', playerId)
+        .eq('from_club_id', resolvedFromMatch.id)
+        .eq('to_club_id', resolvedToMatch.id)
+        .maybeSingle();
+      if (dupErr) console.error(`[${league.slug}] duplicate lookup failed:`, dupErr.message);
+      else duplicateOf = existing;
+    }
+
+    if (duplicateOf) {
+      const newerPublishedAt =
+        new Date(item.publishedAt) > new Date(duplicateOf.published_at) ? item.publishedAt : duplicateOf.published_at;
+      const { error: mergeErr } = await supabase
+        .from('transfers')
+        .update({
+          published_at: newerPublishedAt,
+          summary: item.summary || item.title,
+          source: league.newsSource,
+          source_url: item.link,
+          // Once confirmed official, a later, less-certain rumor-flavored
+          // article about the same move shouldn't walk that back.
+          is_official: duplicateOf.is_official || isOfficial,
+        })
+        .eq('id', duplicateOf.id);
+      if (mergeErr) console.error(`[${league.slug}] failed to merge duplicate transfer:`, mergeErr.message);
+      else merged += 1;
+      continue;
+    }
+
     const { error: upsertErr } = await supabase
       .from('transfers')
       .upsert(
@@ -213,7 +256,7 @@ async function scrapeLeague(supabase, league) {
     }
   }
 
-  return { inserted, skipped, notifiable };
+  return { inserted, skipped, merged, notifiable };
 }
 
 // One notification per transfer, naming the player, so tapping it (or
@@ -254,7 +297,7 @@ export async function runNewsScraper() {
   for (const league of LEAGUES) {
     try {
       const result = await scrapeLeague(supabase, league);
-      results[league.slug] = { inserted: result.inserted, skipped: result.skipped };
+      results[league.slug] = { inserted: result.inserted, skipped: result.skipped, merged: result.merged };
       allNotifiable.push(...result.notifiable);
     } catch (err) {
       console.error(`[${league.slug}] scrape failed:`, err.message);
