@@ -19,7 +19,16 @@ export default function SettingsTab({
   onRemoveQuickFilter,
 }) {
   const { byLeague } = useAllClubs();
-  const { supported: pushSupported, subscribed: pushSubscribed, loading: pushLoading, error: pushError, subscribe, unsubscribe } = usePushSubscription();
+  const {
+    supported: pushSupported,
+    subscribed: pushSubscribed,
+    notifyLineups,
+    loading: pushLoading,
+    error: pushError,
+    subscribe,
+    unsubscribe,
+    setNotifyLineups,
+  } = usePushSubscription();
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px', boxSizing: 'border-box' }}>
@@ -182,13 +191,43 @@ export default function SettingsTab({
           borderRadius: '10px',
           padding: '12px',
           border: `1px solid ${theme.border}`,
-          opacity: 0.6,
+          opacity: pushSupported ? 1 : 0.6,
         }}
       >
         <span style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Bell size={14} /> Push bei bestätigter Aufstellung
         </span>
-        <span style={{ fontSize: '11px', color: theme.textMuted }}>bald verfügbar</span>
+        {!pushSupported ? (
+          <span style={{ fontSize: '11px', color: theme.textMuted }}>nicht unterstützt</span>
+        ) : (
+          <button
+            onClick={() => setNotifyLineups(!(pushSubscribed && notifyLineups))}
+            disabled={pushLoading}
+            aria-label="Push bei bestätigter Aufstellung umschalten"
+            style={{
+              width: '40px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              cursor: pushLoading ? 'default' : 'pointer',
+              background: pushSubscribed && notifyLineups ? theme.accent : theme.border,
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: theme.surface,
+                position: 'absolute',
+                top: '3px',
+                left: pushSubscribed && notifyLineups ? '21px' : '3px',
+                transition: 'left 0.15s',
+              }}
+            />
+          </button>
+        )}
       </div>
     </div>
   );

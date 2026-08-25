@@ -25,16 +25,7 @@ function ensureConfigured() {
   configured = true;
 }
 
-// Sends the same notification to every stored subscription. A subscription
-// that comes back 404/410 (browser unsubscribed, or the token expired) is
-// removed -- otherwise every future send would keep retrying a dead
-// endpoint forever.
-export async function sendPushToAll(payload) {
-  ensureConfigured();
-  const supabase = getSupabaseClient();
-
-  const { data: subs, error } = await supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth');
-  if (error) throw error;
+async function sendToSubscriptions(supabase, subs, payload) {
   if (subs.length === 0) return { sent: 0, failed: 0, removed: 0 };
 
   let sent = 0;
@@ -64,4 +55,32 @@ export async function sendPushToAll(payload) {
   }
 
   return { sent, failed, removed: staleIds.length };
+}
+
+// Sends the same notification to every stored subscription. A subscription
+// that comes back 404/410 (browser unsubscribed, or the token expired) is
+// removed -- otherwise every future send would keep retrying a dead
+// endpoint forever. Used for transfers -- there's no separate "notify
+// transfers" preference, the subscription itself is the opt-in.
+export async function sendPushToAll(payload) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { data: subs, error } = await supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth');
+  if (error) throw error;
+  return sendToSubscriptions(supabase, subs, payload);
+}
+
+// Lineup confirmations are a separate opt-in on top of an existing
+// subscription (push_subscriptions.notify_lineups, default true) -- a
+// subscriber who only wants transfer pushes can turn this off without
+// unsubscribing entirely, see SettingsTab.jsx's second toggle.
+export async function sendPushToLineupSubscribers(payload) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { data: subs, error } = await supabase
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .eq('notify_lineups', true);
+  if (error) throw error;
+  return sendToSubscriptions(supabase, subs, payload);
 }

@@ -29,6 +29,7 @@ export function usePushSubscription() {
     () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
   );
   const [subscribed, setSubscribed] = useState(false);
+  const [notifyLineups, setNotifyLineupsState] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,7 +40,18 @@ export function usePushSubscription() {
     }
     navigator.serviceWorker.ready
       .then((registration) => registration.pushManager.getSubscription())
-      .then((existing) => setSubscribed(!!existing))
+      .then(async (existing) => {
+        setSubscribed(!!existing);
+        // notify_lineups is a per-category preference on the stored
+        // subscription row, not something the browser's own PushManager
+        // knows about -- read it from Supabase, defaulting to the
+        // column's own default (true) if there's no subscription yet.
+        if (existing) {
+          const { endpoint } = existing.toJSON();
+          const { data } = await supabase.from('push_subscriptions').select('notify_lineups').eq('endpoint', endpoint).maybeSingle();
+          if (data) setNotifyLineupsState(data.notify_lineups);
+        }
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [supported]);
@@ -95,5 +107,31 @@ export function usePushSubscription() {
     }
   }, []);
 
-  return { supported, subscribed, loading, error, subscribe, unsubscribe };
+  const setNotifyLineups = useCallback(
+    async (value) => {
+      setError(null);
+      try {
+        let registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          // A lineup-push preference is meaningless without an active
+          // subscription -- toggling this on before ever subscribing to
+          // transfers subscribes first, same flow as that toggle.
+          await subscribe();
+          registration = await navigator.serviceWorker.ready;
+          subscription = await registration.pushManager.getSubscription();
+          if (!subscription) return; // subscribe() already recorded an error
+        }
+        const { endpoint } = subscription.toJSON();
+        const { error: updateErr } = await supabase.from('push_subscriptions').update({ notify_lineups: value }).eq('endpoint', endpoint);
+        if (updateErr) throw updateErr;
+        setNotifyLineupsState(value);
+      } catch (err) {
+        setError(err.message);
+      }
+    },
+    [subscribe]
+  );
+
+  return { supported, subscribed, notifyLineups, loading, error, subscribe, unsubscribe, setNotifyLineups };
 }
