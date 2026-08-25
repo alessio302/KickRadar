@@ -42,11 +42,14 @@ function playerLabel(p) {
 // place players.
 //
 // A real pitch is 105 x 68m; a half (halfway line to goal line) is
-// 52.5 x 68m -- wider than it is tall. aspect-ratio keeps that roughly
-// true at any container width, with ranks distributed inside it via
-// flex instead of being stacked at a fixed per-rank height (which read
-// as too tall/sparse -- confirmed by the user against the reference
-// screenshot's much more compact proportions).
+// 52.5 x 68m -- wider than tall, which is why this stays compact instead
+// of stacking ranks at a generous fixed height. But a literal
+// `aspectRatio` CSS property combined with `overflow: hidden` clips
+// silently once content needs more room than the ratio provides --
+// confirmed live: a 5-rank formation (4-2-3-1's GK/DF/DM/AM/FW split)
+// lost its entire forward line, cropped out with no visual warning.
+// minHeight scaled to the actual rank count guarantees every rank fits
+// while staying close to the real proportions for the common 4-rank case.
 function PitchFormation({ formation, rows }) {
   return (
     <div
@@ -57,7 +60,9 @@ function PitchFormation({ formation, rows }) {
         borderRadius: '14px',
         background: 'linear-gradient(180deg, #1e6b3a, #164d2a)',
         padding: '30px 6px 10px',
-        aspectRatio: '68 / 52.5',
+        minHeight: `${Math.max(4, rows.length) * 44 + 40}px`,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {formation && (
@@ -113,7 +118,7 @@ function PitchFormation({ formation, rows }) {
       <div
         style={{
           position: 'relative',
-          height: '100%',
+          flex: 1,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
