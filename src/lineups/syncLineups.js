@@ -6,12 +6,11 @@ import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 
 // Highlightly's own league.name for each of our leagues -- confirmed live
 // via diagnoseHighlightly.js for the original 4 (Serie A id 115669,
-// Bundesliga 67162, Premier League 33973, Ligue 1 52695). Filtering by
-// this (not just countryName) matters: each country also returns lower
-// divisions, women's/youth competitions and cups sharing the same country.
-// La Liga's own id/name is NOT yet confirmed live the same way -- 'La Liga'
-// is Highlightly's likely name for it (matches their pattern for the other
-// four), but needs the same live check before relying on it.
+// Bundesliga 67162, Premier League 33973, Ligue 1 52695) and via
+// diagnoseHighlightlySpain.js for La Liga (id 119924). Filtering by this
+// (not just countryName) matters: each country also returns lower
+// divisions, women's/youth competitions and cups sharing the same country
+// (confirmed for Spain too: Segunda División, Primera División Femenina).
 const HIGHLIGHTLY_LEAGUE_NAME = {
   'serie-a': 'Serie A',
   bundesliga: 'Bundesliga',
