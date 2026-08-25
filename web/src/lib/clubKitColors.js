@@ -1,0 +1,118 @@
+// Real home-kit colors (primary shirt color + the classic secondary/trim
+// color, e.g. Inter black+blue, Juventus black+white, Milan red+black,
+// VfB Stuttgart red+white) for every club currently synced into the
+// `clubs` table -- confirmed per club, not brand-guideline-exact hex but
+// close enough for instant recognition at badge size. Keyed by the exact
+// `clubs.name` string as synced from football-data.org (see
+// src/football-api/syncClubs.js), which is why this lives as data rather
+// than a lookup on club id -- id is a Supabase-assigned serial, not
+// something to hand-map, but name is the same stable string every sync.
+// Any club not in this map (a newly promoted side football-data.org adds
+// before this list is updated, say) falls back to the old deterministic
+// hashed color in clubColor.js -- graceful, not a build/runtime error.
+export const CLUB_KIT_COLORS = {
+  // Serie A
+  'AC Milan': { primary: '#FB090B', secondary: '#000000' },
+  'AC Monza': { primary: '#C8102E', secondary: '#FFFFFF' },
+  'ACF Fiorentina': { primary: '#5B2A86', secondary: '#FFFFFF' },
+  'AS Roma': { primary: '#8E1F2F', secondary: '#F0BC42' },
+  'Atalanta BC': { primary: '#000000', secondary: '#1E4FA3' },
+  'Bologna FC 1909': { primary: '#8E1B2A', secondary: '#1B3E8E' },
+  'Cagliari Calcio': { primary: '#B71234', secondary: '#00205B' },
+  'Como 1907': { primary: '#1B6FC9', secondary: '#FFFFFF' },
+  'FC Internazionale Milano': { primary: '#010E80', secondary: '#000000' },
+  'Frosinone Calcio': { primary: '#FFD200', secondary: '#1B3E8E' },
+  'Genoa CFC': { primary: '#B0182E', secondary: '#002A5C' },
+  'Juventus FC': { primary: '#000000', secondary: '#FFFFFF' },
+  'Parma Calcio 1913': { primary: '#FFD200', secondary: '#002B7F' },
+  'SS Lazio': { primary: '#87D8F7', secondary: '#FFFFFF' },
+  'SSC Napoli': { primary: '#12A0D7', secondary: '#FFFFFF' },
+  'Torino FC': { primary: '#7B1E3A', secondary: '#FFFFFF' },
+  'Udinese Calcio': { primary: '#000000', secondary: '#FFFFFF' },
+  'US Lecce': { primary: '#FFD200', secondary: '#C8102E' },
+  'US Sassuolo Calcio': { primary: '#000000', secondary: '#2E8B57' },
+  'Venezia FC': { primary: '#000000', secondary: '#1E8449' },
+
+  // Bundesliga
+  '1. FC Köln': { primary: '#ED1C24', secondary: '#FFFFFF' },
+  '1. FC Union Berlin': { primary: '#EB1923', secondary: '#FFFFFF' },
+  '1. FSV Mainz 05': { primary: '#C3141E', secondary: '#FFFFFF' },
+  'Bayer 04 Leverkusen': { primary: '#000000', secondary: '#E32219' },
+  'Borussia Dortmund': { primary: '#FDE100', secondary: '#000000' },
+  'Borussia Mönchengladbach': { primary: '#000000', secondary: '#007A3D' },
+  'Eintracht Frankfurt': { primary: '#000000', secondary: '#E1000F' },
+  'FC Augsburg': { primary: '#BA3733', secondary: '#00843D' },
+  'FC Bayern München': { primary: '#DC052D', secondary: '#FFFFFF' },
+  'FC Schalke 04': { primary: '#004D9D', secondary: '#FFFFFF' },
+  'Hamburger SV': { primary: '#00458C', secondary: '#000000' },
+  'RB Leipzig': { primary: '#DD0741', secondary: '#FFFFFF' },
+  'SC Freiburg': { primary: '#EB0016', secondary: '#000000' },
+  'SC Paderborn 07': { primary: '#001D70', secondary: '#000000' },
+  'SV 07 Elversberg': { primary: '#FFFFFF', secondary: '#000000' },
+  'SV Werder Bremen': { primary: '#009036', secondary: '#FFFFFF' },
+  'TSG 1899 Hoffenheim': { primary: '#1961B5', secondary: '#FFFFFF' },
+  'VfB Stuttgart': { primary: '#E32219', secondary: '#FFFFFF' },
+
+  // Premier League
+  'AFC Bournemouth': { primary: '#DA020E', secondary: '#000000' },
+  'Arsenal FC': { primary: '#EF0107', secondary: '#FFFFFF' },
+  'Aston Villa FC': { primary: '#670E36', secondary: '#95BFE5' },
+  'Brentford FC': { primary: '#E30613', secondary: '#FFFFFF' },
+  'Brighton & Hove Albion FC': { primary: '#0057B8', secondary: '#FFFFFF' },
+  'Chelsea FC': { primary: '#034694', secondary: '#FFFFFF' },
+  'Coventry City FC': { primary: '#78D0F1', secondary: '#FFFFFF' },
+  'Crystal Palace FC': { primary: '#1B458F', secondary: '#C4122E' },
+  'Everton FC': { primary: '#003399', secondary: '#FFFFFF' },
+  'Fulham FC': { primary: '#FFFFFF', secondary: '#000000' },
+  'Hull City AFC': { primary: '#F18A00', secondary: '#000000' },
+  'Ipswich Town FC': { primary: '#0044A9', secondary: '#FFFFFF' },
+  'Leeds United FC': { primary: '#FFFFFF', secondary: '#1D428A' },
+  'Liverpool FC': { primary: '#C8102E', secondary: '#FFFFFF' },
+  'Manchester City FC': { primary: '#6CABDD', secondary: '#1C2C5B' },
+  'Manchester United FC': { primary: '#DA291C', secondary: '#000000' },
+  'Newcastle United FC': { primary: '#241F20', secondary: '#FFFFFF' },
+  'Nottingham Forest FC': { primary: '#DD0000', secondary: '#FFFFFF' },
+  'Sunderland AFC': { primary: '#EB172B', secondary: '#FFFFFF' },
+  'Tottenham Hotspur FC': { primary: '#FFFFFF', secondary: '#132257' },
+
+  // Ligue 1
+  'AJ Auxerre': { primary: '#FFFFFF', secondary: '#003DA5' },
+  'Angers SCO': { primary: '#000000', secondary: '#FFFFFF' },
+  'AS Monaco FC': { primary: '#E4032E', secondary: '#FFFFFF' },
+  'ES Troyes AC': { primary: '#0033A0', secondary: '#F58220' },
+  'FC Lorient': { primary: '#FF6600', secondary: '#000000' },
+  'Le Havre AC': { primary: '#4FA8DA', secondary: '#002654' },
+  'Le Mans FC': { primary: '#BE081A', secondary: '#F1C100' },
+  'Lille OSC': { primary: '#E2001A', secondary: '#FFFFFF' },
+  'OGC Nice': { primary: '#CC092F', secondary: '#000000' },
+  'Olympique de Marseille': { primary: '#2FAEE0', secondary: '#FFFFFF' },
+  'Olympique Lyonnais': { primary: '#FFFFFF', secondary: '#003DA5' },
+  'Paris FC': { primary: '#002D62', secondary: '#6CACE4' },
+  'Paris Saint-Germain FC': { primary: '#004170', secondary: '#DA291C' },
+  'Racing Club de Lens': { primary: '#E2001A', secondary: '#FFD100' },
+  'RC Strasbourg Alsace': { primary: '#0072CE', secondary: '#FFFFFF' },
+  'Stade Brestois 29': { primary: '#E2001A', secondary: '#FFFFFF' },
+  'Stade Rennais FC 1901': { primary: '#E2001A', secondary: '#000000' },
+  'Toulouse FC': { primary: '#6B2C91', secondary: '#FFFFFF' },
+
+  // LaLiga
+  'Athletic Club': { primary: '#EE2523', secondary: '#FFFFFF' },
+  'CA Osasuna': { primary: '#D2122E', secondary: '#001A70' },
+  'Club Atlético de Madrid': { primary: '#CB3524', secondary: '#FFFFFF' },
+  'Deportivo Alavés': { primary: '#0055A4', secondary: '#FFFFFF' },
+  'Elche CF': { primary: '#00843D', secondary: '#FFFFFF' },
+  'FC Barcelona': { primary: '#004D98', secondary: '#A50044' },
+  'Getafe CF': { primary: '#005CA9', secondary: '#FFFFFF' },
+  'Levante UD': { primary: '#0F4C9A', secondary: '#C8102E' },
+  'Málaga CF': { primary: '#1E5EA8', secondary: '#FFFFFF' },
+  'Rayo Vallecano de Madrid': { primary: '#FFFFFF', secondary: '#C8102E' },
+  'RC Celta de Vigo': { primary: '#8AC7EA', secondary: '#FFFFFF' },
+  'RC Deportivo La Coruña': { primary: '#0055A4', secondary: '#FFFFFF' },
+  'RCD Espanyol de Barcelona': { primary: '#0A4C99', secondary: '#FFFFFF' },
+  'Real Betis Balompié': { primary: '#00954C', secondary: '#FFFFFF' },
+  'Real Madrid CF': { primary: '#FFFFFF', secondary: '#FEBE10' },
+  'Real Racing Club de Santander': { primary: '#007A3D', secondary: '#FFFFFF' },
+  'Real Sociedad de Fútbol': { primary: '#0058A8', secondary: '#FFFFFF' },
+  'Sevilla FC': { primary: '#FFFFFF', secondary: '#D0021B' },
+  'Villarreal CF': { primary: '#FFE667', secondary: '#005CA9' },
+};
