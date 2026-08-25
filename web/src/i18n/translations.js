@@ -63,7 +63,7 @@ const de = {
   },
   quickFilters: {
     addAria: 'Quick-Filter hinzufügen',
-    confirmRemove: 'Willst du den Filter wirklich löschen?',
+    confirmRemove: 'Willst du den Filter wirklich entfernen?',
     remove: 'Entfernen',
   },
   errors: {
