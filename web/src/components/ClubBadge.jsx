@@ -1,16 +1,13 @@
-import { clubBadgeColor } from '../lib/clubColor.js';
 import { clubShortCode } from '../lib/clubShortCodes.js';
 
-export default function ClubBadge({ club, size = 24 }) {
+// Flat, theme-neutral badge -- no per-club color. Used only where there's
+// no adjacent club-name text (quick-filter chips): confirmed live that
+// coloring every chip per-club, next to short unlabeled codes, read as
+// cluttered rather than helpful. See ClubJersey.jsx for the colored
+// treatment used everywhere the name is already shown as text.
+export default function ClubBadge({ club, size = 24, theme }) {
   if (!club) return null;
-  const { bg, border, fg } = clubBadgeColor(club);
   const code = clubShortCode(club);
-  // Border (not a split background) carries the kit's second color -- puts
-  // the short code on a single solid fill, so text contrast only ever has
-  // to work against one color regardless of how light or dark either kit
-  // color is (real primaries range from near-black to near-white, unlike
-  // the old hash-generated fallback colors).
-  const borderWidth = Math.max(1.5, size * 0.09);
   // Almost every code is 3 chars, and the badge is a fixed square sized
   // for that. Confirmed live: shrinking the font to fit a longer code
   // (e.g. "ESTAC", the one current override that isn't 3 chars, see
@@ -32,10 +29,10 @@ export default function ClubBadge({ club, size = 24 }) {
         height: size,
         padding: isLong ? '0 4px' : 0,
         borderRadius: '6px',
-        background: bg,
-        border: `${borderWidth}px solid ${border}`,
+        background: theme.surface,
+        border: `1px solid ${theme.border}`,
         boxSizing: 'border-box',
-        color: fg,
+        color: theme.textMuted,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

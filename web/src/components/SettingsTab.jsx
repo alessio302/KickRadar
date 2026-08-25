@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bell, Check, ChevronDown, X } from 'lucide-react';
-import ClubBadge from './ClubBadge.jsx';
+import ClubJersey from './ClubJersey.jsx';
 import { useAllClubs } from '../hooks/useAllClubs.js';
 import { usePushSubscription, NOTIFICATIONS_DENIED } from '../hooks/usePushSubscription.js';
 import { LANGUAGES } from '../i18n/languages.js';
@@ -174,7 +174,7 @@ export default function SettingsTab({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ClubBadge club={c} size={20} />
+              <ClubJersey club={c} size={20} theme={theme} />
               <span style={{ fontSize: '14px' }}>{c.name}</span>
             </div>
             <button onClick={() => onRemoveQuickFilter(c.id)} aria-label={t.settings.removeClub(c.name)} style={{ border: 'none', background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}>

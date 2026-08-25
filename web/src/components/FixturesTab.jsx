@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
-import ClubBadge from './ClubBadge.jsx';
+import ClubJersey from './ClubJersey.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
@@ -140,7 +140,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
                         {formatTime(f.kickoff_at, locale)}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-                        <ClubBadge club={clubsById.get(f.home_club_id)} size={20} />
+                        <ClubJersey club={clubsById.get(f.home_club_id)} size={20} theme={theme} />
                         <span style={{ fontSize: '13px' }}>{clubsById.get(f.home_club_id)?.name}</span>
                       </div>
                       <span style={{ fontSize: '11px', color: theme.textMuted }}>
@@ -148,7 +148,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, justifyContent: 'flex-end' }}>
                         <span style={{ fontSize: '13px' }}>{clubsById.get(f.away_club_id)?.name}</span>
-                        <ClubBadge club={clubsById.get(f.away_club_id)} size={20} />
+                        <ClubJersey club={clubsById.get(f.away_club_id)} size={20} theme={theme} />
                       </div>
                     </div>
                   ))}

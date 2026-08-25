@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Star, Plus } from 'lucide-react';
 import ClubBadge from './ClubBadge.jsx';
+import ClubJersey from './ClubJersey.jsx';
 
 // Confirmed via feedback: the little corner "x" (15px, overlapping the
 // badge) was too fiddly a target on a touchscreen -- well under Apple's
@@ -82,7 +83,7 @@ function QuickFilterChip({ theme, club, isActive, onSelect, onLongPress }) {
         transition: pressing ? `transform ${LONG_PRESS_MS}ms ease, opacity ${LONG_PRESS_MS}ms ease` : 'transform 0.15s ease, opacity 0.15s ease',
       }}
     >
-      <ClubBadge club={club} size={22} />
+      <ClubBadge club={club} size={22} theme={theme} />
     </button>
   );
 }
@@ -125,7 +126,7 @@ export default function QuickFilters({
             color: activeFilterId === favoriteClub.id ? theme.accent : theme.text,
           }}
         >
-          <ClubBadge club={favoriteClub} size={20} />
+          <ClubBadge club={favoriteClub} size={20} theme={theme} />
           <Star size={11} fill="currentColor" />
         </button>
       )}
@@ -219,7 +220,7 @@ export default function QuickFilters({
               textAlign: 'center',
             }}
           >
-            <ClubBadge club={confirmClub} size={36} />
+            <ClubJersey club={confirmClub} size={36} theme={theme} />
             <p style={{ fontSize: '15px', fontWeight: 700, color: theme.text, margin: '10px 0 4px' }}>{confirmClub.name}</p>
             <p style={{ fontSize: '14px', color: theme.textMuted, margin: '0 0 18px' }}>{t.quickFilters.confirmRemove}</p>
             <div style={{ display: 'flex', gap: '10px' }}>
