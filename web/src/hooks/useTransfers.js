@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { useLeagueId } from './useLeagueId.js';
 
@@ -30,12 +30,9 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
   const leagueId = useLeagueId(leagueSlug);
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (leagueId == null) return;
-    let cancelled = false;
-    setLoading(true);
-
+  const buildQuery = useCallback(() => {
     let query = supabase
       .from('transfers')
       .select(
@@ -51,8 +48,15 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     if (officialOnly) {
       query = query.eq('is_official', true);
     }
+    return query;
+  }, [leagueId, officialOnly]);
 
-    query.then(({ data, error }) => {
+  useEffect(() => {
+    if (leagueId == null) return;
+    let cancelled = false;
+    setLoading(true);
+
+    buildQuery().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error('Failed to load transfers for league', leagueSlug, error);
@@ -66,7 +70,24 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId, leagueSlug, officialOnly]);
+  }, [leagueId, leagueSlug, buildQuery]);
 
-  return { transfers, loading };
+  // Re-queries Supabase directly for pull-to-refresh -- this never touches
+  // the actual news sources, the LLM extraction, or any other rate-limited
+  // free-tier API. Those only run on the hourly GitHub Actions scrape,
+  // independent of how often (or how many people) pull-to-refresh; a
+  // refetch just re-reads whatever that last scrape already stored.
+  const refetch = useCallback(async () => {
+    if (leagueId == null) return;
+    setRefreshing(true);
+    const { data, error } = await buildQuery();
+    if (error) {
+      console.error('Failed to refresh transfers for league', leagueSlug, error);
+    } else {
+      setTransfers(data);
+    }
+    setRefreshing(false);
+  }, [leagueId, leagueSlug, buildQuery]);
+
+  return { transfers, loading, refreshing, refetch };
 }

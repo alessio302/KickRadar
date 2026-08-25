@@ -1,9 +1,14 @@
-import { useMemo } from 'react';
-import { ArrowRightCircle, User, ExternalLink } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { ArrowRightCircle, RefreshCw, User, ExternalLink } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import QuickFilters from './QuickFilters.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
+
+// Distance the indicator has to be pulled past before releasing triggers a
+// refresh, and the cap on how far it visually travels while dragging.
+const PULL_THRESHOLD = 60;
+const PULL_MAX = 90;
 
 function relativeTime(iso) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -30,12 +35,47 @@ export default function TransfersTab({
   onToggleOfficialOnly,
 }) {
   const { clubs } = useClubs(league);
-  const { transfers, loading } = useTransfers(league, { officialOnly });
+  const { transfers, loading, refreshing, refetch } = useTransfers(league, { officialOnly });
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
     return transfers.filter((t) => t.from_club_id === activeFilter.id || t.to_club_id === activeFilter.id);
   }, [transfers, activeFilter]);
+
+  // Pull-to-refresh: only starts tracking when the list is already
+  // scrolled to the top (a pull gesture mid-list would just be a normal
+  // scroll), and bails the moment either condition stops holding mid-drag
+  // (scrolled away, or dragging back up) so it never fights native
+  // scrolling. Pointer events (not touch) so this also works with a mouse
+  // during desktop testing.
+  const scrollRef = useRef(null);
+  const dragStartY = useRef(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pulling, setPulling] = useState(false);
+
+  const handlePointerDown = (e) => {
+    if (scrollRef.current && scrollRef.current.scrollTop <= 0) {
+      dragStartY.current = e.clientY;
+    }
+  };
+  const handlePointerMove = (e) => {
+    if (dragStartY.current == null) return;
+    const delta = e.clientY - dragStartY.current;
+    if (delta <= 0 || !scrollRef.current || scrollRef.current.scrollTop > 0) {
+      dragStartY.current = null;
+      setPulling(false);
+      setPullDistance(0);
+      return;
+    }
+    setPulling(true);
+    setPullDistance(Math.min(delta, PULL_MAX));
+  };
+  const handlePointerUp = () => {
+    if (pulling && pullDistance >= PULL_THRESHOLD) refetch();
+    dragStartY.current = null;
+    setPulling(false);
+    setPullDistance(0);
+  };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -93,7 +133,44 @@ export default function TransfersTab({
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 14px' }}>
+      <div
+        ref={scrollRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorY: 'contain',
+          padding: '12px 16px 14px',
+        }}
+      >
+      <style>{'@keyframes kickradar-spin { to { transform: rotate(360deg); } }'}</style>
+      <div
+        style={{
+          height: refreshing ? '40px' : `${pullDistance}px`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          overflow: 'hidden',
+          color: theme.textMuted,
+          fontSize: '12px',
+          transition: pulling ? 'none' : 'height 0.2s ease',
+        }}
+      >
+        <RefreshCw
+          size={14}
+          style={{
+            animation: refreshing ? 'kickradar-spin 0.7s linear infinite' : 'none',
+            transform: refreshing ? undefined : `rotate(${Math.min(pullDistance / PULL_THRESHOLD, 1) * 180}deg)`,
+          }}
+        />
+        {refreshing ? 'Aktualisiert…' : pullDistance >= PULL_THRESHOLD ? 'Loslassen zum Aktualisieren' : 'Zum Aktualisieren ziehen'}
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>Lädt…</p>
