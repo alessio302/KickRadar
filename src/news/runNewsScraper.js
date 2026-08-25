@@ -324,6 +324,7 @@ async function scrapeLeague(supabase, league) {
         toClub: resolvedToMatch?.name ?? resolvedToClub,
         league: league.name,
         leagueSlug: league.slug,
+        isOfficial,
       });
     }
   }
@@ -358,7 +359,8 @@ function buildNotificationPayloads(notifiable) {
   }
   return notifiable.map((t) => {
     const body = t.fromClub && t.toClub ? `${t.fromClub} → ${t.toClub} (${t.league})` : `${t.toClub ?? t.fromClub} (${t.league})`;
-    return { title: `Neuer Transfer: ${t.playerName}`, body, url: `/?league=${t.leagueSlug}` };
+    const prefix = t.isOfficial ? 'Offiziell' : 'Neues Gerücht';
+    return { title: `${prefix}: ${t.playerName}`, body, url: `/?league=${t.leagueSlug}` };
   });
 }
 
