@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRightCircle, RefreshCw, User, ExternalLink } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import QuickFilters from './QuickFilters.jsx';
@@ -9,6 +9,14 @@ import { useTransfers } from '../hooks/useTransfers.js';
 // refresh, and the cap on how far it visually travels while dragging.
 const PULL_THRESHOLD = 60;
 const PULL_MAX = 90;
+
+// Rubber-band curve (grows fast at first, increasingly resists further
+// pulling) instead of 1:1 finger tracking -- matches native overscroll
+// physics; confirmed live that a linear mapping read as "not elastic
+// enough, can barely pull it."
+function dampen(rawDelta) {
+  return Math.min(PULL_MAX, Math.sqrt(rawDelta) * 6);
+}
 
 function relativeTime(iso) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -44,38 +52,68 @@ export default function TransfersTab({
 
   // Pull-to-refresh: only starts tracking when the list is already
   // scrolled to the top (a pull gesture mid-list would just be a normal
-  // scroll), and bails the moment either condition stops holding mid-drag
-  // (scrolled away, or dragging back up) so it never fights native
-  // scrolling. Pointer events (not touch) so this also works with a mouse
-  // during desktop testing.
+  // scroll), and lets go cleanly the moment either condition stops holding
+  // mid-drag (scrolled away, or dragging back up).
+  //
+  // A real, non-passive touchmove listener (attached via useEffect), not
+  // React's synthetic onTouchMove/onPointerMove props -- confirmed live
+  // that those can't reliably preventDefault() the browser's own decision
+  // to hand an ambiguous vertical drag off to native scrolling mid-gesture,
+  // which showed up as the custom indicator flashing briefly and then the
+  // pull just stopping tracking. Calling preventDefault() ourselves, once
+  // we've decided this is a pull (not a scroll), keeps the whole gesture.
   const scrollRef = useRef(null);
-  const dragStartY = useRef(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [pulling, setPulling] = useState(false);
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
 
-  const handlePointerDown = (e) => {
-    if (scrollRef.current && scrollRef.current.scrollTop <= 0) {
-      dragStartY.current = e.clientY;
-    }
-  };
-  const handlePointerMove = (e) => {
-    if (dragStartY.current == null) return;
-    const delta = e.clientY - dragStartY.current;
-    if (delta <= 0 || !scrollRef.current || scrollRef.current.scrollTop > 0) {
-      dragStartY.current = null;
-      setPulling(false);
-      setPullDistance(0);
-      return;
-    }
-    setPulling(true);
-    setPullDistance(Math.min(delta, PULL_MAX));
-  };
-  const handlePointerUp = () => {
-    if (pulling && pullDistance >= PULL_THRESHOLD) refetch();
-    dragStartY.current = null;
-    setPulling(false);
-    setPullDistance(0);
-  };
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let startY = null;
+
+    const handleTouchStart = (e) => {
+      startY = el.scrollTop <= 0 ? e.touches[0].clientY : null;
+    };
+
+    const handleTouchMove = (e) => {
+      if (startY == null) return;
+      const rawDelta = e.touches[0].clientY - startY;
+      if (rawDelta <= 0 || el.scrollTop > 0) {
+        startY = null;
+        setPulling(false);
+        setPullDistance(0);
+        return;
+      }
+      e.preventDefault();
+      setPulling(true);
+      setPullDistance(dampen(rawDelta));
+    };
+
+    const handleTouchEnd = () => {
+      if (startY != null) {
+        setPullDistance((current) => {
+          if (current >= PULL_THRESHOLD) refetchRef.current();
+          return 0;
+        });
+        setPulling(false);
+      }
+      startY = null;
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, []);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -135,10 +173,6 @@ export default function TransfersTab({
 
       <div
         ref={scrollRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
         style={{
           flex: 1,
           minHeight: 0,
