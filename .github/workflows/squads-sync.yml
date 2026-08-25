@@ -9,8 +9,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # ~75 clubs across 4 leagues at ~6.5s/request (free tier: 10 req/min)
-    # takes roughly 8 minutes end to end.
+    # ~95 clubs across 5 leagues at ~6.5s/request (free tier: 10 req/min)
+    # takes roughly 10 minutes end to end.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4

@@ -111,7 +111,7 @@ async function scrapeLeague(supabase, league) {
     // ("OM" and "Olympique de Marseille" both become the same canonical
     // record) and gives the frontend a real FK for badges/filtering instead
     // of free-standing text. A miss just keeps the raw extracted string.
-    // Matched against all four leagues' clubs (see allClubs above), so a
+    // Matched against all five leagues' clubs (see allClubs above), so a
     // cross-league story gets a real club_id on both sides, not just the
     // side that happens to belong to this scraper's own league.
     const fromClubMatch = resolveClub(fromClub, allClubs);

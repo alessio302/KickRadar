@@ -16,7 +16,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Syncs every club's current squad (across all four leagues, since a
+// Syncs every club's current squad (across all five leagues, since a
 // transfer story frequently involves clubs from two different ones) so
 // runNewsScraper.js can resolve transfer direction against a real "where
 // does this player actually play" signal instead of guessing between two
@@ -58,7 +58,7 @@ export async function syncAllSquads() {
       results[club.name] = { error: err.message };
     }
     // Free tier: 10 requests/minute. 6.5s spacing keeps a comfortable
-    // margin -- ~75 clubs across 4 leagues takes ~8 minutes end to end.
+    // margin -- ~95 clubs across 5 leagues takes ~10 minutes end to end.
     await sleep(6500);
   }
   return results;
