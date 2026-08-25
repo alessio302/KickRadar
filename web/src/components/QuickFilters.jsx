@@ -1,6 +1,75 @@
-import { useState } from 'react';
-import { Star, Plus, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Star, Plus } from 'lucide-react';
 import ClubBadge from './ClubBadge.jsx';
+
+// Confirmed via feedback: the little corner "x" (15px, overlapping the
+// badge) was too fiddly a target on a touchscreen -- well under Apple's
+// 44pt minimum tap-target guideline, and visually cluttered every chip
+// even when not being used. Long-press instead: the whole chip (much
+// bigger) is the target, nothing is drawn until you actually press, and
+// the same removal is still available as an explicit, clearly-labeled
+// button in Settings' quick-filter list for anyone who doesn't find the
+// gesture. Not a full a11y substitute for that button -- long-press has
+// no reliable screen-reader equivalent -- which is exactly why that
+// Settings list stays as the accessible path.
+const LONG_PRESS_MS = 500;
+
+function QuickFilterChip({ theme, club, isActive, onSelect, onRemove }) {
+  const [pressing, setPressing] = useState(false);
+  const timerRef = useRef(null);
+  const firedRef = useRef(false);
+
+  const clearTimer = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
+
+  const endPress = () => {
+    clearTimer();
+    setPressing(false);
+  };
+
+  const handlePointerDown = () => {
+    firedRef.current = false;
+    setPressing(true);
+    timerRef.current = setTimeout(() => {
+      firedRef.current = true;
+      setPressing(false);
+      if (navigator.vibrate) navigator.vibrate(10);
+      onRemove();
+    }, LONG_PRESS_MS);
+  };
+
+  const handlePointerUp = () => {
+    const wasLongPress = firedRef.current;
+    endPress();
+    if (!wasLongPress) onSelect();
+  };
+
+  return (
+    <button
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={endPress}
+      onPointerCancel={endPress}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        flex: '0 0 auto',
+        padding: '3px',
+        borderRadius: '999px',
+        border: `2px solid ${isActive ? theme.accent : theme.border}`,
+        background: 'transparent',
+        cursor: 'pointer',
+        transform: pressing ? 'scale(0.85)' : 'scale(1)',
+        opacity: pressing ? 0.55 : 1,
+        transition: pressing ? `transform ${LONG_PRESS_MS}ms ease, opacity ${LONG_PRESS_MS}ms ease` : 'transform 0.15s ease, opacity 0.15s ease',
+      }}
+    >
+      <ClubBadge club={club} size={22} />
+    </button>
+  );
+}
 
 export default function QuickFilters({
   theme,
@@ -44,49 +113,16 @@ export default function QuickFilters({
         </button>
       )}
 
-      {quickFilters.map((club) => {
-        const isActive = activeFilterId === club.id;
-        return (
-          <div key={club.id} style={{ position: 'relative', flex: '0 0 auto' }}>
-            <button
-              onClick={() => onSelectFilter(club)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '3px',
-                borderRadius: '999px',
-                border: `2px solid ${isActive ? theme.accent : theme.border}`,
-                background: 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              <ClubBadge club={club} size={22} />
-            </button>
-            <button
-              onClick={() => onRemoveQuickFilter(club.id)}
-              aria-label={t.quickFilters.removeAria(club.name)}
-              style={{
-                position: 'absolute',
-                top: '-5px',
-                right: '-5px',
-                width: '15px',
-                height: '15px',
-                borderRadius: '50%',
-                background: theme.surfaceRaised,
-                border: `1px solid ${theme.border}`,
-                color: theme.textMuted,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                padding: 0,
-              }}
-            >
-              <X size={9} />
-            </button>
-          </div>
-        );
-      })}
+      {quickFilters.map((club) => (
+        <QuickFilterChip
+          key={club.id}
+          theme={theme}
+          club={club}
+          isActive={activeFilterId === club.id}
+          onSelect={() => onSelectFilter(club)}
+          onRemove={() => onRemoveQuickFilter(club.id)}
+        />
+      ))}
 
       {!showAdd ? (
         availableToAdd.length > 0 && (

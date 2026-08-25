@@ -62,7 +62,6 @@ const de = {
     language: 'Sprache',
   },
   quickFilters: {
-    removeAria: (name) => `${name} aus Quick-Filtern entfernen`,
     addAria: 'Quick-Filter hinzufügen',
   },
   errors: {
@@ -122,7 +121,6 @@ const en = {
     language: 'Language',
   },
   quickFilters: {
-    removeAria: (name) => `Remove ${name} from quick filters`,
     addAria: 'Add quick filter',
   },
   errors: {
@@ -182,7 +180,6 @@ const it = {
     language: 'Lingua',
   },
   quickFilters: {
-    removeAria: (name) => `Rimuovi ${name} dai filtri rapidi`,
     addAria: 'Aggiungi filtro rapido',
   },
   errors: {
@@ -242,7 +239,6 @@ const fr = {
     language: 'Langue',
   },
   quickFilters: {
-    removeAria: (name) => `Retirer ${name} des filtres rapides`,
     addAria: 'Ajouter un filtre rapide',
   },
   errors: {
@@ -302,7 +298,6 @@ const es = {
     language: 'Idioma',
   },
   quickFilters: {
-    removeAria: (name) => `Eliminar ${name} de los filtros rápidos`,
     addAria: 'Añadir filtro rápido',
   },
   errors: {
