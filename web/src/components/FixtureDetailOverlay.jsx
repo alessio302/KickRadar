@@ -39,17 +39,25 @@ function playerLabel(p) {
 // initialLineup's own row grouping (GK, then each tactical line, forwards
 // last) already *is* a formation layout -- one horizontal rank per row,
 // top to bottom -- so no separate formation-string parsing is needed to
-// place players. minHeight scales with the number of ranks so a back-5
-// formation isn't cramped into the same vertical space as a back-4 one.
+// place players.
+//
+// A real pitch is 105 x 68m; a half (halfway line to goal line) is
+// 52.5 x 68m -- wider than it is tall. aspect-ratio keeps that roughly
+// true at any container width, with ranks distributed inside it via
+// flex instead of being stacked at a fixed per-rank height (which read
+// as too tall/sparse -- confirmed by the user against the reference
+// screenshot's much more compact proportions).
 function PitchFormation({ formation, rows }) {
   return (
     <div
       style={{
         position: 'relative',
+        boxSizing: 'border-box',
         overflow: 'hidden',
         borderRadius: '14px',
         background: 'linear-gradient(180deg, #1e6b3a, #164d2a)',
-        padding: '34px 6px 22px',
+        padding: '30px 6px 10px',
+        aspectRatio: '68 / 52.5',
       }}
     >
       {formation && (
@@ -70,15 +78,16 @@ function PitchFormation({ formation, rows }) {
         </span>
       )}
 
-      {/* Own goal box, open at the field boundary (top edge). */}
+      {/* Own penalty area, open at the field boundary (top edge) -- real
+          proportions are ~40.3m wide x 16.5m deep out of a 68 x 52.5m half. */}
       <div
         style={{
           position: 'absolute',
           top: 0,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '46%',
-          height: '15%',
+          width: '58%',
+          height: '27%',
           border: '1.5px solid rgba(255,255,255,0.32)',
           borderTop: 'none',
           borderBottomLeftRadius: '4px',
@@ -91,11 +100,11 @@ function PitchFormation({ formation, rows }) {
       <div
         style={{
           position: 'absolute',
-          bottom: '-70px',
+          bottom: '-46px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '150px',
-          height: '150px',
+          width: '92px',
+          height: '92px',
           borderRadius: '50%',
           border: '1.5px solid rgba(255,255,255,0.32)',
         }}
@@ -104,27 +113,27 @@ function PitchFormation({ formation, rows }) {
       <div
         style={{
           position: 'relative',
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          minHeight: `${Math.max(4, rows.length) * 92}px`,
         }}
       >
         {rows.map((rank, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-evenly' }}>
             {rank.map((p) => (
-              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '60px' }}>
+              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '54px' }}>
                 <div
                   style={{
-                    width: '30px',
-                    height: '30px',
+                    width: '26px',
+                    height: '26px',
                     borderRadius: '50%',
                     background: 'rgba(255,255,255,0.94)',
                     color: '#15181D',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: 800,
                     flexShrink: 0,
                   }}
@@ -133,11 +142,11 @@ function PitchFormation({ formation, rows }) {
                 </div>
                 <span
                   style={{
-                    fontSize: '10px',
+                    fontSize: '9px',
                     color: '#fff',
                     textAlign: 'center',
-                    marginTop: '4px',
-                    lineHeight: 1.15,
+                    marginTop: '2px',
+                    lineHeight: 1.1,
                     textShadow: '0 1px 3px rgba(0,0,0,0.7)',
                   }}
                 >
