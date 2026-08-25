@@ -40,15 +40,24 @@ jobs) at the repo root; the frontend lives in `web/` (see `web/README.md`).
    npm run scrape:news
    ```
 7. **GitHub Actions**: add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `FOOTBALL_DATA_API_KEY`, and `GEMINI_API_KEY` as repository secrets
-   (Settings → Secrets and variables → Actions). The three workflows in
-   `.github/workflows/` then run on their own schedule:
-   - `news-scraper.yml` — hourly
+   `FOOTBALL_DATA_API_KEY`, `GEMINI_API_KEY`, `HIGHLIGHTLY_API_KEY`, and
+   the VAPID push keys as repository secrets (Settings → Secrets and
+   variables → Actions). The workflows in `.github/workflows/` then run
+   on their own schedule:
+   - `news-scraper.yml` — every 15 min
+   - `lineups-sync.yml` — every 15 min
    - `fixtures-sync.yml` — 4x/day
+   - `squads-sync.yml` — daily
    - `clubs-sync.yml` — daily
 
    You can also trigger any of them manually via "Run workflow"
    (`workflow_dispatch`) to do the first-time load without a local `.env`.
+
+   The two 15-min workflows only work out within GitHub Actions' free
+   tier because this repo is **public** (unlimited Actions minutes) --
+   a private repo's free 2,000 min/month is easily exceeded by a single
+   96-runs/day schedule alone, since Actions bills whole minutes per job
+   regardless of how fast the job actually finishes.
 
 ## Project layout
 
@@ -141,8 +150,8 @@ internet access) to get right:
   symptom: a wall of "LLM extraction failed" warnings). `llmExtract.js`
   now throttles itself to stay under that cap, which is why a large
   backlog run can take several minutes (see the `timeout-minutes: 20` on
-  the news-scraper workflow) -- steady-state hourly runs, which only ever
-  see genuinely new items, aren't affected.
+  the news-scraper workflow) -- steady-state runs, which only ever see
+  genuinely new items since the last run, aren't affected.
 - **Transfermarkt profile resolution** (`playerProfileResolver.js`) scrapes
   the public "Schnellsuche" (quick search) results page for the first
   player-profile link. If transfermarkt.de changes that page's markup, the
