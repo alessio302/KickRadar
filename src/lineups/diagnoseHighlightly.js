@@ -1,99 +1,71 @@
-// Read-only smoke test, no DB writes. Answers two questions in one run
-// (to avoid another guess-then-wait-for-a-fresh-log round trip):
+import { getMatches, getLineups } from './highlightlyClient.js';
+
+// Read-only smoke test, no DB writes. Auth is confirmed working now (see
+// git history of this file for the header-probing round) -- this pass
+// checks the two things still open:
 //
-// 1. Which auth header shape does this key actually need? Highlightly's
-//    own docs/blog content contradicts itself between their two product
-//    lines (native highlightly.net signup vs. RapidAPI marketplace) --
-//    confirmed live: "Authorization: Bearer" alone got "403 Missing
-//    mandatory HTTP Headers" from the native host (soccer.highlightly.net),
-//    even though that's what their native-platform docs say to use.
-// 2. Once auth works: does the FREE plan return CURRENT SEASON match data
-//    at all? API-Football looked just as good on paper and turned out to
-//    hard-block the current season on its free tier entirely (see
-//    src/football-api/client.js's history) -- no point building the full
-//    lineups sync before ruling that out here too.
-const BASE_URL = process.env.HIGHLIGHTLY_BASE_URL || 'https://soccer.highlightly.net';
-
-function headerVariants(apiKey) {
-  return [
-    { label: 'Authorization: Bearer', headers: { Authorization: `Bearer ${apiKey}` } },
-    { label: 'x-api-key', headers: { 'x-api-key': apiKey } },
-    { label: 'x-rapidapi-key + x-rapidapi-host: soccer.highlightly.net', headers: { 'x-rapidapi-key': apiKey, 'x-rapidapi-host': 'soccer.highlightly.net' } },
-    { label: 'Authorization: Bearer + x-rapidapi-host', headers: { Authorization: `Bearer ${apiKey}`, 'x-rapidapi-host': 'soccer.highlightly.net' } },
-  ];
-}
-
-async function tryVariant(variant, path, params) {
-  const url = new URL(`${BASE_URL}${path}`);
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) url.searchParams.set(key, value);
-  }
-  const res = await fetch(url, { headers: variant.headers });
-  const body = await res.text();
-  return { ok: res.ok, status: res.status, body };
-}
+// 1. Does /matches actually surface our 4 target leagues when filtered by
+//    country? An unfiltered call returned 100 South/Central American
+//    matches with no sign of Serie A/Bundesliga/Premier League/Ligue 1 --
+//    could be pagination (the response carries a `pagination` field) or
+//    could mean a country/league filter is required.
+// 2. Does /lineups return real starters for one of our leagues close to
+//    kickoff? The one match checked so far was days out and came back
+//    with an empty "Unknown" formation, which is expected that far ahead
+//    regardless of source quality -- not yet a real signal either way.
+const COUNTRIES = ['Italy', 'Germany', 'England', 'France'];
 
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
-async function findWorkingVariant(apiKey) {
-  const dateStr = toDateString(new Date());
-  for (const variant of headerVariants(apiKey)) {
-    console.log(`\n--- trying headers: ${variant.label} ---`);
-    const result = await tryVariant(variant, '/matches', { date: dateStr });
-    console.log(`  ${result.status}: ${result.body.slice(0, 300)}`);
-    if (result.ok) return variant;
-  }
-  return null;
+async function matchesForCountryAndDate(countryName, dateStr) {
+  const data = await getMatches({ date: dateStr, countryName });
+  const matches = Array.isArray(data) ? data : data.data || data.matches || [];
+  return { matches, raw: data };
 }
 
 async function run() {
-  const apiKey = process.env.HIGHLIGHTLY_API_KEY;
-  if (!apiKey) throw new Error('Missing HIGHLIGHTLY_API_KEY env var.');
-
-  console.log('=== Probing auth header variants against /matches ===');
-  const workingVariant = await findWorkingVariant(apiKey);
-  if (!workingVariant) {
-    console.log('\nNone of the tried header combinations worked. Check the raw error bodies above -- the real answer is usually in there (auth docs link, or a plan/subscription message).');
-    return;
-  }
-  console.log(`\nWorking header shape: ${workingVariant.label}`);
-
-  console.log('\n=== Fetching matches for a few dates with the working headers ===');
   const today = new Date();
-  const allMatches = [];
-  for (const offsetDays of [0, 2, 5]) {
-    const dateStr = toDateString(new Date(today.getTime() + offsetDays * 24 * 60 * 60 * 1000));
-    console.log(`\n--- date=${dateStr} ---`);
-    const result = await tryVariant(workingVariant, '/matches', { date: dateStr });
-    console.log(`  ${result.status}`);
-    if (!result.ok) {
-      console.log(`  ${result.body.slice(0, 500)}`);
-      continue;
+  const dates = [0, 1, 2, 3, 4, 5, 6].map((d) => toDateString(new Date(today.getTime() + d * 24 * 60 * 60 * 1000)));
+
+  const found = [];
+  for (const countryName of COUNTRIES) {
+    console.log(`\n=== country=${countryName} ===`);
+    for (const dateStr of dates) {
+      let result;
+      try {
+        result = await matchesForCountryAndDate(countryName, dateStr);
+      } catch (err) {
+        console.error(`  date=${dateStr} failed:`, err.message);
+        continue;
+      }
+      if (result.matches.length === 0) continue;
+      console.log(`  date=${dateStr}: ${result.matches.length} matches, pagination=${JSON.stringify(result.raw.pagination || null)}`);
+      for (const m of result.matches.slice(0, 5)) {
+        console.log('   ', JSON.stringify({ id: m.id, round: m.round, date: m.date, league: m.league, home: m.homeTeam?.name, away: m.awayTeam?.name }));
+        found.push(m);
+      }
     }
-    const data = JSON.parse(result.body);
-    const matches = Array.isArray(data) ? data : data.matches || data.data || [];
-    console.log(`  ${matches.length} matches (response shape: ${Array.isArray(data) ? 'array' : Object.keys(data).join(', ')})`);
-    for (const m of matches.slice(0, 10)) console.log('   ', JSON.stringify(m).slice(0, 300));
-    allMatches.push(...matches);
   }
 
-  if (allMatches.length === 0) {
-    console.log('\nNo matches returned for any tried date -- either the free plan blocks current-season data (as API-Football did), or /matches needs different params (league/season) that weren\'t guessed here. Check the raw responses above.');
+  if (found.length === 0) {
+    console.log('\nNo matches found for any of the 4 target countries across the next week -- either countryName isn\'t the right filter param, or these leagues aren\'t covered on the free plan. Try leagueName instead, or inspect a raw unfiltered response for a "league" field to find the right id.');
     return;
   }
 
-  const sample = allMatches[0];
-  const matchId = sample.id ?? sample.matchId ?? sample.match_id;
-  console.log(`\n=== GET /lineups/${matchId} (first match found) ===`);
-  if (!matchId) {
-    console.log('Could not find an id field on the sample match object -- inspect the JSON logged above to find the right field name.');
-    return;
+  // Prefer a match that's closest to kickoff for the lineup check -- lineups
+  // only populate ~30-40 min before, per Highlightly's docs, so a match
+  // days out will always come back empty regardless of coverage quality.
+  found.sort((a, b) => new Date(a.date) - new Date(b.date));
+  const soonest = found[0];
+  console.log(`\n=== GET /lineups/${soonest.id} (soonest match found: ${soonest.home ?? soonest.homeTeam?.name} vs ${soonest.away ?? soonest.awayTeam?.name}, ${soonest.date}) ===`);
+  try {
+    const lineups = await getLineups(soonest.id);
+    console.log(JSON.stringify(lineups, null, 2).slice(0, 2000));
+  } catch (err) {
+    console.error('failed:', err.message);
   }
-  const result = await tryVariant(workingVariant, `/lineups/${matchId}`, {});
-  console.log(`  ${result.status}`);
-  console.log(result.body.slice(0, 2000));
 }
 
 run()
