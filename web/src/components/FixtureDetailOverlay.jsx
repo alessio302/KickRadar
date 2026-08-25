@@ -7,12 +7,27 @@ function formatKickoff(iso) {
   return new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-// Highlightly's real per-player shape isn't confirmed yet (every match
-// checked during the source evaluation was too far out for lineups to be
-// populated) -- stay defensive about the field name until a real payload
-// is seen.
+// Confirmed live against a real populated Highlightly response (Kazakhstan
+// Premier League, FK Tobol Kostanay vs Kaisar, 2026-08-25): initialLineup
+// is an array of arrays -- one per formation row (GK, then each tactical
+// line) -- not a flat list, and each player is { name, number, position,
+// id }. substitutes is a flat array of the same player shape.
+const POSITION_LABELS = {
+  Goalkeeper: 'Torwart',
+  Defender: 'Verteidiger',
+  Midfielder: 'Mittelfeld',
+  Forward: 'Sturm',
+};
+
 function playerLabel(p) {
-  return p.name || p.player?.name || p.playerName || JSON.stringify(p);
+  const pos = POSITION_LABELS[p.position] || p.position;
+  return (
+    <>
+      <span style={{ color: 'inherit', opacity: 0.6, marginRight: '8px' }}>{p.number ?? '–'}</span>
+      {p.name}
+      {pos && <span style={{ opacity: 0.6 }}> · {pos}</span>}
+    </>
+  );
 }
 
 function LineupList({ theme, row }) {
@@ -28,7 +43,7 @@ function LineupList({ theme, row }) {
   }
 
   const players = row.players || {};
-  const starters = players.initialLineup || players.starters || [];
+  const starters = (players.initialLineup || []).flat();
   const subs = players.substitutes || [];
 
   return (
@@ -46,8 +61,8 @@ function LineupList({ theme, row }) {
         <p style={{ fontSize: '13px', color: theme.textMuted, margin: 0 }}>Noch keine Spieler gemeldet.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: subs.length ? '16px' : 0 }}>
-          {starters.map((p, i) => (
-            <div key={i} style={{ fontSize: '14px' }}>{playerLabel(p)}</div>
+          {starters.map((p) => (
+            <div key={p.id} style={{ fontSize: '14px' }}>{playerLabel(p)}</div>
           ))}
         </div>
       )}
@@ -58,8 +73,8 @@ function LineupList({ theme, row }) {
             Ersatzbank
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {subs.map((p, i) => (
-              <div key={i} style={{ fontSize: '13px', color: theme.textMuted }}>{playerLabel(p)}</div>
+            {subs.map((p) => (
+              <div key={p.id} style={{ fontSize: '13px', color: theme.textMuted }}>{playerLabel(p)}</div>
             ))}
           </div>
         </>
