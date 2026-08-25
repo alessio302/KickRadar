@@ -23,13 +23,14 @@
 // nothing is gained by pre-filtering here -- only stories lost.
 const RELEVANCE_KEYWORDS = {
   kicker: [
-    'transfer', 'wechsel', 'verpflicht', 'leihe', 'ablöse', 'unterschreib',
+    'transfer', 'wechsel', 'verpflicht', 'leih', 'ablöse', 'unterschreib',
     'engagiert', 'gerücht', 'medizincheck', 'neuzugang', 'abgang', 'vertrag',
+    'rückkehr',
   ],
   skysports: [
-    'transfer', 'sign', 'signing', 'deal', 'move to', 'joins', 'on loan',
-    'loan move', 'fee', 'medical', 'agree terms', 'bid for', 'target',
-    'linked with', 'rumour', 'rumor', 'new club',
+    'transfer', 'sign', 'signing', 'deal', 'move to', 'move', 'joins',
+    'on loan', 'loan move', 'fee', 'medical', 'agree terms', 'bid for',
+    'target', 'linked with', 'rumour', 'rumor', 'new club',
   ],
   rmcsport: [
     'mercato', 'transfert', 'signe', "s'engage", 'prêt', 'officialise',
@@ -37,9 +38,20 @@ const RELEVANCE_KEYWORDS = {
   ],
 };
 
+// Diacritic-insensitive on both sides -- confirmed live: kicker's feed
+// silently failed the "neuzugang" keyword against a real headline reading
+// "Neuzugänge" (ä vs a breaks plain substring containment), and separately
+// "Frankfurt verleiht Wahi erneut nach Nizza" (a real loan story) had no
+// keyword hit at all until 'leihe' was shortened to the 'leih' stem so it
+// also covers the conjugated "verleiht".
+const COMBINING_DIACRITICS = /[\u0300-\u036f]/g;
+function normalize(text) {
+  return text.normalize('NFD').replace(COMBINING_DIACRITICS, '').toLowerCase();
+}
+
 export function isTransferRelevant(sourceKey, text) {
   const keywords = RELEVANCE_KEYWORDS[sourceKey];
   if (!keywords) return true; // no rule defined -> fail open, don't filter
-  const haystack = text.toLowerCase();
-  return keywords.some((keyword) => haystack.includes(keyword));
+  const haystack = normalize(text);
+  return keywords.some((keyword) => haystack.includes(normalize(keyword)));
 }
