@@ -1,0 +1,24 @@
+name: Diagnose Highlightly lineup timing (one-off)
+
+# Finds whatever match is live or about to kick off *anywhere* in
+# Highlightly's coverage right now and checks its lineup -- proves (or
+# disproves) that the free plan actually populates lineup data close to
+# kickoff, without waiting for one of our 4 leagues' next match. See
+# src/lineups/diagnoseHighlightlyLineupNow.js. Read-only, no DB writes.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/diagnoseHighlightlyLineupNow.js
+        env:
+          HIGHLIGHTLY_API_KEY: ${{ secrets.HIGHLIGHTLY_API_KEY }}
