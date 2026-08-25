@@ -8,7 +8,7 @@ import { llmExtractTransferInfo } from './llmExtract.js';
 import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 import { normalize } from '../util/normalize.js';
-import { sendPushToAll } from '../push/sendPush.js';
+import { sendPushToTransferSubscribers } from '../push/sendPush.js';
 
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
 import kicker from './sources/kicker.js';
@@ -310,7 +310,7 @@ export async function runNewsScraper() {
     const pushResults = [];
     for (const payload of payloads) {
       try {
-        pushResults.push(await sendPushToAll(payload));
+        pushResults.push(await sendPushToTransferSubscribers(payload));
       } catch (err) {
         // Missing/misconfigured VAPID keys or a send failure shouldn't fail
         // the whole scrape run -- the transfers are already stored either way.

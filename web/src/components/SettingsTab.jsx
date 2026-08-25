@@ -22,11 +22,11 @@ export default function SettingsTab({
   const {
     supported: pushSupported,
     subscribed: pushSubscribed,
+    notifyTransfers,
     notifyLineups,
     loading: pushLoading,
     error: pushError,
-    subscribe,
-    unsubscribe,
+    setNotifyTransfers,
     setNotifyLineups,
   } = usePushSubscription();
 
@@ -150,7 +150,7 @@ export default function SettingsTab({
           <span style={{ fontSize: '11px', color: theme.textMuted }}>nicht unterstützt</span>
         ) : (
           <button
-            onClick={() => (pushSubscribed ? unsubscribe() : subscribe())}
+            onClick={() => setNotifyTransfers(!(pushSubscribed && notifyTransfers))}
             disabled={pushLoading}
             aria-label="Push bei neuen Transfers umschalten"
             style={{
@@ -159,7 +159,7 @@ export default function SettingsTab({
               borderRadius: '999px',
               border: 'none',
               cursor: pushLoading ? 'default' : 'pointer',
-              background: pushSubscribed ? theme.accent : theme.border,
+              background: pushSubscribed && notifyTransfers ? theme.accent : theme.border,
               position: 'relative',
             }}
           >
@@ -171,7 +171,7 @@ export default function SettingsTab({
                 background: theme.surface,
                 position: 'absolute',
                 top: '3px',
-                left: pushSubscribed ? '21px' : '3px',
+                left: pushSubscribed && notifyTransfers ? '21px' : '3px',
                 transition: 'left 0.15s',
               }}
             />

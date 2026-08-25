@@ -57,11 +57,11 @@ async function sendToSubscriptions(supabase, subs, payload) {
   return { sent, failed, removed: staleIds.length };
 }
 
-// Sends the same notification to every stored subscription. A subscription
-// that comes back 404/410 (browser unsubscribed, or the token expired) is
-// removed -- otherwise every future send would keep retrying a dead
-// endpoint forever. Used for transfers -- there's no separate "notify
-// transfers" preference, the subscription itself is the opt-in.
+// Sends to literally every stored subscription, ignoring both category
+// preferences -- only for testPush.js's manual pipeline smoke test, never
+// for a real notification category. A subscription that comes back
+// 404/410 (browser unsubscribed, or the token expired) is removed --
+// otherwise every future send would keep retrying a dead endpoint forever.
 export async function sendPushToAll(payload) {
   ensureConfigured();
   const supabase = getSupabaseClient();
@@ -70,10 +70,25 @@ export async function sendPushToAll(payload) {
   return sendToSubscriptions(supabase, subs, payload);
 }
 
-// Lineup confirmations are a separate opt-in on top of an existing
-// subscription (push_subscriptions.notify_lineups, default true) -- a
-// subscriber who only wants transfer pushes can turn this off without
-// unsubscribing entirely, see SettingsTab.jsx's second toggle.
+// Transfers and lineup confirmations are two fully independent opt-ins on
+// top of the same underlying subscription (push_subscriptions.
+// notify_transfers / notify_lineups, both default true) -- confirmed live
+// that tying transfer push to "subscription exists" alone (no dedicated
+// column) made the two toggles in SettingsTab.jsx look synchronized:
+// subscribing via either one satisfied both toggles' on-condition at once,
+// since a fresh row's other column defaults true regardless of which
+// toggle the subscriber actually touched.
+export async function sendPushToTransferSubscribers(payload) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { data: subs, error } = await supabase
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .eq('notify_transfers', true);
+  if (error) throw error;
+  return sendToSubscriptions(supabase, subs, payload);
+}
+
 export async function sendPushToLineupSubscribers(payload) {
   ensureConfigured();
   const supabase = getSupabaseClient();
