@@ -4,6 +4,7 @@ import ClubBadge from './ClubBadge.jsx';
 
 export default function QuickFilters({
   theme,
+  t,
   clubs,
   favoriteClub,
   quickFilters,
@@ -63,7 +64,7 @@ export default function QuickFilters({
             </button>
             <button
               onClick={() => onRemoveQuickFilter(club.id)}
-              aria-label={`${club.name} aus Quick-Filtern entfernen`}
+              aria-label={t.quickFilters.removeAria(club.name)}
               style={{
                 position: 'absolute',
                 top: '-5px',
@@ -91,7 +92,7 @@ export default function QuickFilters({
         availableToAdd.length > 0 && (
           <button
             onClick={() => setShowAdd(true)}
-            aria-label="Quick-Filter hinzufügen"
+            aria-label={t.quickFilters.addAria}
             style={{
               flex: '0 0 auto',
               width: '28px',
@@ -130,7 +131,7 @@ export default function QuickFilters({
           }}
         >
           <option value="" disabled>
-            Verein wählen…
+            {t.common.chooseClub}
           </option>
           {availableToAdd.map((c) => (
             <option key={c.id} value={c.id}>

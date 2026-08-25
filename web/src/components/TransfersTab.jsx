@@ -18,19 +18,20 @@ function dampen(rawDelta) {
   return Math.min(PULL_MAX, Math.sqrt(rawDelta) * 6);
 }
 
-function relativeTime(iso) {
+function relativeTime(iso, t) {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return 'gerade eben';
-  if (mins < 60) return `vor ${mins} Min`;
+  if (mins < 1) return t.transfers.justNow;
+  if (mins < 60) return t.transfers.minutesAgo(mins);
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `vor ${hours} Std`;
+  if (hours < 24) return t.transfers.hoursAgo(hours);
   const days = Math.round(hours / 24);
-  return `vor ${days} Tag${days === 1 ? '' : 'en'}`;
+  return t.transfers.daysAgo(days);
 }
 
 export default function TransfersTab({
   theme,
+  t,
   league,
   onSelectLeague,
   favoriteClub,
@@ -47,7 +48,7 @@ export default function TransfersTab({
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
-    return transfers.filter((t) => t.from_club_id === activeFilter.id || t.to_club_id === activeFilter.id);
+    return transfers.filter((transfer) => transfer.from_club_id === activeFilter.id || transfer.to_club_id === activeFilter.id);
   }, [transfers, activeFilter]);
 
   // Pull-to-refresh: only starts tracking when the list is already
@@ -122,6 +123,7 @@ export default function TransfersTab({
 
         <QuickFilters
           theme={theme}
+          t={t}
           clubs={clubs}
           favoriteClub={favoriteClub}
           quickFilters={quickFilters}
@@ -141,10 +143,10 @@ export default function TransfersTab({
             borderBottom: `1px solid ${theme.border}`,
           }}
         >
-          <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur offizielle Transfers</span>
+          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.transfers.officialOnly}</span>
           <button
             onClick={onToggleOfficialOnly}
-            aria-label="Nur offizielle Transfers umschalten"
+            aria-label={t.transfers.officialOnlyToggle}
             style={{
               width: '40px',
               height: '22px',
@@ -203,20 +205,20 @@ export default function TransfersTab({
             transform: refreshing ? undefined : `rotate(${Math.min(pullDistance / PULL_THRESHOLD, 1) * 180}deg)`,
           }}
         />
-        {refreshing ? 'Aktualisiert…' : pullDistance >= PULL_THRESHOLD ? 'Loslassen zum Aktualisieren' : 'Zum Aktualisieren ziehen'}
+        {refreshing ? t.transfers.refreshing : pullDistance >= PULL_THRESHOLD ? t.transfers.releaseToRefresh : t.transfers.pullToRefresh}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
-          <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>Lädt…</p>
+          <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>
         )}
         {!loading && filtered.length === 0 && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
-            Keine Meldungen für diese Auswahl.
+            {t.transfers.empty}
           </p>
         )}
-        {filtered.map((t) => (
+        {filtered.map((transfer) => (
           <div
-            key={t.id}
+            key={transfer.id}
             style={{ background: theme.surfaceRaised, borderRadius: '12px', padding: '12px 14px', border: `1px solid ${theme.border}` }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -228,17 +230,17 @@ export default function TransfersTab({
                   borderRadius: '999px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.03em',
-                  background: t.is_official ? theme.accent : 'transparent',
-                  color: t.is_official ? theme.accentText : theme.danger,
-                  border: t.is_official ? 'none' : `1px solid ${theme.danger}`,
+                  background: transfer.is_official ? theme.accent : 'transparent',
+                  color: transfer.is_official ? theme.accentText : theme.danger,
+                  border: transfer.is_official ? 'none' : `1px solid ${theme.danger}`,
                 }}
               >
-                {t.is_official ? 'offiziell' : 'gerücht'}
+                {transfer.is_official ? t.transfers.official : t.transfers.rumor}
               </span>
-              <span style={{ fontSize: '11px', color: theme.textMuted }}>{relativeTime(t.published_at)}</span>
+              <span style={{ fontSize: '11px', color: theme.textMuted }}>{relativeTime(transfer.published_at, t)}</span>
             </div>
-            <p style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 6px' }}>{t.player_name ?? t.summary}</p>
-            {(t.from_club || t.to_club) && (
+            <p style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 6px' }}>{transfer.player_name ?? transfer.summary}</p>
+            {(transfer.from_club || transfer.to_club) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 {/* Arrow only when both sides are known -- confirmed live that a
                     lone club can be misdirected by the extraction (a "sale"
@@ -246,39 +248,39 @@ export default function TransfersTab({
                     destination), so asserting a direction from one club alone
                     can actively mislead. A bare, arrow-less name is neutral
                     context instead of a (possibly wrong) directional claim. */}
-                {t.from_club && t.to_club ? (
+                {transfer.from_club && transfer.to_club ? (
                   <>
-                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club}</span>
+                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{transfer.from_club}</span>
                     <ArrowRightCircle size={13} style={{ color: theme.textMuted, margin: '0 2px', flex: '0 0 auto' }} />
-                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.to_club}</span>
+                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{transfer.to_club}</span>
                   </>
                 ) : (
-                  <span style={{ fontSize: '12px', color: theme.textMuted }}>{t.from_club ?? t.to_club}</span>
+                  <span style={{ fontSize: '12px', color: theme.textMuted }}>{transfer.from_club ?? transfer.to_club}</span>
                 )}
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: theme.textMuted }}>{t.source}</span>
+              <span style={{ fontSize: '11px', color: theme.textMuted }}>{transfer.source}</span>
               <div style={{ display: 'flex', gap: '10px' }}>
-                {t.players?.transfermarkt_url && (
+                {transfer.players?.transfermarkt_url && (
                   <a
-                    href={t.players.transfermarkt_url}
+                    href={transfer.players.transfermarkt_url}
                     target="_blank"
                     rel="noreferrer"
-                    title="Spieler auf Transfermarkt suchen"
+                    title={t.transfers.searchPlayerTitle}
                     style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
                   >
-                    <User size={13} /> Spieler suchen
+                    <User size={13} /> {t.transfers.searchPlayer}
                   </a>
                 )}
                 <a
-                  href={t.source_url}
+                  href={transfer.source_url}
                   target="_blank"
                   rel="noreferrer"
-                  title="Artikel lesen"
+                  title={t.transfers.articleTitle}
                   style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
                 >
-                  <ExternalLink size={13} /> Artikel
+                  <ExternalLink size={13} /> {t.transfers.article}
                 </a>
               </div>
             </div>

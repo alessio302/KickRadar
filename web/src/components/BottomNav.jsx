@@ -2,14 +2,16 @@ import { ArrowLeftRight, Calendar, Settings } from 'lucide-react';
 
 // No separate "Aufstellungen" tab -- lineups live in a per-fixture overlay
 // opened from the Spiele tab instead (tap a match card), see
-// FixtureDetailOverlay.jsx.
+// FixtureDetailOverlay.jsx. Tab ids stay the fixed internal keys they
+// always were (App.jsx branches on them, notifications deep-link via
+// them) -- only the displayed label is translated.
 const TABS = [
-  ['transfers', 'Transfers', ArrowLeftRight],
-  ['spiele', 'Spiele', Calendar],
-  ['einstellungen', 'Einstellungen', Settings],
+  ['transfers', (t) => t.nav.transfers, ArrowLeftRight],
+  ['spiele', (t) => t.nav.fixtures, Calendar],
+  ['einstellungen', (t) => t.nav.settings, Settings],
 ];
 
-export default function BottomNav({ tab, onSelectTab, theme }) {
+export default function BottomNav({ tab, onSelectTab, theme, t }) {
   return (
     <div
       style={{
@@ -21,7 +23,7 @@ export default function BottomNav({ tab, onSelectTab, theme }) {
         borderTop: `1px solid ${theme.border}`,
       }}
     >
-      {TABS.map(([id, label, Icon]) => (
+      {TABS.map(([id, getLabel, Icon]) => (
         <button
           key={id}
           onClick={() => onSelectTab(id)}
@@ -37,7 +39,7 @@ export default function BottomNav({ tab, onSelectTab, theme }) {
           }}
         >
           <Icon size={20} />
-          <span style={{ fontSize: '10px', fontWeight: 600 }}>{label}</span>
+          <span style={{ fontSize: '10px', fontWeight: 600 }}>{getLabel(t)}</span>
         </button>
       ))}
     </div>

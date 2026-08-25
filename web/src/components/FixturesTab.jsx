@@ -4,12 +4,13 @@ import ClubBadge from './ClubBadge.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
+import { DATE_LOCALES } from '../i18n/languages.js';
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' });
+function formatDate(iso, locale) {
+  return new Date(iso).toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' });
 }
-function formatTime(iso) {
-  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+function formatTime(iso, locale) {
+  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
 // The "current" matchday is the round containing the next upcoming/live
@@ -31,11 +32,12 @@ function pickCurrentMatchday(matchdays) {
   return matchdays[matchdays.length - 1];
 }
 
-export default function FixturesTab({ theme, league, onSelectLeague }) {
+export default function FixturesTab({ theme, t, language, league, onSelectLeague }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading } = useFixtures(league);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
+  const locale = DATE_LOCALES[language];
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
@@ -56,10 +58,10 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
             borderBottom: `1px solid ${theme.border}`,
           }}
         >
-          <span style={{ fontSize: '13px', color: theme.textMuted }}>Nur aktueller Spieltag</span>
+          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.fixtures.currentMatchdayOnly}</span>
           <button
             onClick={() => setCurrentMatchdayOnly((v) => !v)}
-            aria-label="Nur aktuellen Spieltag anzeigen umschalten"
+            aria-label={t.fixtures.currentMatchdayOnlyToggle}
             style={{
               width: '40px',
               height: '22px',
@@ -87,23 +89,23 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 14px' }}>
-      {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>Lädt…</p>}
+      {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
       {!loading && visible.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
-          Keine Spiele im Kalender.
+          {t.fixtures.empty}
         </p>
       )}
 
       {visible.map(({ matchday, games }) => {
         const byDate = games.reduce((acc, g) => {
-          const key = formatDate(g.kickoff_at);
+          const key = formatDate(g.kickoff_at, locale);
           (acc[key] = acc[key] || []).push(g);
           return acc;
         }, {});
 
         return (
           <div key={matchday} style={{ marginBottom: '18px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 8px' }}>{matchday}. Spieltag</p>
+            <p style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 8px' }}>{t.fixtures.matchday(matchday)}</p>
             {Object.entries(byDate).map(([date, dateGames]) => (
               <div key={date} style={{ marginBottom: '10px' }}>
                 <p
@@ -135,14 +137,14 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
                       }}
                     >
                       <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '40px', flex: '0 0 auto' }}>
-                        {formatTime(f.kickoff_at)}
+                        {formatTime(f.kickoff_at, locale)}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                         <ClubBadge club={clubsById.get(f.home_club_id)} size={20} />
                         <span style={{ fontSize: '13px' }}>{clubsById.get(f.home_club_id)?.name}</span>
                       </div>
                       <span style={{ fontSize: '11px', color: theme.textMuted }}>
-                        {f.status === 'finished' ? `${f.home_score} : ${f.away_score}` : 'vs'}
+                        {f.status === 'finished' ? `${f.home_score} : ${f.away_score}` : t.common.vs}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, justifyContent: 'flex-end' }}>
                         <span style={{ fontSize: '13px' }}>{clubsById.get(f.away_club_id)?.name}</span>
@@ -161,6 +163,8 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
       {selectedFixture && (
         <FixtureDetailOverlay
           theme={theme}
+          t={t}
+          language={language}
           fixture={selectedFixture}
           homeClub={clubsById.get(selectedFixture.home_club_id)}
           awayClub={clubsById.get(selectedFixture.away_club_id)}

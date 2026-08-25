@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Users } from 'lucide-react';
 import ClubBadge from './ClubBadge.jsx';
 import { useLineups } from '../hooks/useLineups.js';
+import { DATE_LOCALES } from '../i18n/languages.js';
 
 // Drag distance past which releasing counts as "dismiss" rather than
 // "snap back" -- matches the rough feel of native bottom sheets (iOS
@@ -9,24 +10,20 @@ import { useLineups } from '../hooks/useLineups.js';
 // one interaction.
 const DISMISS_THRESHOLD_PX = 100;
 
-function formatKickoff(iso) {
-  return new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+function formatKickoff(iso, locale) {
+  return new Date(iso).toLocaleString(locale, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 // Confirmed live against a real populated Highlightly response (Kazakhstan
 // Premier League, FK Tobol Kostanay vs Kaisar, 2026-08-25): initialLineup
 // is an array of arrays -- one per formation row (GK, then each tactical
 // line) -- not a flat list, and each player is { name, number, position,
-// id }. substitutes is a flat array of the same player shape.
-const POSITION_LABELS = {
-  Goalkeeper: 'Torwart',
-  Defender: 'Verteidiger',
-  Midfielder: 'Mittelfeld',
-  Forward: 'Sturm',
-};
-
-function playerLabel(p) {
-  const pos = POSITION_LABELS[p.position] || p.position;
+// id }. substitutes is a flat array of the same player shape. Keys here
+// are the Highlightly API's own English enum values and must stay as-is;
+// t.lineup.positions (see i18n/translations.js) supplies the translated
+// value per language for the same keys.
+function playerLabel(p, t) {
+  const pos = t.lineup.positions[p.position] || p.position;
   return (
     <>
       <span style={{ color: 'inherit', opacity: 0.6, marginRight: '8px' }}>{p.number ?? '–'}</span>
@@ -166,13 +163,13 @@ function PitchFormation({ formation, rows }) {
   );
 }
 
-function LineupList({ theme, row }) {
+function LineupList({ theme, t, row }) {
   if (!row) {
     return (
       <div style={{ padding: '32px 16px', textAlign: 'center' }}>
         <Users size={22} style={{ color: theme.textMuted, marginBottom: '8px' }} />
         <p style={{ fontSize: '13px', color: theme.textMuted, margin: 0 }}>
-          Aufstellung noch nicht bekannt. Wird veröffentlicht, sobald die Vereine sie bestätigen (meist 30–60 Min vor Anpfiff).
+          {t.lineup.notYetKnown}
         </p>
       </div>
     );
@@ -185,11 +182,11 @@ function LineupList({ theme, row }) {
   return (
     <div style={{ padding: '4px 16px 16px' }}>
       <p style={{ fontSize: '12px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '8px 0 10px' }}>
-        {row.confirmed ? 'Offizielle Aufstellung' : 'Voraussichtliche Aufstellung'}
+        {row.confirmed ? t.lineup.official : t.lineup.predicted}
       </p>
 
       {rows.length === 0 ? (
-        <p style={{ fontSize: '13px', color: theme.textMuted, margin: '0 0 16px' }}>Noch keine Spieler gemeldet.</p>
+        <p style={{ fontSize: '13px', color: theme.textMuted, margin: '0 0 16px' }}>{t.lineup.noPlayers}</p>
       ) : (
         <div style={{ marginBottom: subs.length ? '16px' : 0 }}>
           <PitchFormation formation={row.formation} rows={rows} />
@@ -199,11 +196,11 @@ function LineupList({ theme, row }) {
       {subs.length > 0 && (
         <>
           <p style={{ fontSize: '11px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px' }}>
-            Ersatzbank
+            {t.lineup.substitutes}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {subs.map((p) => (
-              <div key={p.id} style={{ fontSize: '13px', color: theme.textMuted }}>{playerLabel(p)}</div>
+              <div key={p.id} style={{ fontSize: '13px', color: theme.textMuted }}>{playerLabel(p, t)}</div>
             ))}
           </div>
         </>
@@ -212,9 +209,10 @@ function LineupList({ theme, row }) {
   );
 }
 
-export default function FixtureDetailOverlay({ theme, fixture, homeClub, awayClub, onClose }) {
+export default function FixtureDetailOverlay({ theme, t, language, fixture, homeClub, awayClub, onClose }) {
   const [side, setSide] = useState('home');
   const { byClubId } = useLineups(fixture.id);
+  const locale = DATE_LOCALES[language];
 
   const activeClub = side === 'home' ? homeClub : awayClub;
   const activeRow = activeClub ? byClubId.get(activeClub.id) : null;
@@ -292,11 +290,11 @@ export default function FixtureDetailOverlay({ theme, fixture, homeClub, awayClu
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
               <ClubBadge club={homeClub} size={22} />
               <span style={{ fontSize: '14px', fontWeight: 700 }}>
-                {fixture.status === 'finished' ? `${fixture.home_score} : ${fixture.away_score}` : 'vs'}
+                {fixture.status === 'finished' ? `${fixture.home_score} : ${fixture.away_score}` : t.common.vs}
               </span>
               <ClubBadge club={awayClub} size={22} />
             </div>
-            <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at)}</p>
+            <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at, locale)}</p>
           </div>
 
           <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', border: `1px solid ${theme.border}` }}>
@@ -323,7 +321,7 @@ export default function FixtureDetailOverlay({ theme, fixture, homeClub, awayClu
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <LineupList theme={theme} row={activeRow} />
+          <LineupList theme={theme} t={t} row={activeRow} />
         </div>
       </div>
     </div>

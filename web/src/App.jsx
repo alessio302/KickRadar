@@ -4,6 +4,7 @@ import FixturesTab from './components/FixturesTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
+import { useLanguage } from './hooks/useLanguage.js';
 
 function useDarkMode(mode) {
   const [systemDark, setSystemDark] = useState(
@@ -48,8 +49,17 @@ export default function App() {
   const [favoriteClub, setFavoriteClub] = usePersistedState('kickradar.favoriteClub', null);
   const [quickFilters, setQuickFilters] = usePersistedState('kickradar.quickFilters', []);
   const [darkModeSetting, setDarkModeSetting] = usePersistedState('kickradar.theme', 'system');
+  const { language, setLanguage, t } = useLanguage();
 
   const isDark = useDarkMode(darkModeSetting);
+
+  // Keeps the document's own language attribute (screen readers, browser
+  // spell-check/translate prompts) in sync with the in-app choice -- it's
+  // otherwise stuck on the static lang="de" set in index.html regardless
+  // of what the user picks in Settings.
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   const selectLeague = (slug) => {
     setLeague(slug);
@@ -189,6 +199,7 @@ export default function App() {
         {tab === 'transfers' && (
           <TransfersTab
             theme={theme}
+            t={t}
             league={league}
             onSelectLeague={selectLeague}
             favoriteClub={favoriteClub}
@@ -201,10 +212,13 @@ export default function App() {
             onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
           />
         )}
-        {tab === 'spiele' && <FixturesTab theme={theme} league={league} onSelectLeague={selectLeague} />}
+        {tab === 'spiele' && <FixturesTab theme={theme} t={t} language={language} league={league} onSelectLeague={selectLeague} />}
         {tab === 'einstellungen' && (
           <SettingsTab
             theme={theme}
+            t={t}
+            language={language}
+            onSetLanguage={setLanguage}
             darkModeSetting={darkModeSetting}
             onSetDarkModeSetting={setDarkModeSetting}
             favoriteClub={favoriteClub}
@@ -216,7 +230,7 @@ export default function App() {
       </div>
 
       <div style={{ flexShrink: 0 }}>
-        <BottomNav tab={tab} onSelectTab={setTab} theme={theme} />
+        <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
     </div>
   );

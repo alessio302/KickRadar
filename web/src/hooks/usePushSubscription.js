@@ -10,6 +10,15 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
+// Sentinel thrown for the one error case that's a normal, expected user
+// action (declining the permission prompt) rather than a rare technical
+// fault -- lets SettingsTab map it to a translated message via
+// t.errors.notificationsDenied. Other errors here (missing env var,
+// Supabase failures) surface as their raw, untranslated message; that gap
+// is a known, accepted scope limit for now, not something this sentinel
+// needs to solve too.
+export const NOTIFICATIONS_DENIED = 'notifications-denied';
+
 function subscriptionRow(subscription) {
   const json = subscription.toJSON();
   return {
@@ -83,7 +92,7 @@ export function usePushSubscription() {
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      throw new Error('Benachrichtigungen wurden nicht erlaubt.');
+      throw new Error(NOTIFICATIONS_DENIED);
     }
 
     // .trim(): a stray trailing newline/space in the env var value (easy
