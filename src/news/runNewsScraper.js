@@ -202,6 +202,26 @@ async function scrapeLeague(supabase, league) {
       }
     }
 
+    // A story whose from/to resolve to the same club isn't a transfer at
+    // all -- confirmed live: "Sivera renueva hasta 2030" (a contract
+    // renewal, not a move) was extracted as "Antonio Sivera, Deportivo
+    // Alavés -> Deportivo Alavés". marca.js has no relevance.js keyword
+    // gate (same as tuttomercatoweb, see relevance.js's comment), so this
+    // kind of item relies entirely on llmExtract.js correctly recognizing
+    // non-transfer stories -- worth revisiting there too if this keeps
+    // showing up, but a same-club "move" is cheap to catch here regardless
+    // of why extraction produced it. Compares by id when both sides
+    // resolved to a curated club, else by dedupeKey() text (same
+    // normalization the duplicate check below uses) -- either way, "no
+    // club on either side" (both empty) must NOT count as a match.
+    const sameClub = resolvedFromMatch && resolvedToMatch
+      ? resolvedFromMatch.id === resolvedToMatch.id
+      : dedupeKey(resolvedFromClub) !== '' && dedupeKey(resolvedFromClub) === dedupeKey(resolvedToClub);
+    if (sameClub) {
+      skipped += 1;
+      continue;
+    }
+
     // Multiple articles (often the same outlet, different days) reporting
     // the exact same rumor produce visually identical cards -- confirmed
     // live: "Rafael Leão, AC Milan -> Aston Villa" showed up twice, a few
