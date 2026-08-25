@@ -164,7 +164,18 @@ export default function App() {
           paddingTop: 'calc(18px + env(safe-area-inset-top))',
         }}
       >
-        <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, textTransform: 'uppercase' }}>KickRadar</h1>
+        <h1
+          style={{
+            fontFamily: "'Orbitron', sans-serif",
+            fontSize: '20px',
+            fontWeight: 800,
+            letterSpacing: '0.02em',
+            margin: 0,
+            textTransform: 'uppercase',
+          }}
+        >
+          KickRadar
+        </h1>
       </div>
 
       {/* Doesn't scroll itself: each tab manages its own internal split
