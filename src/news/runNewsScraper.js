@@ -22,6 +22,15 @@ function externalIdFor(item) {
   return createHash('sha256').update(item.guid || item.link).digest('hex');
 }
 
+// For comparing club names that never resolve to a curated club id (a club
+// outside our 5 tracked leagues, e.g. a Gulf/MLS/Saudi destination in a
+// rumor) -- strips everything but letters/digits on top of normalize()'s
+// diacritics/case folding, so spelling variants across two articles about
+// the same move ("Al Jazira" vs "Al-Jazira") still compare equal.
+function dedupeKey(text) {
+  return normalize(text || '').replace(/[^a-z0-9]/g, '');
+}
+
 // LLM extraction is the primary path (see llmExtract.js for why); the regex
 // heuristic only kicks in if the API call itself fails (rate limit, outage,
 // missing key), so a bad run degrades to the old behavior instead of losing
@@ -196,23 +205,37 @@ async function scrapeLeague(supabase, league) {
     // Multiple articles (often the same outlet, different days) reporting
     // the exact same rumor produce visually identical cards -- confirmed
     // live: "Rafael Leão, AC Milan -> Aston Villa" showed up twice, a few
-    // hours apart. Two cards are only a legitimate pair when they disagree
-    // on the destination (a player linked to two different clubs is real
-    // news); the *same* player+from+to combination is the same story, not
-    // two. Only checked once both clubs and the player are resolved to real
-    // ids -- without that there's no reliable key to match duplicates on,
-    // so it falls through to a normal insert like before.
+    // hours apart, and separately "Kristjan Asllani, Inter -> Al Jazira"/
+    // "Al-Jazira" (a Gulf club, never in our curated `clubs` table, so
+    // to_club_id is always null and the old id-only check below never even
+    // ran). Two cards are only a legitimate pair when they disagree on the
+    // destination (a player linked to two different clubs is real news);
+    // the *same* player+from+to combination is the same story, not two.
+    // Only requires the player to be resolved -- club matching then uses
+    // the id when a side resolved to a curated club (exact, safe), or a
+    // punctuation/diacritic-insensitive text comparison via dedupeKey()
+    // when it didn't, so "Al Jazira" and "Al-Jazira" still count as the
+    // same destination instead of silently bypassing dedup entirely.
     let duplicateOf = null;
-    if (playerId && resolvedFromMatch && resolvedToMatch) {
-      const { data: existing, error: dupErr } = await supabase
+    if (playerId) {
+      let candidateQuery = supabase
         .from('transfers')
-        .select('id, published_at, is_official')
+        .select('id, published_at, is_official, from_club, from_club_id, to_club, to_club_id')
         .eq('player_id', playerId)
-        .eq('from_club_id', resolvedFromMatch.id)
-        .eq('to_club_id', resolvedToMatch.id)
-        .maybeSingle();
-      if (dupErr) console.error(`[${league.slug}] duplicate lookup failed:`, dupErr.message);
-      else duplicateOf = existing;
+        .limit(20);
+      candidateQuery = resolvedFromMatch
+        ? candidateQuery.eq('from_club_id', resolvedFromMatch.id)
+        : candidateQuery.eq('from_club', resolvedFromClub);
+      const { data: candidates, error: dupErr } = await candidateQuery;
+      if (dupErr) {
+        console.error(`[${league.slug}] duplicate lookup failed:`, dupErr.message);
+      } else {
+        const targetToKey = dedupeKey(resolvedToMatch?.name ?? resolvedToClub);
+        duplicateOf =
+          candidates.find((c) =>
+            resolvedToMatch ? c.to_club_id === resolvedToMatch.id : dedupeKey(c.to_club) === targetToKey
+          ) ?? null;
+      }
     }
 
     if (duplicateOf) {
