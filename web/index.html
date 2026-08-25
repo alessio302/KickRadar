@@ -16,6 +16,20 @@
         height: 100%;
         margin: 0;
       }
+
+      /* Confirmed live: pulling down inside a scrolled-to-top content area
+         (e.g. TransfersTab's pull-to-refresh) dragged the *entire page*
+         down, revealing blank space above the header -- the browser's own
+         native overscroll bounce, triggered on the touched element and
+         then chaining all the way up to the document, since
+         overscroll-behavior: contain on that one element only stops
+         chaining, it doesn't suppress the element's own bounce glow.
+         Blocking it at the document root kills the native effect
+         everywhere at once so every scroll area's own fixed header/nav
+         actually stays put, not just the one that happened to set contain. */
+      html, body {
+        overscroll-behavior: none;
+      }
     </style>
   </head>
   <body>

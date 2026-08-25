@@ -144,7 +144,7 @@ export default function TransfersTab({
           minHeight: 0,
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
-          overscrollBehaviorY: 'contain',
+          overscrollBehaviorY: 'none',
           padding: '12px 16px 14px',
         }}
       >
