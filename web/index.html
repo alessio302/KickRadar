@@ -3,7 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#954730" />
+    <meta name="theme-color" content="#0B0D10" />
+    <!-- Confirmed live: without these two, iOS draws the status bar area
+         as its own opaque white bar instead of letting the app's own
+         background (App.jsx already pads for env(safe-area-inset-top),
+         exactly anticipating this) show through underneath it.
+         black-translucent makes it transparent with light system icons/
+         text -- App.jsx flips this to "default" (opaque, dark icons) at
+         runtime when the resolved theme is light, since translucent would
+         otherwise put white status-bar text on a light background. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>KickRadar</title>
     <style>

@@ -105,6 +105,19 @@ export default function App() {
         danger: '#B23A2E',
       };
 
+  // Confirmed live: iOS drew the status bar area as its own opaque white
+  // bar regardless of the app's actual theme, since index.html's static
+  // apple-mobile-web-app-status-bar-style default (black-translucent)
+  // only covers dark mode -- black-translucent makes the bar transparent
+  // with light system icons/text, which would be unreadable (white on
+  // white) once the resolved theme is actually light. Flips it to
+  // "default" (opaque, dark icons) there instead, and keeps theme-color
+  // (Android's toolbar/task-switcher color) in sync with the same bg.
+  useEffect(() => {
+    document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', isDark ? 'black-translucent' : 'default');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.bg);
+  }, [isDark, theme.bg]);
+
   // App-shell layout: the page itself never scrolls (html/body/#root are
   // pinned to 100% height, see index.html), only the content area between
   // header and bottom nav does (flex: 1, overflowY: auto below). Confirmed
