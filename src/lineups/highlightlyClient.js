@@ -44,8 +44,8 @@ async function call(path, params = {}) {
   return JSON.parse(body);
 }
 
-export function getMatches({ date, leagueId, leagueName, countryName } = {}) {
-  return call('/matches', { date, leagueId, leagueName, countryName });
+export function getMatches({ date, leagueId, leagueName, countryName, offset, limit } = {}) {
+  return call('/matches', { date, leagueId, leagueName, countryName, offset, limit });
 }
 
 export function getLineups(matchId) {

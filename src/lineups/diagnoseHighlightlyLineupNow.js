@@ -11,13 +11,26 @@ function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
+async function fetchAllPages(dateStr) {
+  const all = [];
+  let offset = 0;
+  for (;;) {
+    const data = await getMatches({ date: dateStr, offset, limit: 100 });
+    const matches = Array.isArray(data) ? data : data.data || data.matches || [];
+    all.push(...matches);
+    const total = data.pagination?.totalCount ?? all.length;
+    offset += matches.length;
+    if (matches.length === 0 || offset >= total) break;
+  }
+  return all;
+}
+
 async function run() {
   const now = new Date();
   const dateStr = toDateString(now);
-  console.log(`=== GET /matches?date=${dateStr} (no country filter) ===`);
-  const data = await getMatches({ date: dateStr });
-  const matches = Array.isArray(data) ? data : data.data || data.matches || [];
-  console.log(`${matches.length} matches on page 1 (pagination: ${JSON.stringify(data.pagination || null)})`);
+  console.log(`=== GET /matches?date=${dateStr} (no country filter, all pages) ===`);
+  const matches = await fetchAllPages(dateStr);
+  console.log(`${matches.length} matches total for today`);
 
   const withDelta = matches
     .filter((m) => m.date)
@@ -34,12 +47,12 @@ async function run() {
   const candidates = [...live, ...soon].sort((a, b) => a.minutesFromNow - b.minutesFromNow);
 
   if (candidates.length === 0) {
-    console.log('\nNothing live or kicking off within 45 min on page 1 of today\'s matches. Closest matches found:');
+    console.log('\nNothing live or kicking off within 45 min across all of today\'s matches. Closest matches found:');
     withDelta
       .sort((a, b) => Math.abs(a.minutesFromNow) - Math.abs(b.minutesFromNow))
       .slice(0, 5)
       .forEach(({ m, minutesFromNow }) => console.log(`  ${Math.round(minutesFromNow)} min: ${m.league?.name} ${m.homeTeam?.name} vs ${m.awayTeam?.name} (id ${m.id})`));
-    console.log('\nRe-run in a bit, or widen the search (pagination / a later date).');
+    console.log('\nRe-run closer to one of those, or in a bit if kickoffs are clustered a few hours out.');
     return;
   }
 
