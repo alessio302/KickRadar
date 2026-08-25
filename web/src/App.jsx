@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
-import LineupsTab from './components/LineupsTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
@@ -166,7 +165,6 @@ export default function App() {
           />
         )}
         {tab === 'spiele' && <FixturesTab theme={theme} league={league} onSelectLeague={selectLeague} />}
-        {tab === 'aufstellungen' && <LineupsTab theme={theme} league={league} />}
         {tab === 'einstellungen' && (
           <SettingsTab
             theme={theme}

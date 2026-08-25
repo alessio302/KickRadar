@@ -1,9 +1,11 @@
-import { ArrowLeftRight, Calendar, Users, Settings } from 'lucide-react';
+import { ArrowLeftRight, Calendar, Settings } from 'lucide-react';
 
+// No separate "Aufstellungen" tab -- lineups live in a per-fixture overlay
+// opened from the Spiele tab instead (tap a match card), see
+// FixtureDetailOverlay.jsx.
 const TABS = [
   ['transfers', 'Transfers', ArrowLeftRight],
   ['spiele', 'Spiele', Calendar],
-  ['aufstellungen', 'Aufstellungen', Users],
   ['einstellungen', 'Einstellungen', Settings],
 ];
 

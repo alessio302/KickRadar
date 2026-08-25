@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import ClubBadge from './ClubBadge.jsx';
+import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
 
@@ -34,6 +35,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading } = useFixtures(league);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
+  const [selectedFixture, setSelectedFixture] = useState(null);
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
@@ -120,6 +122,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
                   {dateGames.map((f) => (
                     <div
                       key={f.id}
+                      onClick={() => setSelectedFixture(f)}
                       style={{
                         background: theme.surfaceRaised,
                         borderRadius: '12px',
@@ -128,6 +131,7 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
+                        cursor: 'pointer',
                       }}
                     >
                       <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '40px', flex: '0 0 auto' }}>
@@ -153,6 +157,16 @@ export default function FixturesTab({ theme, league, onSelectLeague }) {
         );
       })}
       </div>
+
+      {selectedFixture && (
+        <FixtureDetailOverlay
+          theme={theme}
+          fixture={selectedFixture}
+          homeClub={clubsById.get(selectedFixture.home_club_id)}
+          awayClub={clubsById.get(selectedFixture.away_club_id)}
+          onClose={() => setSelectedFixture(null)}
+        />
+      )}
     </div>
   );
 }
