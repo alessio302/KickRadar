@@ -287,6 +287,9 @@ async function scrapeLeague(supabase, league) {
       continue;
     }
 
+    const finalFromClub = resolvedFromMatch?.name ?? resolvedFromClub;
+    const finalToClub = resolvedToMatch?.name ?? resolvedToClub;
+
     const { error: upsertErr } = await supabase
       .from('transfers')
       .upsert(
@@ -294,8 +297,8 @@ async function scrapeLeague(supabase, league) {
           league_id: dbLeague.id,
           player_id: playerId,
           player_name: playerName,
-          from_club: resolvedFromMatch?.name ?? resolvedFromClub,
-          to_club: resolvedToMatch?.name ?? resolvedToClub,
+          from_club: finalFromClub,
+          to_club: finalToClub,
           from_club_id: resolvedFromMatch?.id ?? null,
           to_club_id: resolvedToMatch?.id ?? null,
           is_official: isOfficial,
@@ -313,15 +316,20 @@ async function scrapeLeague(supabase, league) {
       continue;
     }
     inserted += 1;
-    // Only worth notifying about if it would actually show as a card (see
-    // useTransfers.js's own player_name/from_club/to_club filter) --
-    // notifying about a roundup story with no single identifiable player
-    // would just be confusing.
-    if (playerName) {
+    // Only worth notifying about if it would actually show as a card --
+    // confirmed live: a push fired for "Luis Henrique, FC Internazionale
+    // Milano -> [no to_club]" (the article only named the club he's
+    // already linked with, no origin), the user tapped it, and found
+    // nothing, because useTransfers.js requires BOTH from_club and
+    // to_club non-null to display a row at all. This comment already
+    // claimed that match existed; the actual condition below just checked
+    // playerName and let incomplete rows notify anyway. Requiring all
+    // three here now actually enforces it.
+    if (playerName && finalFromClub && finalToClub) {
       notifiable.push({
         playerName,
-        fromClub: resolvedFromMatch?.name ?? resolvedFromClub,
-        toClub: resolvedToMatch?.name ?? resolvedToClub,
+        fromClub: finalFromClub,
+        toClub: finalToClub,
         league: league.name,
         leagueSlug: league.slug,
         isOfficial,
@@ -358,7 +366,10 @@ function buildNotificationPayloads(notifiable) {
     return [{ title: `${notifiable.length} neue Transfer-Meldungen`, body, url: '/' }];
   }
   return notifiable.map((t) => {
-    const body = t.fromClub && t.toClub ? `${t.fromClub} → ${t.toClub} (${t.league})` : `${t.toClub ?? t.fromClub} (${t.league})`;
+    // Both clubs are guaranteed non-null here -- notifiable only ever
+    // collects rows that satisfy useTransfers.js's own display filter,
+    // see where it's built above.
+    const body = `${t.fromClub} → ${t.toClub} (${t.league})`;
     const prefix = t.isOfficial ? 'Offiziell' : 'Neues Gerücht';
     return { title: `${prefix}: ${t.playerName}`, body, url: `/?league=${t.leagueSlug}` };
   });
