@@ -2,6 +2,22 @@ import { precacheAndRoute } from 'workbox-precaching';
 
 precacheAndRoute(self.__WB_MANIFEST);
 
+// Missing until now, and likely why the last several deploys never
+// actually reached the device under test: this is a fully custom service
+// worker (switched from vite-plugin-pwa's auto-generated one to add the
+// push/notificationclick handlers below), which doesn't come with
+// generateSW's built-in "activate immediately" lifecycle -- without these,
+// a new SW version sits in "waiting" until every open instance of the app
+// is completely closed, which on iOS a backgrounded (not force-quit) PWA
+// never truly is. skipWaiting() + clients.claim() make a newly installed
+// SW take over immediately instead.
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
