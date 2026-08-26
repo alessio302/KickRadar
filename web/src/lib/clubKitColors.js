@@ -134,5 +134,6 @@ export const CLUB_KIT_COLORS = {
   'Real Racing Club de Santander': { primary: '#007A3D', secondary: '#FFFFFF', pattern: 'stripes' },
   'Real Sociedad de Fútbol': { primary: '#0058A8', secondary: '#FFFFFF', pattern: 'stripes' },
   'Sevilla FC': { primary: '#FFFFFF', secondary: '#D0021B', pattern: 'solid' },
+  'Valencia CF': { primary: '#FFFFFF', secondary: '#000000', pattern: 'solid' },
   'Villarreal CF': { primary: '#FFE667', secondary: '#005CA9', pattern: 'solid' },
 };
