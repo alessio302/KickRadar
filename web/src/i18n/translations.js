@@ -156,7 +156,7 @@ const it = {
     pullToRefresh: 'Trascina per aggiornare',
     justNow: 'proprio ora',
     minutesAgo: (n) => `${n} min fa`,
-    hoursAgo: (n) => `${n} h fa`,
+    hoursAgo: (n) => `${n} ${n === 1 ? 'ora' : 'ore'} fa`,
     daysAgo: (n) => `${n} ${n === 1 ? 'giorno' : 'giorni'} fa`,
   },
   fixtures: {
