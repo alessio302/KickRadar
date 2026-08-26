@@ -31,6 +31,29 @@ function dedupeKey(text) {
   return normalize(text || '').replace(/[^a-z0-9]/g, '');
 }
 
+// resolvePlayerProfile() matches players by an EXACT normalized_name
+// lookup, so two articles about the same real player using different name
+// forms ("Kristjan Asllani" in one, just "Asllani" -- a shorter follow-up
+// headline -- in another) resolve to two different `players` rows with two
+// different ids. Confirmed live: exactly that pair inserted as two visibly
+// duplicate cards a couple hours apart, because the id-based duplicate
+// check below never saw them as the same player. Fixing resolution itself
+// to fuzzy-match by surname was rejected -- that risks silently merging
+// two genuinely *different* real players who share a surname into one
+// transfermarkt profile, which is a worse failure than an occasional
+// missed duplicate. Instead, treat one extracted name as a variant of
+// another when every word of the shorter one appears in the longer one --
+// this only gets consulted below alongside a matching destination club, so
+// two unrelated same-surname players would also need to be linked to the
+// exact same club at the same time to false-positive.
+function isNameVariant(a, b) {
+  const wordsA = new Set(normalize(a || '').split(/\s+/).filter(Boolean));
+  const wordsB = new Set(normalize(b || '').split(/\s+/).filter(Boolean));
+  if (wordsA.size === 0 || wordsB.size === 0) return false;
+  const [smaller, bigger] = wordsA.size <= wordsB.size ? [wordsA, wordsB] : [wordsB, wordsA];
+  return [...smaller].every((w) => bigger.has(w));
+}
+
 // LLM extraction is the primary path (see llmExtract.js for why); the regex
 // heuristic only kicks in if the API call itself fails (rate limit, outage,
 // missing key), so a bad run degrades to the old behavior instead of losing
@@ -224,30 +247,35 @@ async function scrapeLeague(supabase, league) {
 
     // Multiple articles (often the same outlet, different days) reporting
     // the exact same rumor produce visually identical cards -- confirmed
-    // live: "Rafael Leão, AC Milan -> Aston Villa" showed up twice, a few
-    // hours apart, and separately "Kristjan Asllani, Inter -> Al Jazira"/
-    // "Al-Jazira" (a Gulf club, never in our curated `clubs` table, so
-    // to_club_id is always null and the old id-only check below never even
-    // ran). Two cards are only a legitimate pair when they disagree on the
-    // destination (a player linked to two different clubs is real news);
-    // the *same* player+from+to combination is the same story, not two.
-    // Only requires the player to be resolved -- club matching then uses
-    // the id when a side resolved to a curated club (exact, safe), or a
-    // punctuation/diacritic-insensitive text comparison via dedupeKey()
+    // live twice now: "Rafael Leão, AC Milan -> Aston Villa" showed up
+    // twice, a few hours apart, and separately "Kristjan Asllani, Inter ->
+    // Al Jazira" / "Asllani, Inter -> Al-Jazira" (a Gulf club, never in our
+    // curated `clubs` table, so to_club_id is always null -- and, the
+    // second time, a shorter follow-up headline that only used the
+    // player's surname, which is a different `players` row/id than the
+    // first article's full name, see isNameVariant() above). Two cards are
+    // only a legitimate pair when they disagree on the destination (a
+    // player linked to two different clubs is real news); the *same*
+    // player+from+to combination is the same story, not two. Club matching
+    // uses the id when a side resolved to a curated club (exact, safe), or
+    // a punctuation/diacritic-insensitive text comparison via dedupeKey()
     // when it didn't, so "Al Jazira" and "Al-Jazira" still count as the
     // same destination instead of silently bypassing dedup entirely.
     let duplicateOf = null;
-    if (playerId) {
+    if (playerName) {
+      // Scoped by from-club (not player_id, see isNameVariant() above) and
+      // recency-bounded, so a name-variant fragmented across two `players`
+      // rows still gets caught. .eq('from_club', null) would NOT match real
+      // NULLs -- PostgREST reads a JS `null` value there as the literal
+      // string "null", not IS NULL -- confirmed live via findDupes.js: a
+      // from_club of null is common (many "official signing" headlines only
+      // name the new club), so this needs .is() specifically or every one
+      // of those never dedupes.
       let candidateQuery = supabase
         .from('transfers')
-        .select('id, published_at, is_official, from_club, from_club_id, to_club, to_club_id')
-        .eq('player_id', playerId)
-        .limit(20);
-      // .eq('from_club', null) would NOT match real NULLs -- PostgREST reads
-      // a JS `null` value there as the literal string "null", not IS NULL --
-      // confirmed live via findDupes.js: a from_club of null is common (many
-      // "official signing" headlines only name the new club), so this needs
-      // .is() specifically or every one of those never dedupes.
+        .select('id, published_at, is_official, from_club, from_club_id, to_club, to_club_id, player_id, player_name')
+        .order('published_at', { ascending: false })
+        .limit(30);
       if (resolvedFromMatch) {
         candidateQuery = candidateQuery.eq('from_club_id', resolvedFromMatch.id);
       } else if (resolvedFromClub) {
@@ -261,9 +289,11 @@ async function scrapeLeague(supabase, league) {
       } else {
         const targetToKey = dedupeKey(resolvedToMatch?.name ?? resolvedToClub);
         duplicateOf =
-          candidates.find((c) =>
-            resolvedToMatch ? c.to_club_id === resolvedToMatch.id : dedupeKey(c.to_club) === targetToKey
-          ) ?? null;
+          candidates.find((c) => {
+            const sameTo = resolvedToMatch ? c.to_club_id === resolvedToMatch.id : dedupeKey(c.to_club) === targetToKey;
+            if (!sameTo) return false;
+            return (playerId && c.player_id === playerId) || isNameVariant(playerName, c.player_name);
+          }) ?? null;
       }
     }
 
