@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { useLeagueId } from './useLeagueId.js';
 
-// How far back to include already-played fixtures -- needs to cover a
-// full matchday's typical spread (Fri-Mon) so "current matchday" can
-// include that round's earlier, already-finished games alongside its
-// still-upcoming ones.
-const PAST_WINDOW_DAYS = 5;
+// How far back to include already-played fixtures. Kept in sync with
+// syncFixturesForLeague's own FIXTURE_PAST_WINDOW_DAYS (src/football-api/
+// syncFixtures.js) -- a fixture that sync now backfills but this query
+// still excludes would sync successfully and still never appear. See that
+// file's comment: a season opener can span much wider than a typical
+// Fri-Mon round (confirmed live: LaLiga's 2026/27 Jornada 1 ran 15-27 Aug).
+const PAST_WINDOW_DAYS = 15;
 
 // Patches one fixture in place across the matchday-grouped structure --
 // used for the Realtime update below, so a live score/status change

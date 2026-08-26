@@ -3,12 +3,19 @@ import { LEAGUES } from '../config/leagues.js';
 import { getMatches, sleep, STATUS_MAP } from './client.js';
 
 const FIXTURE_WINDOW_DAYS = Number(process.env.FIXTURE_WINDOW_DAYS || 21);
-// A matchday can span several days (typically Fri-Mon); syncing strictly
-// from "today" forward means a game that already happened earlier in the
-// current matchday is never fetched at all -- confirmed live (Inter-Monza
-// missing from Serie A's "current matchday" view even though the rest of
-// that same round was there). Reaching a few days back covers that.
-const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 5);
+// A matchday can span several days -- typically Fri-Mon, but confirmed
+// live that a SEASON OPENER can span much wider: LaLiga's real 2026/27
+// Jornada 1 runs 15-27 Aug (TV scheduling for the opening round is
+// announced later than usual), 12 days, while Jornada 2 -- entirely
+// within that same window (20-24 Aug) -- was fully synced. A 5-day past
+// window meant Jornada 1's early games (15-19 Aug) were never fetched at
+// all: only 4 of its 10 fixtures existed in the DB, all from its late
+// end, which then sorted *after* the complete Jornada 2 by kickoff date.
+// 15 days covers this with a little margin; still cheap; the frontend's
+// own display-query window (useFixtures.js's PAST_WINDOW_DAYS) needs to
+// stay at least this wide too, or a backfilled fixture would sync here
+// but still not be queried back out for display.
+const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 15);
 
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
