@@ -4,8 +4,6 @@ import FixtureRow from './FixtureRow.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
-import { useFavoriteFixtures } from '../hooks/useFavoriteFixtures.js';
-import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 function formatDate(iso, locale) {
@@ -38,23 +36,12 @@ function pickCurrentMatchday(matchdays) {
   return matchdays[matchdays.length - 1];
 }
 
-export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
+export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading } = useFixtures(league);
-  const { favoriteIds, toggleFavorite } = useFavoriteFixtures();
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
-  const [openFixtureId, setOpenFixtureId] = useState(null);
   const locale = DATE_LOCALES[language];
-
-  const handleToggleFavorite = async (fixture) => {
-    try {
-      const result = await toggleFavorite(fixture.id);
-      onFavoriteToast(result === 'added' ? t.fixtures.favoritedToast : t.fixtures.unfavoritedToast);
-    } catch (err) {
-      onFavoriteToast(err.message === NOTIFICATIONS_DENIED ? t.errors.notificationsDenied : err.message);
-    }
-  };
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
@@ -164,12 +151,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
                       formatTime={formatTime}
                       clubsById={clubsById}
                       fixture={f}
-                      isFavorite={favoriteIds.has(f.id)}
-                      isOpen={openFixtureId === f.id}
-                      onOpenRow={() => setOpenFixtureId(f.id)}
-                      onCloseRow={() => setOpenFixtureId(null)}
                       onSelectFixture={setSelectedFixture}
-                      onToggleFavorite={handleToggleFavorite}
                     />
                   ))}
                 </div>

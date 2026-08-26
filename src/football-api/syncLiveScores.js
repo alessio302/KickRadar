@@ -1,7 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
 import { getMatchesForDate, sleep, STATUS_MAP } from './client.js';
-import { notifyFavoritedFixtureEvents } from '../lineups/matchEventNotifier.js';
 
 const COMPETITION_IDS = LEAGUES.map((l) => l.externalCompetitionId);
 
@@ -81,25 +80,11 @@ export async function syncLiveScores() {
   const deadline = Date.now() + JOB_BUDGET_MS;
   let polls = 0;
   let totalUpdated = 0;
-  let totalEventsPushed = 0;
 
   while (Date.now() < deadline) {
     const { updated, stillLive } = await pollOnce(supabase);
     polls += 1;
     totalUpdated += updated;
-
-    // Rides the same ~75s loop/budget rather than a separate job: match
-    // events (goals/cards/subs) only matter while something is live, which
-    // this loop is already tracking. A favorited fixture going live is
-    // already reflected in `stillLive` above (pollOnce checks every match
-    // today, not just favorited ones), so no separate keep-alive check is
-    // needed here.
-    try {
-      const { pushed } = await notifyFavoritedFixtureEvents(supabase);
-      totalEventsPushed += pushed;
-    } catch (err) {
-      console.error('Match event notification pass failed:', err.message);
-    }
 
     const keepGoing = stillLive || (await hasFixtureStartingSoon(supabase));
     if (!keepGoing) break;
@@ -107,7 +92,7 @@ export async function syncLiveScores() {
     await sleep(POLL_INTERVAL_MS);
   }
 
-  return { polls, totalUpdated, totalEventsPushed };
+  return { polls, totalUpdated };
 }
 
 const isMain = process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href;

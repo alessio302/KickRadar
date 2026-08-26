@@ -16,12 +16,9 @@ function urlBase64ToUint8Array(base64String) {
 export const NOTIFICATIONS_DENIED = 'notifications-denied';
 
 // Creates the browser subscription + DB row if one doesn't exist yet,
-// otherwise returns the existing one. Shared by usePushSubscription.js
-// (the two blanket notify_transfers/notify_lineups toggles) and
-// useFavoriteFixtures.js (favoriting a fixture) -- both need "there's an
-// active subscription" as a precondition before they can write anything,
-// since every push preference (blanket toggle or per-fixture favorite)
-// hangs off this same underlying subscription row.
+// otherwise returns the existing one. Used by usePushSubscription.js
+// (the two blanket notify_transfers/notify_lineups toggles) as a
+// precondition before it can write anything.
 export async function ensurePushSubscription() {
   const registration = await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
