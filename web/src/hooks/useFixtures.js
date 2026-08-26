@@ -52,9 +52,17 @@ export function useFixtures(leagueSlug) {
           if (!byMatchday.has(key)) byMatchday.set(key, []);
           byMatchday.get(key).push(fixture);
         }
+        // Sorted by each group's earliest kickoff, not the raw matchday
+        // number -- confirmed live: football-data.org's own matchday field
+        // doesn't always track calendar order (a fully rescheduled round
+        // can end up dated entirely before the round "before" it), and
+        // sorting by the number alone showed "2ª giornata" above "1ª
+        // giornata" with genuinely earlier dates. games within each group
+        // are already ascending by kickoff_at from the query's own
+        // .order() above, so games[0] is that group's earliest.
         const grouped = [...byMatchday.entries()]
-          .sort(([a], [b]) => a - b)
-          .map(([matchday, games]) => ({ matchday, games }));
+          .map(([matchday, games]) => ({ matchday, games }))
+          .sort((a, b) => new Date(a.games[0].kickoff_at) - new Date(b.games[0].kickoff_at));
 
         setMatchdays(grouped);
         setLoading(false);
