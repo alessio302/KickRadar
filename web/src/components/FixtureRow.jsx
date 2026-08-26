@@ -29,7 +29,16 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
   const startRef = useRef(null);
   const directionRef = useRef(null); // 'horizontal' | 'vertical' | null while undecided
 
-  const baseX = isOpen ? -PANEL_WIDTH : 0;
+  // A finished match never goes live again, so matchEventNotifier.js's own
+  // `.eq('status', 'live')` filter would silently never fetch events for
+  // it regardless of favoriting it -- offering the swipe/star action here
+  // would just leave a permanently "on" favorite that can never do
+  // anything. Not swipeable at all past this point: no reveal panel, no
+  // drag handling, a plain tap opens the result like before this feature
+  // existed. isOpen is ignored here too, in case a row was left swiped
+  // open right as its match finished (e.g. via a Realtime status update).
+  const swipeable = fixture.status !== 'finished';
+  const baseX = swipeable && isOpen ? -PANEL_WIDTH : 0;
 
   const handlePointerDown = (e) => {
     startRef.current = { x: e.clientX, y: e.clientY, pointerId: e.pointerId };
@@ -90,43 +99,46 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
 
   return (
     <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden' }}>
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: `${PANEL_WIDTH}px`,
-          background: theme.accent,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <button
-          onClick={handleStarClick}
-          aria-label={isFavorite ? t.fixtures.unfavoriteAria : t.fixtures.favoriteAria}
+      {swipeable && (
+        <div
           style={{
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            background: 'transparent',
-            color: theme.accentText,
-            cursor: 'pointer',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: `${PANEL_WIDTH}px`,
+            background: theme.accent,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Star size={22} fill={isFavorite ? 'currentColor' : 'none'} />
-        </button>
-      </div>
+          <button
+            onClick={handleStarClick}
+            aria-label={isFavorite ? t.fixtures.unfavoriteAria : t.fixtures.favoriteAria}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: 'transparent',
+              color: theme.accentText,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Star size={22} fill={isFavorite ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+      )}
 
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endGesture}
-        onPointerCancel={endGesture}
+        onPointerDown={swipeable ? handlePointerDown : undefined}
+        onPointerMove={swipeable ? handlePointerMove : undefined}
+        onPointerUp={swipeable ? endGesture : undefined}
+        onPointerCancel={swipeable ? endGesture : undefined}
+        onClick={swipeable ? undefined : () => onSelectFixture(fixture)}
         style={{
           position: 'relative',
           background: theme.surfaceRaised,
@@ -137,7 +149,7 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           alignItems: 'center',
           gap: '10px',
           cursor: 'pointer',
-          touchAction: 'pan-y',
+          touchAction: swipeable ? 'pan-y' : 'auto',
           transform: `translateX(${displayX}px)`,
           transition: dragging ? 'none' : 'transform 0.2s ease',
         }}
