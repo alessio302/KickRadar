@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import ClubJersey from './ClubJersey.jsx';
+import MatchScore from './MatchScore.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
@@ -25,7 +26,11 @@ function pickCurrentMatchday(matchdays) {
   if (matchdays.length === 0) return null;
   const now = Date.now();
   for (const group of matchdays) {
-    if (group.games.some((g) => new Date(g.kickoff_at).getTime() >= now)) {
+    // A game already live counts as "current" even though its own
+    // kickoff_at is now in the past -- otherwise a round where every game
+    // has kicked off, but the last one is still being played, would get
+    // skipped in favor of a future round while a match is visibly live.
+    if (group.games.some((g) => g.status === 'live' || new Date(g.kickoff_at).getTime() >= now)) {
       return group;
     }
   }
@@ -160,9 +165,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
                         <ClubJersey club={clubsById.get(f.home_club_id)} size={20} theme={theme} />
                         <span style={{ fontSize: '13px' }}>{clubsById.get(f.home_club_id)?.name}</span>
                       </div>
-                      <span style={{ fontSize: '11px', color: theme.textMuted }}>
-                        {f.status === 'finished' ? `${f.home_score} : ${f.away_score}` : t.common.vs}
-                      </span>
+                      <MatchScore fixture={f} t={t} theme={theme} style={{ fontSize: '11px', color: theme.textMuted }} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, justifyContent: 'flex-end' }}>
                         <span style={{ fontSize: '13px' }}>{clubsById.get(f.away_club_id)?.name}</span>
                         <ClubJersey club={clubsById.get(f.away_club_id)} size={20} theme={theme} />

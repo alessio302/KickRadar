@@ -8,6 +8,17 @@ import { useLeagueId } from './useLeagueId.js';
 // still-upcoming ones.
 const PAST_WINDOW_DAYS = 5;
 
+// Patches one fixture in place across the matchday-grouped structure --
+// used for the Realtime update below, so a live score/status change
+// doesn't need a full refetch (which would also reset scroll position and
+// briefly show a loading state for an update that's really just one row).
+function applyFixtureUpdate(matchdays, updated) {
+  return matchdays.map((group) => ({
+    ...group,
+    games: group.games.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)),
+  }));
+}
+
 // Groups fixtures by matchday, sorted ascending. home_club_id/away_club_id
 // are resolved against the caller's clubs list (see useClubs), same
 // pattern as useTransfers, rather than an embedded Postgrest select.
@@ -68,8 +79,27 @@ export function useFixtures(leagueSlug) {
         setLoading(false);
       });
 
+    // Live scores land here via syncLiveScores.js's ~75s poll loop (see
+    // that file) writing status/home_score/away_score to this same row --
+    // subscribing to Postgres changes means an already-open tab reflects a
+    // live goal within that same window instead of only on the next
+    // manual reload. Filtered server-side to this league so a goal
+    // elsewhere doesn't wake up every open tab watching a different one.
+    const channel = supabase
+      .channel(`fixtures-${leagueId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'fixtures', filter: `league_id=eq.${leagueId}` },
+        (payload) => {
+          if (cancelled) return;
+          setMatchdays((prev) => applyFixtureUpdate(prev, payload.new));
+        }
+      )
+      .subscribe();
+
     return () => {
       cancelled = true;
+      supabase.removeChannel(channel);
     };
   }, [leagueId, leagueSlug]);
 

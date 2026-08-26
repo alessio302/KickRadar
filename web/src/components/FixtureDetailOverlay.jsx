@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Users } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
+import MatchScore from './MatchScore.jsx';
 import { useLineups } from '../hooks/useLineups.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
@@ -298,9 +299,7 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
               <ClubJersey club={homeClub} size={22} theme={theme} />
-              <span style={{ fontSize: '14px', fontWeight: 700 }}>
-                {fixture.status === 'finished' ? `${fixture.home_score} : ${fixture.away_score}` : t.common.vs}
-              </span>
+              <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '14px', fontWeight: 700 }} />
               <ClubJersey club={awayClub} size={22} theme={theme} />
             </div>
             <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at, locale)}</p>

@@ -75,6 +75,9 @@ create table if not exists fixtures (
 );
 create index if not exists idx_fixtures_league_matchday on fixtures(league_id, matchday);
 create index if not exists idx_fixtures_kickoff on fixtures(kickoff_at);
+-- Lets the frontend subscribe to live score/status updates instead of only
+-- seeing them on the next manual reload -- see sql/013_fixtures_realtime.sql.
+alter publication supabase_realtime add table fixtures;
 
 -- Lineups tab is a v1 placeholder: schema covers "confirmed lineup published" so
 -- push notifications can fire; the exact lineup shape (formation, positions, subs)

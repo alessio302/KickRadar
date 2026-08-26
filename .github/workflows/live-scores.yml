@@ -1,0 +1,36 @@
+name: Live scores
+
+# Fires every 15 min like the other sync jobs, but the script itself loops
+# internally with ~75s sleeps whenever something is live or about to kick
+# off, and exits within seconds otherwise -- so the *effective* update
+# cadence during a live window is ~75s even though GitHub Actions' own
+# cron granularity can't go that low. timeout-minutes is kept under the
+# 15-min cron interval so one run can't still be going when the next one
+# is due; concurrency skips a new run outright if the previous one somehow
+# is (both belt-and-suspenders, syncLiveScores.js's own JOB_BUDGET_MS
+# already exits before the timeout would).
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: live-scores
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncLiveScores.js
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

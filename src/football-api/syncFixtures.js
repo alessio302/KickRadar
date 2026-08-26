@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getMatches, sleep } from './client.js';
+import { getMatches, sleep, STATUS_MAP } from './client.js';
 
 const FIXTURE_WINDOW_DAYS = Number(process.env.FIXTURE_WINDOW_DAYS || 21);
 // A matchday can span several days (typically Fri-Mon); syncing strictly
@@ -13,18 +13,6 @@ const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
-
-const STATUS_MAP = {
-  SCHEDULED: 'scheduled',
-  TIMED: 'scheduled',
-  IN_PLAY: 'live',
-  PAUSED: 'live',
-  FINISHED: 'finished',
-  POSTPONED: 'postponed',
-  SUSPENDED: 'postponed',
-  CANCELLED: 'cancelled',
-  AWARDED: 'finished',
-};
 
 export async function syncFixturesForLeague(supabase, league) {
   const { data: dbLeague, error: leagueErr } = await supabase

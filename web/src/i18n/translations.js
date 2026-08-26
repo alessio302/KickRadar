@@ -36,6 +36,7 @@ const de = {
     currentMatchdayOnlyToggle: 'Nur aktuellen Spieltag anzeigen umschalten',
     empty: 'Keine Spiele im Kalender.',
     matchday: (n) => `${n}. Spieltag`,
+    live: 'LIVE',
   },
   lineup: {
     notYetKnown: 'Aufstellung noch nicht bekannt. Wird veröffentlicht, sobald die Vereine sie bestätigen (meist 30–60 Min vor Anpfiff).',
@@ -100,6 +101,7 @@ const en = {
     currentMatchdayOnlyToggle: 'Toggle showing only the current matchday',
     empty: 'No games on the calendar.',
     matchday: (n) => `Matchday ${n}`,
+    live: 'LIVE',
   },
   lineup: {
     notYetKnown: 'Lineup not yet known. Published as soon as the clubs confirm it (usually 30–60 min before kickoff).',
@@ -164,6 +166,7 @@ const it = {
     currentMatchdayOnlyToggle: 'Attiva/disattiva solo giornata attuale',
     empty: 'Nessuna partita in calendario.',
     matchday: (n) => `${n}ª giornata`,
+    live: 'LIVE',
   },
   lineup: {
     notYetKnown: "Formazione non ancora nota. Pubblicata non appena le squadre la confermano (di solito 30–60 min prima del fischio d'inizio).",
@@ -228,6 +231,7 @@ const fr = {
     currentMatchdayOnlyToggle: 'Activer/désactiver journée en cours uniquement',
     empty: 'Aucun match au calendrier.',
     matchday: (n) => `${n}${n === 1 ? 're' : 'e'} journée`,
+    live: 'LIVE',
   },
   lineup: {
     notYetKnown: "Composition pas encore connue. Publiée dès que les clubs la confirment (généralement 30 à 60 min avant le coup d'envoi).",
@@ -292,6 +296,7 @@ const es = {
     currentMatchdayOnlyToggle: 'Alternar solo jornada actual',
     empty: 'No hay partidos en el calendario.',
     matchday: (n) => `Jornada ${n}`,
+    live: 'EN VIVO',
   },
   lineup: {
     notYetKnown: 'Alineación aún no conocida. Se publica en cuanto los clubes la confirman (normalmente 30–60 min antes del inicio).',
