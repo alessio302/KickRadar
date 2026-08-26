@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import ClubJersey from './ClubJersey.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
@@ -32,7 +32,7 @@ function pickCurrentMatchday(matchdays) {
   return matchdays[matchdays.length - 1];
 }
 
-export default function FixturesTab({ theme, t, language, league, onSelectLeague }) {
+export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading } = useFixtures(league);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
@@ -42,6 +42,23 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
   const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
+
+  // Opens the fixture a lineup push notification pointed at, once its
+  // matchday has actually loaded -- initialFixtureId arrives from App.jsx
+  // synchronously on mount, well before this league's fixtures have
+  // finished fetching. Searches all loaded matchdays, not just the
+  // "current matchday only" filtered view above, since a confirmed lineup
+  // can land on a fixture that toggle would otherwise hide. Reported once
+  // via onConsumedInitialFixture so a later matchdays refetch (e.g. after
+  // the user closes the overlay) doesn't reopen it.
+  useEffect(() => {
+    if (initialFixtureId == null) return;
+    const found = matchdays.flatMap((m) => m.games).find((f) => f.id === initialFixtureId);
+    if (found) {
+      setSelectedFixture(found);
+      onConsumedInitialFixture();
+    }
+  }, [initialFixtureId, matchdays, onConsumedInitialFixture]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

@@ -164,18 +164,18 @@ export async function syncLineups() {
         confirmedCount += 1;
         if (!wasConfirmed) fixtureNewlyConfirmed = true;
       }
-      if (fixtureNewlyConfirmed) newlyConfirmedFixtures.push({ fixture: f, homeClub, awayClub, leagueSlug });
+      if (fixtureNewlyConfirmed) newlyConfirmedFixtures.push({ fixtureId: f.id, homeClub, awayClub, leagueSlug });
     }
   }
 
   const pushResults = [];
-  for (const { homeClub, awayClub, leagueSlug } of newlyConfirmedFixtures) {
+  for (const { fixtureId, homeClub, awayClub, leagueSlug } of newlyConfirmedFixtures) {
     try {
       pushResults.push(
         await sendPushToLineupSubscribers({
           title: 'Aufstellung bestätigt',
           body: `${homeClub.name} vs ${awayClub.name}`,
-          url: `/?league=${leagueSlug}`,
+          url: `/?league=${leagueSlug}&fixture=${fixtureId}`,
         })
       );
     } catch (err) {

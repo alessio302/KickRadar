@@ -25,6 +25,7 @@ const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1', 'la-
 export default function App() {
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
+  const [initialFixtureId, setInitialFixtureId] = useState(null);
 
   // Tapping a push notification about a specific league's transfer should
   // land on that league, not whatever was last open -- the persisted
@@ -34,12 +35,25 @@ export default function App() {
   // switching. Read once on mount (the URL is what the notification's
   // navigate()/openWindow() sets it to); doesn't fight the persisted value
   // on normal, non-notification opens where there's no query param.
+  //
+  // A lineup-confirmed push additionally carries a `fixture` id (see
+  // syncLineups.js) -- that one should land straight on the fixture's own
+  // detail overlay in the Spiele tab, not just the league's transfer list.
+  // Confirmed live: tapping that notification only switched leagues, the
+  // user still had to find and open the actual fixture by hand.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedLeague = params.get('league');
+    const requestedFixture = params.get('fixture');
     if (requestedLeague && LEAGUE_SLUGS.includes(requestedLeague)) {
       setLeague(requestedLeague);
-      setTab('transfers');
+      const fixtureId = requestedFixture ? Number(requestedFixture) : NaN;
+      if (Number.isInteger(fixtureId)) {
+        setInitialFixtureId(fixtureId);
+        setTab('spiele');
+      } else {
+        setTab('transfers');
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -212,7 +226,17 @@ export default function App() {
             onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
           />
         )}
-        {tab === 'spiele' && <FixturesTab theme={theme} t={t} language={language} league={league} onSelectLeague={selectLeague} />}
+        {tab === 'spiele' && (
+          <FixturesTab
+            theme={theme}
+            t={t}
+            language={language}
+            league={league}
+            onSelectLeague={selectLeague}
+            initialFixtureId={initialFixtureId}
+            onConsumedInitialFixture={() => setInitialFixtureId(null)}
+          />
+        )}
         {tab === 'einstellungen' && (
           <SettingsTab
             theme={theme}

@@ -54,7 +54,16 @@ function PitchFormation({ formation, rows }) {
         position: 'relative',
         boxSizing: 'border-box',
         overflow: 'hidden',
-        borderRadius: '14px',
+        // Only the top corners are rounded -- the bottom edge is the
+        // halfway line (see the div below), where the pitch is meant to
+        // look cut off, not rounded like a card. Rounding all four
+        // corners while that line's straight, full-width border sat
+        // flush with the bottom edge created a stray light seam right at
+        // the bottom-left/right corners where the two didn't quite agree
+        // on the pitch's actual shape -- confirmed live, it read as a
+        // stray white stripe under the pitch.
+        borderTopLeftRadius: '14px',
+        borderTopRightRadius: '14px',
         background: 'linear-gradient(180deg, #1e6b3a, #164d2a)',
         padding: '30px 6px 10px',
         minHeight: `${Math.max(4, rows.length) * 44 + 40}px`,
