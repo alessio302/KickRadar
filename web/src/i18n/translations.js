@@ -60,6 +60,9 @@ const de = {
     pushLineups: 'Push bei offizieller Aufstellung',
     pushLineupsToggle: 'Push bei offizieller Aufstellung umschalten',
     language: 'Sprache',
+    legal: 'Rechtliches',
+    imprint: 'Impressum',
+    privacyPolicy: 'Datenschutz',
   },
   quickFilters: {
     addAria: 'Quick-Filter hinzufügen',
@@ -121,6 +124,9 @@ const en = {
     pushLineups: 'Push for official lineups',
     pushLineupsToggle: 'Toggle push for official lineups',
     language: 'Language',
+    legal: 'Legal',
+    imprint: 'Imprint',
+    privacyPolicy: 'Privacy Policy',
   },
   quickFilters: {
     addAria: 'Add quick filter',
@@ -182,6 +188,9 @@ const it = {
     pushLineups: 'Notifiche push per formazioni ufficiali',
     pushLineupsToggle: 'Attiva/disattiva notifiche per formazioni ufficiali',
     language: 'Lingua',
+    legal: 'Note legali',
+    imprint: 'Impressum',
+    privacyPolicy: 'Privacy',
   },
   quickFilters: {
     addAria: 'Aggiungi filtro rapido',
@@ -243,6 +252,9 @@ const fr = {
     pushLineups: 'Notifications push pour compositions officielles',
     pushLineupsToggle: 'Activer/désactiver notifications compositions officielles',
     language: 'Langue',
+    legal: 'Informations légales',
+    imprint: 'Mentions légales',
+    privacyPolicy: 'Confidentialité',
   },
   quickFilters: {
     addAria: 'Ajouter un filtre rapide',
@@ -304,6 +316,9 @@ const es = {
     pushLineups: 'Notificaciones push de alineaciones oficiales',
     pushLineupsToggle: 'Alternar notificaciones de alineaciones oficiales',
     language: 'Idioma',
+    legal: 'Aspectos legales',
+    imprint: 'Aviso legal',
+    privacyPolicy: 'Privacidad',
   },
   quickFilters: {
     addAria: 'Añadir filtro rápido',

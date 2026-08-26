@@ -286,6 +286,12 @@ export default function SettingsTab({
           </button>
         )}
       </div>
+
+      <p style={{ ...SECTION_LABEL_STYLE, color: theme.textMuted }}>{t.settings.legal}</p>
+      <div style={{ display: 'flex', gap: '16px' }}>
+        <a href="/impressum.html" style={{ fontSize: '13px', color: theme.textMuted }}>{t.settings.imprint}</a>
+        <a href="/datenschutz.html" style={{ fontSize: '13px', color: theme.textMuted }}>{t.settings.privacyPolicy}</a>
+      </div>
     </div>
   );
 }

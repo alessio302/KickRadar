@@ -100,6 +100,7 @@ create table if not exists push_subscriptions (
   favorite_club_id int references clubs(id),
   quick_filter_club_ids int[] not null default '{}',
   notify_lineups boolean not null default true,
+  notify_transfers boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -132,4 +133,62 @@ create policy "Public read access" on players for select using (true);
 create policy "Public read access" on transfers for select using (true);
 create policy "Public read access" on fixtures for select using (true);
 create policy "Public read access" on lineups for select using (true);
--- push_subscriptions gets no policy yet -- see sql/004_enable_rls.sql.
+-- push_subscriptions gets no direct anon policies at all (no select,
+-- insert, update, or delete) -- every read/write goes through the
+-- SECURITY DEFINER functions below instead, each of which hardcodes its
+-- own WHERE clause so a call can never touch more than the one row it
+-- names. See sql/012_push_subscriptions_rpc.sql for the full reasoning.
+
+create or replace function upsert_push_subscription(
+  p_endpoint text,
+  p_p256dh text,
+  p_auth text
+) returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into push_subscriptions (endpoint, p256dh, auth, updated_at)
+  values (p_endpoint, p_p256dh, p_auth, now())
+  on conflict (endpoint) do update
+    set p256dh = excluded.p256dh,
+        auth = excluded.auth,
+        updated_at = now();
+$$;
+
+create or replace function get_push_preferences(
+  p_endpoint text,
+  p_auth text
+) returns table (notify_transfers boolean, notify_lineups boolean)
+language sql
+security definer
+set search_path = public
+as $$
+  select notify_transfers, notify_lineups
+  from push_subscriptions
+  where endpoint = p_endpoint and auth = p_auth;
+$$;
+
+create or replace function set_push_preference(
+  p_endpoint text,
+  p_auth text,
+  p_notify_transfers boolean default null,
+  p_notify_lineups boolean default null
+) returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update push_subscriptions
+  set notify_transfers = coalesce(p_notify_transfers, notify_transfers),
+      notify_lineups = coalesce(p_notify_lineups, notify_lineups),
+      updated_at = now()
+  where endpoint = p_endpoint and auth = p_auth;
+$$;
+
+revoke all on function upsert_push_subscription(text, text, text) from public;
+revoke all on function get_push_preferences(text, text) from public;
+revoke all on function set_push_preference(text, text, boolean, boolean) from public;
+grant execute on function upsert_push_subscription(text, text, text) to anon;
+grant execute on function get_push_preferences(text, text) to anon;
+grant execute on function set_push_preference(text, text, boolean, boolean) to anon;

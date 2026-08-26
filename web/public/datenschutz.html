@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Datenschutzerklärung – KickRadar</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #15181d;
+    --muted: #5b6270;
+    --border: #e2e5ea;
+    --accent: #1e6b3a;
+    --surface: #f5f6f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181d;
+      --text: #eef0f3;
+      --muted: #9199a6;
+      --border: #2b2f38;
+      --accent: #4fbd7d;
+      --surface: #1b1e24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    padding: 32px 20px 64px;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  a { color: var(--accent); }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 16px; margin: 30px 0 8px; }
+  h3 { font-size: 14px; margin: 18px 0 6px; }
+  .back { font-size: 13px; margin-bottom: 20px; display: inline-block; }
+  .placeholder {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    border-radius: 4px;
+    padding: 0 4px;
+  }
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    border-left: 3px solid var(--border);
+    padding-left: 12px;
+    margin: 24px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 10px 0 18px;
+  }
+  th, td {
+    text-align: left;
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { color: var(--muted); font-weight: 600; }
+  p, li { margin: 0 0 10px; font-size: 14.5px; }
+  ul { padding-left: 20px; }
+  .updated { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">&larr; Zurück zu KickRadar</a>
+  <h1>Datenschutzerklärung</h1>
+  <p class="updated">Stand: <span class="placeholder">[Datum einsetzen]</span></p>
+
+  <div class="note">
+    Platzhalter unten (Name/Kontakt) vor Veröffentlichung ausfüllen – identisch
+    mit dem <a href="/impressum.html">Impressum</a>.
+  </div>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>
+    <span class="placeholder">[Vollständiger Name]</span><br />
+    <span class="placeholder">[Anschrift]</span><br />
+    E-Mail: <span class="placeholder">[deine-email@beispiel.de]</span>
+  </p>
+
+  <h2>2. Grundsatz</h2>
+  <p>
+    KickRadar ist ohne Benutzerkonto nutzbar. Es werden keine Namen,
+    E-Mail-Adressen oder sonstigen Kontaktdaten von Nutzer:innen erhoben. Die
+    App verwendet keine Cookies, kein Tracking und keine Analyse- oder
+    Werbedienste Dritter.
+  </p>
+
+  <h2>3. Lokal auf deinem Gerät gespeicherte Daten</h2>
+  <p>
+    Sprache, Design (hell/dunkel), Lieblingsverein und Schnellfilter werden
+    ausschließlich im <code>localStorage</code> deines Browsers gespeichert.
+    Diese Daten verlassen dein Gerät nie und sind für den Betreiber nicht
+    einsehbar. Löschen lassen sie sich jederzeit über die Browser- oder
+    App-Einstellungen ("Websitedaten löschen").
+  </p>
+
+  <h2>4. Push-Benachrichtigungen</h2>
+  <p>
+    Wenn du Push-Benachrichtigungen aktivierst, erteilt dein Browser eine
+    Berechtigung und legt eine Subscription an, die serverseitig
+    gespeichert wird, um dir Nachrichten zustellen zu können:
+  </p>
+  <table>
+    <tr><th>Feld</th><th>Inhalt</th></tr>
+    <tr><td>Endpoint</td><td>Vom Browser vergebene, nur für diesen Push-Kanal gültige URL</td></tr>
+    <tr><td>Verschlüsselungsschlüssel (p256dh, auth)</td><td>Für die Ende-zu-Ende-Verschlüsselung der Push-Nachricht benötigt</td></tr>
+    <tr><td>Benachrichtigungs-Einstellungen</td><td>Ob Transfer-News bzw. Aufstellungs-Updates zugestellt werden sollen</td></tr>
+  </table>
+  <p>
+    Ein Name, eine E-Mail-Adresse oder eine IP-Adresse wird dabei nicht
+    gespeichert. Der Endpoint kann jedoch einem einzelnen Gerät/Browser
+    zugeordnet werden und gilt daher datenschutzrechtlich als
+    personenbezogenes Datum.
+  </p>
+  <p>
+    <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. a DSGVO
+    (Einwilligung durch aktives Erlauben der Browser-Berechtigung). Die
+    Einwilligung kann jederzeit durch Deaktivieren der Benachrichtigungen
+    in den App-Einstellungen sowie durch Entziehen der Berechtigung in den
+    Browser-Einstellungen widerrufen werden.
+  </p>
+  <p>
+    <strong>Empfänger:</strong> Um die Nachricht zuzustellen, wird sie
+    zwangsläufig über den Push-Dienst deines Browser- bzw.
+    Betriebssystem-Anbieters geleitet (z. B. Google FCM, Mozilla Push
+    Service, Apple Push Notification Service) – das ist eine technische
+    Voraussetzung des Web-Push-Standards und lässt sich nicht umgehen.
+  </p>
+  <p>
+    <strong>Speicherdauer:</strong> Deaktivierst du beide
+    Benachrichtigungs-Schalter, werden keine weiteren Push-Nachrichten mehr
+    zugestellt. Ungültig gewordene Subscriptions (z. B. nach Deinstallation
+    der App) werden automatisch entfernt, sobald ein Zustellversuch
+    fehlschlägt. Eine sofortige, vollständige Löschung auf Zuruf kann
+    formlos per E-Mail an die oben genannte Adresse angefragt werden.
+  </p>
+
+  <h2>5. Externe Dienste</h2>
+  <p>Beim Betrieb der App werden folgende Auftragsverarbeiter bzw. Drittdienste eingesetzt:</p>
+  <table>
+    <tr><th>Dienst</th><th>Zweck</th></tr>
+    <tr><td>Supabase</td><td>Datenbank-Hosting (Push-Subscriptions, Transfer- und Spieldaten)</td></tr>
+    <tr><td><span class="placeholder">Vercel</span></td><td>Hosting der Web-App (PWA)</td></tr>
+    <tr><td>GitHub Actions</td><td>Zeitgesteuerte Hintergrund-Jobs (News-Abruf, Spielplan-Synchronisierung) – verarbeitet keine Nutzerdaten der App, nur öffentliche Fußballdaten</td></tr>
+  </table>
+  <p>
+    Mit diesen Anbietern bestehen, soweit erforderlich, Verträge zur
+    Auftragsverarbeitung (Art. 28 DSGVO) gemäß deren jeweiligen Standard-AVV.
+  </p>
+
+  <h2>6. Deine Rechte</h2>
+  <p>Du hast das Recht auf:</p>
+  <ul>
+    <li>Auskunft über die zu dir gespeicherten Daten (Art. 15 DSGVO)</li>
+    <li>Berichtigung unrichtiger Daten (Art. 16 DSGVO)</li>
+    <li>Löschung (Art. 17 DSGVO)</li>
+    <li>Widerruf einer erteilten Einwilligung mit Wirkung für die Zukunft (Art. 7 Abs. 3 DSGVO)</li>
+    <li>Beschwerde bei einer Datenschutz-Aufsichtsbehörde (Art. 77 DSGVO)</li>
+  </ul>
+  <p>
+    Da es kein Benutzerkonto gibt, kann eine Anfrage nur über den
+    Push-Endpoint deines Geräts oder formlos per E-Mail zugeordnet werden.
+  </p>
+</main>
+</body>
+</html>

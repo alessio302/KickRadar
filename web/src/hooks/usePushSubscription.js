@@ -19,16 +19,6 @@ function urlBase64ToUint8Array(base64String) {
 // needs to solve too.
 export const NOTIFICATIONS_DENIED = 'notifications-denied';
 
-function subscriptionRow(subscription) {
-  const json = subscription.toJSON();
-  return {
-    endpoint: json.endpoint,
-    p256dh: json.keys.p256dh,
-    auth: json.keys.auth,
-    updated_at: new Date().toISOString(),
-  };
-}
-
 // Transfers and lineup confirmations are two fully independent opt-ins
 // (push_subscriptions.notify_transfers / notify_lineups, both default
 // true) riding on one underlying browser subscription -- confirmed live
@@ -66,11 +56,14 @@ export function usePushSubscription() {
       .then(async (existing) => {
         setSubscribed(!!existing);
         if (existing) {
-          const { endpoint } = existing.toJSON();
+          const { endpoint, keys } = existing.toJSON();
+          // RPC, not a direct table select: push_subscriptions has no
+          // select policy (see sql/012_push_subscriptions_rpc.sql), only
+          // this endpoint+auth-scoped function, so a stray anon-key query
+          // elsewhere in the codebase could never enumerate other users'
+          // rows.
           const { data } = await supabase
-            .from('push_subscriptions')
-            .select('notify_transfers, notify_lineups')
-            .eq('endpoint', endpoint)
+            .rpc('get_push_preferences', { p_endpoint: endpoint, p_auth: keys.auth })
             .maybeSingle();
           if (data) {
             setNotifyTransfersState(data.notify_transfers);
@@ -108,9 +101,12 @@ export function usePushSubscription() {
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
     });
 
-    const { error: upsertErr } = await supabase
-      .from('push_subscriptions')
-      .upsert(subscriptionRow(subscription), { onConflict: 'endpoint' });
+    const { endpoint, keys } = subscription.toJSON();
+    const { error: upsertErr } = await supabase.rpc('upsert_push_subscription', {
+      p_endpoint: endpoint,
+      p_p256dh: keys.p256dh,
+      p_auth: keys.auth,
+    });
     if (upsertErr) throw upsertErr;
 
     setSubscribed(true);
@@ -121,8 +117,12 @@ export function usePushSubscription() {
     setError(null);
     try {
       const subscription = await ensureSubscribed();
-      const { endpoint } = subscription.toJSON();
-      const { error: updateErr } = await supabase.from('push_subscriptions').update({ notify_transfers: value }).eq('endpoint', endpoint);
+      const { endpoint, keys } = subscription.toJSON();
+      const { error: updateErr } = await supabase.rpc('set_push_preference', {
+        p_endpoint: endpoint,
+        p_auth: keys.auth,
+        p_notify_transfers: value,
+      });
       if (updateErr) throw updateErr;
       setNotifyTransfersState(value);
     } catch (err) {
@@ -134,8 +134,12 @@ export function usePushSubscription() {
     setError(null);
     try {
       const subscription = await ensureSubscribed();
-      const { endpoint } = subscription.toJSON();
-      const { error: updateErr } = await supabase.from('push_subscriptions').update({ notify_lineups: value }).eq('endpoint', endpoint);
+      const { endpoint, keys } = subscription.toJSON();
+      const { error: updateErr } = await supabase.rpc('set_push_preference', {
+        p_endpoint: endpoint,
+        p_auth: keys.auth,
+        p_notify_lineups: value,
+      });
       if (updateErr) throw updateErr;
       setNotifyLineupsState(value);
     } catch (err) {
