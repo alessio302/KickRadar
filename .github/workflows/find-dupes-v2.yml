@@ -1,0 +1,24 @@
+name: Find duplicate transfers v2 (one-off)
+
+# Read-only: finds transfers rows that are duplicates of each other under
+# the new name-variant dedup logic (see src/news/findDupesV2.js), so the
+# actual bad rows can be confirmed before any cleanup. No writes. Manual
+# trigger only.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/findDupesV2.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
