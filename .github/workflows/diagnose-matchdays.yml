@@ -1,0 +1,23 @@
+name: Diagnose LaLiga matchdays (one-off)
+
+# Read-only: dumps every LaLiga fixture with its matchday/kickoff/status to
+# investigate the reported matchday-grouping/ordering bug. No writes.
+# Manual trigger only, to be deleted after use.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/diagnoseMatchdays.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
