@@ -51,3 +51,11 @@ export function getMatches({ date, leagueId, leagueName, countryName, offset, li
 export function getLineups(matchId) {
   return call(`/lineups/${matchId}`);
 }
+
+// Confirmed live (diagnoseEvents.js): returns an array of
+// { team, time, type: 'Goal' | 'Yellow Card' | 'Red Card' | 'Substitution' | ...,
+// player, playerId, assist, substituted, assistingPlayerId }, populated in
+// real time during a live match.
+export function getEvents(matchId) {
+  return call(`/events/${matchId}`);
+}

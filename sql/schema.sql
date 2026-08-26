@@ -71,6 +71,7 @@ create table if not exists fixtures (
   home_score int,
   away_score int,
   external_fixture_id bigint unique not null, -- football-data.org match id
+  highlightly_match_id bigint, -- resolved by syncLineups.js, used by matchEventNotifier.js
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_fixtures_league_matchday on fixtures(league_id, matchday);
@@ -108,6 +109,29 @@ create table if not exists push_subscriptions (
   updated_at timestamptz not null default now()
 );
 
+-- Favorited individual fixtures, for match-event push (goals/cards/subs) --
+-- see sql/014_favorite_fixtures.sql and matchEventNotifier.js. Per-fixture,
+-- not a blanket toggle like notify_transfers/notify_lineups, since two
+-- subscriptions can favorite entirely different matches at once.
+create table if not exists favorite_fixtures (
+  id uuid primary key default gen_random_uuid(),
+  push_subscription_id uuid not null references push_subscriptions(id) on delete cascade,
+  fixture_id int not null references fixtures(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (push_subscription_id, fixture_id)
+);
+create index if not exists idx_favorite_fixtures_fixture on favorite_fixtures(fixture_id);
+
+-- Tracks which match events have already been pushed, once per fixture
+-- (not per subscriber -- fanned out to all of that fixture's favoriters
+-- by sendPushToFixtureFavoriters).
+create table if not exists notified_match_events (
+  fixture_id int not null references fixtures(id) on delete cascade,
+  event_key text not null,
+  notified_at timestamptz not null default now(),
+  primary key (fixture_id, event_key)
+);
+
 -- Seed the five leagues (the "big 5"). external_competition_id values are football-data.org's
 -- numeric competition ids.
 insert into leagues (slug, name, country, external_competition_id, news_source) values
@@ -129,6 +153,8 @@ alter table transfers enable row level security;
 alter table fixtures enable row level security;
 alter table lineups enable row level security;
 alter table push_subscriptions enable row level security;
+alter table favorite_fixtures enable row level security;
+alter table notified_match_events enable row level security;
 
 create policy "Public read access" on leagues for select using (true);
 create policy "Public read access" on clubs for select using (true);
@@ -195,3 +221,70 @@ revoke all on function set_push_preference(text, text, boolean, boolean) from pu
 grant execute on function upsert_push_subscription(text, text, text) to anon;
 grant execute on function get_push_preferences(text, text) to anon;
 grant execute on function set_push_preference(text, text, boolean, boolean) to anon;
+
+-- favorite_fixtures gets the same no-direct-policy treatment as
+-- push_subscriptions above -- every read/write goes through these
+-- endpoint+auth-scoped functions instead.
+
+create or replace function add_favorite_fixture(
+  p_endpoint text,
+  p_auth text,
+  p_fixture_id int
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_sub_id uuid;
+begin
+  select id into v_sub_id from push_subscriptions where endpoint = p_endpoint and auth = p_auth;
+  if v_sub_id is null then
+    raise exception 'Unknown push subscription';
+  end if;
+  insert into favorite_fixtures (push_subscription_id, fixture_id)
+  values (v_sub_id, p_fixture_id)
+  on conflict (push_subscription_id, fixture_id) do nothing;
+end;
+$$;
+
+create or replace function remove_favorite_fixture(
+  p_endpoint text,
+  p_auth text,
+  p_fixture_id int
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_sub_id uuid;
+begin
+  select id into v_sub_id from push_subscriptions where endpoint = p_endpoint and auth = p_auth;
+  if v_sub_id is null then
+    return;
+  end if;
+  delete from favorite_fixtures where push_subscription_id = v_sub_id and fixture_id = p_fixture_id;
+end;
+$$;
+
+create or replace function get_favorite_fixture_ids(
+  p_endpoint text,
+  p_auth text
+) returns table (fixture_id int)
+language sql
+security definer
+set search_path = public
+as $$
+  select ff.fixture_id
+  from favorite_fixtures ff
+  join push_subscriptions ps on ps.id = ff.push_subscription_id
+  where ps.endpoint = p_endpoint and ps.auth = p_auth;
+$$;
+
+revoke all on function add_favorite_fixture(text, text, int) from public;
+revoke all on function remove_favorite_fixture(text, text, int) from public;
+revoke all on function get_favorite_fixture_ids(text, text) from public;
+grant execute on function add_favorite_fixture(text, text, int) to anon;
+grant execute on function remove_favorite_fixture(text, text, int) to anon;
+grant execute on function get_favorite_fixture_ids(text, text) to anon;

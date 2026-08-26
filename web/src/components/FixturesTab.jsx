@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
-import ClubJersey from './ClubJersey.jsx';
-import MatchScore from './MatchScore.jsx';
+import FixtureRow from './FixtureRow.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
+import { useFavoriteFixtures } from '../hooks/useFavoriteFixtures.js';
+import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 function formatDate(iso, locale) {
@@ -37,12 +38,23 @@ function pickCurrentMatchday(matchdays) {
   return matchdays[matchdays.length - 1];
 }
 
-export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture }) {
+export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading } = useFixtures(league);
+  const { favoriteIds, toggleFavorite } = useFavoriteFixtures();
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
+  const [openFixtureId, setOpenFixtureId] = useState(null);
   const locale = DATE_LOCALES[language];
+
+  const handleToggleFavorite = async (fixture) => {
+    try {
+      const result = await toggleFavorite(fixture.id);
+      onFavoriteToast(result === 'added' ? t.fixtures.favoritedToast : t.fixtures.unfavoritedToast);
+    } catch (err) {
+      onFavoriteToast(err.message === NOTIFICATIONS_DENIED ? t.errors.notificationsDenied : err.message);
+    }
+  };
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
@@ -144,33 +156,21 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {dateGames.map((f) => (
-                    <div
+                    <FixtureRow
                       key={f.id}
-                      onClick={() => setSelectedFixture(f)}
-                      style={{
-                        background: theme.surfaceRaised,
-                        borderRadius: '12px',
-                        padding: '10px 14px',
-                        border: `1px solid ${theme.border}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '40px', flex: '0 0 auto' }}>
-                        {formatTime(f.kickoff_at, locale)}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-                        <ClubJersey club={clubsById.get(f.home_club_id)} size={20} theme={theme} />
-                        <span style={{ fontSize: '13px' }}>{clubsById.get(f.home_club_id)?.name}</span>
-                      </div>
-                      <MatchScore fixture={f} t={t} theme={theme} style={{ fontSize: '11px', color: theme.textMuted }} />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, justifyContent: 'flex-end' }}>
-                        <span style={{ fontSize: '13px' }}>{clubsById.get(f.away_club_id)?.name}</span>
-                        <ClubJersey club={clubsById.get(f.away_club_id)} size={20} theme={theme} />
-                      </div>
-                    </div>
+                      theme={theme}
+                      t={t}
+                      locale={locale}
+                      formatTime={formatTime}
+                      clubsById={clubsById}
+                      fixture={f}
+                      isFavorite={favoriteIds.has(f.id)}
+                      isOpen={openFixtureId === f.id}
+                      onOpenRow={() => setOpenFixtureId(f.id)}
+                      onCloseRow={() => setOpenFixtureId(null)}
+                      onSelectFixture={setSelectedFixture}
+                      onToggleFavorite={handleToggleFavorite}
+                    />
                   ))}
                 </div>
               </div>

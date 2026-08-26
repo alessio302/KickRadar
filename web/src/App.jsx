@@ -3,6 +3,7 @@ import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
+import Toast from './components/Toast.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 
@@ -59,6 +60,7 @@ export default function App() {
   }, []);
   const [officialOnly, setOfficialOnly] = usePersistedState('kickradar.officialOnly', false);
   const [activeFilter, setActiveFilter] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const [favoriteClub, setFavoriteClub] = usePersistedState('kickradar.favoriteClub', null);
   const [quickFilters, setQuickFilters] = usePersistedState('kickradar.quickFilters', []);
@@ -235,6 +237,7 @@ export default function App() {
             onSelectLeague={selectLeague}
             initialFixtureId={initialFixtureId}
             onConsumedInitialFixture={() => setInitialFixtureId(null)}
+            onFavoriteToast={setToast}
           />
         )}
         {tab === 'einstellungen' && (
@@ -253,7 +256,8 @@ export default function App() {
         )}
       </div>
 
-      <div style={{ flexShrink: 0 }}>
+      <div style={{ flexShrink: 0, position: 'relative' }}>
+        <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
     </div>

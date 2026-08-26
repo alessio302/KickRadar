@@ -48,7 +48,7 @@ export async function syncLineups() {
 
   const { data: fixtures, error: fixturesErr } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, highlightly_match_id')
     .gte('kickoff_at', windowStart)
     .lte('kickoff_at', windowEnd);
   if (fixturesErr) throw fixturesErr;
@@ -123,6 +123,15 @@ export async function syncLineups() {
         return homeMatch && awayMatch;
       });
       if (!match) continue;
+
+      // Persisted so matchEventNotifier.js (goals/cards/subs push for
+      // favorited fixtures) never has to re-run this same fuzzy
+      // home/away-name match itself -- by the time a fixture goes live,
+      // this has already been set by a pre-kickoff run here.
+      if (f.highlightly_match_id !== match.id) {
+        const { error: idErr } = await supabase.from('fixtures').update({ highlightly_match_id: match.id }).eq('id', f.id);
+        if (idErr) console.error(`Failed to persist highlightly_match_id for fixture ${f.id}:`, idErr.message);
+      }
 
       checked += 1;
       let lineups;
