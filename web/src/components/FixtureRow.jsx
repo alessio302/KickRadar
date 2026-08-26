@@ -15,6 +15,14 @@ const OPEN_THRESHOLD = PANEL_WIDTH / 2;
 // few px while pressing".
 const TAP_SLOP = 8;
 
+// Fixed gold, not theme.accent -- confirmed live that using the theme
+// accent made the already-favorited indicator blend into the (also
+// accent-colored) kickoff time right next to it instead of standing out.
+// A literal star-yellow reads as "favorited" against both the light and
+// dark surface colors, matching how league dots/club badges elsewhere in
+// this app also use their own fixed colors rather than theme tokens.
+const FAVORITE_STAR_COLOR = '#FFC107';
+
 export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fixture, isFavorite, isOpen, onOpenRow, onCloseRow, onSelectFixture, onToggleFavorite }) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -134,9 +142,9 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           transition: dragging ? 'none' : 'transform 0.2s ease',
         }}
       >
-        <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '40px', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '3px' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '48px', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '3px' }}>
           {formatTime(fixture.kickoff_at, locale)}
-          {isFavorite && <Star size={10} fill={theme.accent} color={theme.accent} />}
+          {isFavorite && <Star size={14} fill={FAVORITE_STAR_COLOR} color={FAVORITE_STAR_COLOR} style={{ flexShrink: 0 }} />}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
           <ClubJersey club={clubsById.get(fixture.home_club_id)} size={20} theme={theme} />
