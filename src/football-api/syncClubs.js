@@ -31,6 +31,7 @@ export async function syncClubsForLeague(supabase, league) {
     short_code: (team.tla || fallbackShortCode(team.name)).slice(0, 5),
     external_team_id: team.id,
     venue: team.venue || null,
+    short_name: team.shortName || null,
   }));
 
   const { error } = await supabase

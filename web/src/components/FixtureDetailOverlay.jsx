@@ -575,7 +575,7 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
                     textOverflow: 'ellipsis',
                   }}
                 >
-                  {club?.name ?? '–'}
+                  {club?.short_name || club?.name || '–'}
                 </button>
               ))}
             </div>

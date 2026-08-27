@@ -19,6 +19,7 @@ create table if not exists clubs (
   league_id int not null references leagues(id) on delete cascade,
   name text not null,
   short_code text not null,            -- e.g. 'JUV', 'BVB' -- used for the badge in the UI
+  short_name text,                     -- e.g. 'Inter', 'Real Madrid' -- for spots too narrow for the full official name
   external_team_id int,                -- football-data.org team id
   aliases text[] not null default '{}', -- alternate spellings seen in news text, for matching
   venue text,                          -- home stadium, from football-data.org's /teams (team.venue)
