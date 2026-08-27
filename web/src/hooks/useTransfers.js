@@ -19,60 +19,18 @@ const PAGE_SIZE = 50;
 // transfer", so they don't belong in a transfer feed even though the
 // relevance filter (deliberately broad, backend-side) let them through.
 //
-// to_club (the interested/destination club) is still required -- a card
-// that doesn't say which other club wants the player has no content: the
-// player's current club is background, not news. from_club is NOT
-// required anymore: confirmed live (Ligue 1, 2026-08-27) that requiring
-// both sides can hide essentially an entire league's worth of genuinely
-// fresh news when its current cycle is dominated by "player X linked with
-// club Y" stories that don't (yet) restate where X currently plays --
-// the feed then looks stale even though the database has items from the
-// last hour. The backend (runNewsScraper.js's lookupSquadMembership) already
-// tries to backfill from_club from synced squad data whenever an article
-// only named the destination, so most of these still arrive complete;
-// this only affects the remainder it couldn't resolve (a player not in any
-// synced squad, or an ambiguous name).
-//
-// dedupeSupersededSingleSided() below keeps the original filter's actual
-// goal (don't show a bare "linked with Y" card once a fuller card naming
-// both clubs covers the same player+destination) without hiding
-// single-sided news that has no fuller counterpart yet. Keyed by player+
-// destination, not just player, so a player genuinely linked with two
-// different clubs still gets two cards.
-function normalizePlayerName(name) {
-  return (name ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim();
-}
-
-function storyKey(t) {
-  const dest = t.to_club_id != null ? `id:${t.to_club_id}` : `text:${normalizePlayerName(t.to_club)}`;
-  return `${normalizePlayerName(t.player_name)}|${dest}`;
-}
-
-function dedupeSupersededSingleSided(rows) {
-  const hasCompleteForStory = new Set();
-  for (const t of rows) {
-    if (t.from_club) hasCompleteForStory.add(storyKey(t));
-  }
-  const seenIncompleteStory = new Set();
-  return rows.filter((t) => {
-    if (t.from_club) return true;
-    const key = storyKey(t);
-    // A fuller card already tells this exact player+destination story.
-    if (hasCompleteForStory.has(key)) return false;
-    // No fuller card exists yet: keep only the most recent single-sided
-    // card per player+destination (rows already arrive published_at
-    // desc), so a story that gets re-reported a few times doesn't produce
-    // several near-duplicate incomplete cards.
-    if (seenIncompleteStory.has(key)) return false;
-    seenIncompleteStory.add(key);
-    return true;
-  });
-}
-
+// Also requires both from_club and to_club: a card with only one --
+// confirmed live via a screenshot (Ligue 1, footmercato's official-signing
+// headlines that only name the new club, e.g. "Mathieu Patouillet, Stade
+// Brestois 29") -- renders as a bare club name with no arrow, and there's
+// no reliable way to tell a reader whether that's the destination or the
+// club he's leaving. An explicitly-requiring-only-to_club version of this
+// filter was tried (see git history) on the theory that the destination is
+// the newsworthy half and the origin is background info we can look up
+// ourselves -- reverted because the *display* never actually communicated
+// that distinction, so a single-club card was ambiguous either way, not
+// just less complete. Keeping only complete rows removes the ambiguity
+// instead of just softening how the incomplete ones are displayed.
 export function useTransfers(leagueSlug, { officialOnly } = {}) {
   const leagueId = useLeagueId(leagueSlug);
   const [transfers, setTransfers] = useState([]);
@@ -87,6 +45,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
       )
       .eq('league_id', leagueId)
       .not('player_name', 'is', null)
+      .not('from_club', 'is', null)
       .not('to_club', 'is', null)
       .order('published_at', { ascending: false })
       .limit(PAGE_SIZE);
@@ -108,7 +67,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
         console.error('Failed to load transfers for league', leagueSlug, error);
         setTransfers([]);
       } else {
-        setTransfers(dedupeSupersededSingleSided(data));
+        setTransfers(data);
       }
       setLoading(false);
     });
@@ -130,7 +89,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     if (error) {
       console.error('Failed to refresh transfers for league', leagueSlug, error);
     } else {
-      setTransfers(dedupeSupersededSingleSided(data));
+      setTransfers(data);
     }
     setRefreshing(false);
   }, [leagueId, leagueSlug, buildQuery]);
