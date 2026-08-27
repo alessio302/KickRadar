@@ -5,7 +5,7 @@
 // Highlightly, already fetched in syncLineups.js) for the new
 // referee/stadium display request.
 import { LEAGUES } from '../config/leagues.js';
-import { getMatches } from './client.js';
+import { getMatches, getTeams } from './client.js';
 
 async function main() {
   const league = LEAGUES.find((l) => l.slug === 'serie-a');
@@ -26,9 +26,15 @@ async function main() {
   console.log('--- Sample match (full raw object) ---');
   console.log(JSON.stringify(finished, null, 2));
 
-  console.log('--- Field presence check ---');
+  console.log('--- Field presence check (match object) ---');
   console.log('venue:', finished.venue);
   console.log('referees:', JSON.stringify(finished.referees));
+
+  // Stadiums are per-team static data, not per-match -- football-data.org's
+  // /teams endpoint may carry it even if the match object doesn't.
+  const teams = await getTeams({ competitionId: league.externalCompetitionId });
+  console.log(`--- Sample team (full raw object, ${teams.length} teams total) ---`);
+  console.log(JSON.stringify(teams[0], null, 2));
 }
 
 main().catch((err) => {
