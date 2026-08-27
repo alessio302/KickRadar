@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { Users } from 'lucide-react';
+import { Users, CalendarClock } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import { useLineups } from '../hooks/useLineups.js';
+import { useMatchEvents } from '../hooks/useMatchEvents.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 // Drag distance past which releasing counts as "dismiss" rather than
@@ -219,13 +220,108 @@ function LineupList({ theme, t, row }) {
   );
 }
 
+// Football-specific emoji rather than a generic lucide shape -- matches
+// the FlashScore-style reference this feature was designed against, and
+// reads instantly as "goal"/"card"/"sub" without needing a legend.
+const EVENT_ICON = {
+  Goal: '⚽',
+  'Own Goal': '⚽',
+  Penalty: '⚽',
+  'Yellow Card': '🟨',
+  'Red Card': '🟥',
+  Substitution: '🔄',
+};
+
+const EVENT_LABEL_KEY = {
+  Goal: 'goal',
+  'Own Goal': 'ownGoal',
+  Penalty: 'penalty',
+  'Yellow Card': 'yellowCard',
+  'Red Card': 'redCard',
+  Substitution: 'substitution',
+};
+
+// "45+2" sorts after "9" as plain text but must sort *before* "90" --
+// parsing the added-time suffix into a fractional part keeps stoppage-time
+// events in their real chronological position without needing a second
+// sort key.
+function parseMinute(minute) {
+  const match = /^(\d+)(?:\+(\d+))?/.exec(minute || '');
+  if (!match) return 0;
+  const base = Number(match[1]);
+  const added = match[2] ? Number(match[2]) / 100 : 0;
+  return base + added;
+}
+
+function MatchEventRow({ theme, t, event, club }) {
+  const labelKey = EVENT_LABEL_KEY[event.type];
+  const label = labelKey ? t.matchInfo[labelKey] : event.type;
+  const icon = EVENT_ICON[event.type] || '•';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${theme.border}` }}>
+      <span style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>
+          {label} · {event.player || club?.name || '–'} {event.minute}'
+        </p>
+        {event.type === 'Substitution' && event.substituted && (
+          <p style={{ margin: '2px 0 0', fontSize: '12px', color: theme.textMuted }}>
+            {t.matchInfo.substitutionLabel(event.substituted, event.player)}
+          </p>
+        )}
+        {event.assist && (
+          <p style={{ margin: '2px 0 0', fontSize: '12px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>
+        )}
+      </div>
+      {club && <ClubJersey club={club} size={16} theme={theme} />}
+    </div>
+  );
+}
+
+function MatchInfoTimeline({ theme, t, fixture, clubsById }) {
+  const { events, loading } = useMatchEvents(fixture.id);
+
+  if (fixture.status !== 'finished') {
+    return (
+      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+        <CalendarClock size={22} style={{ color: theme.textMuted, marginBottom: '8px' }} />
+        <p style={{ fontSize: '13px', color: theme.textMuted, margin: 0 }}>{t.matchInfo.notFinished}</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>;
+  }
+
+  if (events.length === 0) {
+    return <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.matchInfo.noEvents}</p>;
+  }
+
+  // Newest event at the top -- ties (rare: e.g. a booking logged at the
+  // same minute as a goal) keep whatever order the API returned them in,
+  // since Array.prototype.sort is stable.
+  const sorted = [...events].sort((a, b) => parseMinute(b.minute) - parseMinute(a.minute));
+
+  return (
+    <div style={{ padding: '4px 16px 16px' }}>
+      {sorted.map((event, i) => (
+        <MatchEventRow key={i} theme={theme} t={t} event={event} club={clubsById?.get(event.club_id)} />
+      ))}
+    </div>
+  );
+}
+
 export default function FixtureDetailOverlay({ theme, t, language, fixture, homeClub, awayClub, onClose }) {
+  const [view, setView] = useState('lineups'); // 'lineups' | 'info'
   const [side, setSide] = useState('home');
   const { byClubId } = useLineups(fixture.id);
   const locale = DATE_LOCALES[language];
 
   const activeClub = side === 'home' ? homeClub : awayClub;
   const activeRow = activeClub ? byClubId.get(activeClub.id) : null;
+  const clubsById = new Map([[homeClub?.id, homeClub], [awayClub?.id, awayClub]]);
 
   // Pointer capture (not window listeners) so move/up events keep routing
   // to the handle even once the finger/cursor drifts off it -- avoids an
@@ -305,31 +401,63 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
             <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at, locale)}</p>
           </div>
 
-          <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', border: `1px solid ${theme.border}` }}>
-            {[['home', homeClub], ['away', awayClub]].map(([key, club]) => (
+          {/* Which tab is open at all -- Aufstellungen/Spielinfo -- versus
+              which side's lineup is shown within the Aufstellungen tab are
+              two independent choices, so this is a second, outer toggle
+              row rather than folding "Spielinfo" in as a third side
+              option. */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
+            {[['lineups', t.matchInfo.tabLineups], ['info', t.matchInfo.tabInfo]].map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setSide(key)}
+                onClick={() => setView(key)}
                 style={{
-                  flex: 1,
-                  padding: '8px',
+                  padding: '6px 2px 10px',
                   fontSize: '13px',
-                  fontWeight: side === key ? 700 : 600,
-                  borderRadius: '7px',
+                  fontWeight: view === key ? 700 : 600,
                   border: 'none',
+                  borderBottom: view === key ? `2px solid ${theme.accent}` : '2px solid transparent',
+                  background: 'transparent',
+                  color: view === key ? theme.text : theme.textMuted,
                   cursor: 'pointer',
-                  background: side === key ? theme.surfaceRaised : 'transparent',
-                  color: side === key ? theme.text : theme.textMuted,
                 }}
               >
-                {club?.name ?? '–'}
+                {label}
               </button>
             ))}
           </div>
+
+          {view === 'lineups' && (
+            <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', border: `1px solid ${theme.border}` }}>
+              {[['home', homeClub], ['away', awayClub]].map(([key, club]) => (
+                <button
+                  key={key}
+                  onClick={() => setSide(key)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    fontSize: '13px',
+                    fontWeight: side === key ? 700 : 600,
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: side === key ? theme.surfaceRaised : 'transparent',
+                    color: side === key ? theme.text : theme.textMuted,
+                  }}
+                >
+                  {club?.name ?? '–'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <LineupList theme={theme} t={t} row={activeRow} />
+          {view === 'lineups' ? (
+            <LineupList theme={theme} t={t} row={activeRow} />
+          ) : (
+            <MatchInfoTimeline theme={theme} t={t} fixture={fixture} clubsById={clubsById} />
+          )}
         </div>
       </div>
     </div>

@@ -51,3 +51,12 @@ export function getMatches({ date, leagueId, leagueName, countryName, offset, li
 export function getLineups(matchId) {
   return call(`/lineups/${matchId}`);
 }
+
+// Confirmed live (diagnoseEvents.js, an earlier session): returns an array
+// of { team, time, type: 'Goal' | 'Yellow Card' | 'Red Card' |
+// 'Substitution' | ..., player, playerId, assist, substituted,
+// assistingPlayerId }. Fetched exactly once per fixture, right after it
+// finishes -- see syncLineups.js -- not polled during live play.
+export function getEvents(matchId) {
+  return call(`/events/${matchId}`);
+}

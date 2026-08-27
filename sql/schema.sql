@@ -71,6 +71,7 @@ create table if not exists fixtures (
   home_score int,
   away_score int,
   external_fixture_id bigint unique not null, -- football-data.org match id
+  events_synced_at timestamptz, -- set once match_events has been fetched for this fixture (see syncLineups.js) -- marks "already tried", since a 0-0 draw with no cards legitimately has 0 events
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_fixtures_league_matchday on fixtures(league_id, matchday);
@@ -93,6 +94,24 @@ create table if not exists lineups (
   created_at timestamptz not null default now(),
   unique (fixture_id, club_id)
 );
+
+-- Full match-event timeline (goals/cards/subs) per fixture, for the
+-- "Spielinfo" tab -- fetched exactly once per fixture, right after it
+-- finishes (see syncLineups.js and fixtures.events_synced_at).
+create table if not exists match_events (
+  id uuid primary key default gen_random_uuid(),
+  fixture_id int not null references fixtures(id) on delete cascade,
+  club_id int references clubs(id),
+  type text not null,
+  minute text not null,
+  player text,
+  assist text,
+  substituted text,
+  event_key text not null,
+  created_at timestamptz not null default now(),
+  unique (fixture_id, event_key)
+);
+create index if not exists idx_match_events_fixture on match_events(fixture_id);
 
 -- Web Push subscriptions + the per-user preferences that drive notifications.
 create table if not exists push_subscriptions (
@@ -128,6 +147,7 @@ alter table players enable row level security;
 alter table transfers enable row level security;
 alter table fixtures enable row level security;
 alter table lineups enable row level security;
+alter table match_events enable row level security;
 alter table push_subscriptions enable row level security;
 
 create policy "Public read access" on leagues for select using (true);
@@ -136,6 +156,7 @@ create policy "Public read access" on players for select using (true);
 create policy "Public read access" on transfers for select using (true);
 create policy "Public read access" on fixtures for select using (true);
 create policy "Public read access" on lineups for select using (true);
+create policy "Public read access" on match_events for select using (true);
 -- push_subscriptions gets no direct anon policies at all (no select,
 -- insert, update, or delete) -- every read/write goes through the
 -- SECURITY DEFINER functions below instead, each of which hardcodes its

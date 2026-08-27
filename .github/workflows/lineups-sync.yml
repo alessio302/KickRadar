@@ -23,7 +23,14 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Bumped from 10: syncLineups.js now also catches up on past-fixture
+    # lineups and events within the app's display window (see its own
+    # PAST_WINDOW_DAYS comment), not just the near-kickoff window -- the
+    # first run after this landed has a real backlog to clear (46 missing
+    # lineups at last count). Steady-state runs finish in well under a
+    # minute once that backlog is gone, same as news-scraper.yml's own
+    # 10->20 bump for the same reason.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
