@@ -27,6 +27,10 @@ import { fetchArticleText } from './articleBody.js';
 import { llmExtractTransferInfo } from './llmExtract.js';
 import { lookupSquadMembership } from './runNewsScraper.js';
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function main() {
   const supabase = getSupabaseClient();
 
@@ -73,6 +77,13 @@ async function main() {
       }
     }
 
+    // Confirmed live: firing article-body fetches back-to-back with zero
+    // spacing (unlike the LLM calls, which llmExtract.js already
+    // throttles) got several footmercato.net requests near the end of a
+    // ~45-row run rejected/unreachable in a row -- looks like a
+    // rate-limit or bot-block kicking in after enough rapid requests to
+    // the same host. A small per-row delay keeps this gentler.
+    await sleep(1500);
     const articleText = await fetchArticleText(t.source_url);
     if (!articleText) {
       console.log('  no squad match and article body unreachable -- leaving as-is');
