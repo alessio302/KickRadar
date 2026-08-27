@@ -77,13 +77,15 @@ async function main() {
       }
     }
 
-    // Confirmed live: firing article-body fetches back-to-back with zero
-    // spacing (unlike the LLM calls, which llmExtract.js already
-    // throttles) got several footmercato.net requests near the end of a
-    // ~45-row run rejected/unreachable in a row -- looks like a
-    // rate-limit or bot-block kicking in after enough rapid requests to
-    // the same host. A small per-row delay keeps this gentler.
-    await sleep(1500);
+    // Confirmed live (diagnoseArticleFetch.js): an isolated fetch of a
+    // URL that failed here mid-run succeeds instantly and cleanly (200,
+    // full body) -- the URLs themselves are fine, it's specifically
+    // bursting many requests at the same host in one run that trips a
+    // rate-limit/bot-block. 1.5s wasn't enough spacing to avoid it once
+    // several dozen requests had already gone out in the same run; 3s is
+    // still cheap for a batch this size (well under a minute of total
+    // delay) and gives real headroom.
+    await sleep(3000);
     const articleText = await fetchArticleText(t.source_url);
     if (!articleText) {
       console.log('  no squad match and article body unreachable -- leaving as-is');
