@@ -1,0 +1,30 @@
+name: Head-to-head sync
+
+on:
+  schedule:
+    # Same 4x/day cadence as fixtures/standings-sync. Offset another 20 min
+    # off standings-sync's own slots to avoid the scheduler throttling
+    # multiple workflows sharing identical cron minutes (see
+    # news-scraper.yml's history for the confirmed cause).
+    - cron: '40 5,11,17,23 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # syncHeadToHead.js caps itself at 30 requests/run, ~6.5s apart to stay
+    # under football-data.org's 10 req/min free-tier cap -- worst case
+    # ~3.5 min, comfortably inside this budget with real margin.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncHeadToHead.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}

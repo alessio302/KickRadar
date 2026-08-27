@@ -504,7 +504,7 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', padding: '6px 0' }}>
-      <span style={{ color: theme.textMuted }}>{new Date(meeting.kickoff_at).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+      <span style={{ color: theme.textMuted }}>{new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
       <span style={{ fontWeight: 600 }}>
         {hostClub?.short_name || hostClub?.name} {meeting.home_score} : {meeting.away_score} {guestClub?.short_name || guestClub?.name}
       </span>

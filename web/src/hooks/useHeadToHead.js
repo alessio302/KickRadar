@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 
-const H2H_LIMIT = 5;
-
-// Past meetings between exactly these two clubs, most recent first. Early
-// in a season (or for two clubs that rarely cross paths across seasons)
-// this can come back empty -- callers show an empty state rather than
-// treating that as an error.
+// Backed by the head_to_head table (see syncHeadToHead.js), not a live
+// query against our own fixtures table -- that only keeps a rolling
+// ~60-day window, nowhere near enough since two clubs in the same league
+// typically meet just twice a SEASON. head_to_head instead reaches back
+// across past seasons via football-data.org's own /head2head endpoint,
+// synced in the background; this hook just reads whatever's stored, one
+// row per unordered club pair.
 export function useHeadToHead(clubIdA, clubIdB) {
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,24 +16,21 @@ export function useHeadToHead(clubIdA, clubIdB) {
     if (clubIdA == null || clubIdB == null) return;
     let cancelled = false;
     setLoading(true);
+    const [a, b] = clubIdA < clubIdB ? [clubIdA, clubIdB] : [clubIdB, clubIdA];
     supabase
-      .from('fixtures')
-      .select('id, home_club_id, away_club_id, home_score, away_score, kickoff_at')
-      .eq('status', 'finished')
-      .or(
-        `and(home_club_id.eq.${clubIdA},away_club_id.eq.${clubIdB}),and(home_club_id.eq.${clubIdB},away_club_id.eq.${clubIdA})`
-      )
-      .order('kickoff_at', { ascending: false })
-      .limit(H2H_LIMIT)
+      .from('head_to_head')
+      .select('matches')
+      .eq('club_id_a', a)
+      .eq('club_id_b', b)
+      .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) {
           console.error('Failed to load head-to-head for clubs', clubIdA, clubIdB, error);
           setMeetings([]);
-          setLoading(false);
-          return;
+        } else {
+          setMeetings(data?.matches ?? []);
         }
-        setMeetings(data);
         setLoading(false);
       });
     return () => {

@@ -65,6 +65,18 @@ export async function getStandings({ competitionId }) {
   return data.standings.find((s) => s.type === 'TOTAL')?.table ?? [];
 }
 
+// Reaches back across PAST SEASONS for free -- confirmed live
+// (diagnoseHeadToHead.js, this session, since removed): Real Madrid vs
+// Elche CF returned meetings back to the 2020-21 season. A per-MATCH
+// endpoint (not per-competition like everything else in this file), so
+// it's called once per fixture, not once per league -- see
+// syncHeadToHead.js for the pacing/prioritization that needs given the
+// free tier's 10 req/min cap once there are many fixtures to cover.
+export async function getHeadToHead({ matchId, limit = 5 }) {
+  const data = await call(`/matches/${matchId}/head2head`, { limit });
+  return data.matches ?? [];
+}
+
 // Shared between syncFixtures.js (a few times a day) and syncLiveScores.js
 // (every ~75s during a live window) so the two never drift apart on what a
 // given football-data.org status actually means for us.

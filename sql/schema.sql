@@ -140,6 +140,24 @@ create table if not exists standings (
 );
 create index if not exists idx_standings_league_position on standings(league_id, position);
 
+-- Last 5 direct meetings between two clubs, for the fixture overlay's
+-- "Statistiken" tab -- see syncHeadToHead.js. Unlike everything else
+-- synced, this reaches ACROSS PAST SEASONS (football-data.org's
+-- /matches/{id}/head2head, confirmed live: Real Madrid vs Elche CF
+-- returned meetings back to 2020-21), which our own fixtures table never
+-- will since it only keeps a rolling ~60-day window. One row per
+-- unordered club pair (club_id_a < club_id_b, enforced by the sync
+-- script, not the DB).
+create table if not exists head_to_head (
+  id serial primary key,
+  club_id_a int not null references clubs(id) on delete cascade,
+  club_id_b int not null references clubs(id) on delete cascade,
+  matches jsonb not null, -- array of { id, date, home_club_id, away_club_id, home_score, away_score }, most recent first
+  updated_at timestamptz not null default now(),
+  unique (club_id_a, club_id_b)
+);
+create index if not exists idx_head_to_head_pair on head_to_head(club_id_a, club_id_b);
+
 -- Web Push subscriptions + the per-user preferences that drive notifications.
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -176,6 +194,7 @@ alter table fixtures enable row level security;
 alter table lineups enable row level security;
 alter table match_events enable row level security;
 alter table standings enable row level security;
+alter table head_to_head enable row level security;
 alter table push_subscriptions enable row level security;
 
 create policy "Public read access" on leagues for select using (true);
@@ -186,6 +205,7 @@ create policy "Public read access" on fixtures for select using (true);
 create policy "Public read access" on lineups for select using (true);
 create policy "Public read access" on match_events for select using (true);
 create policy "Public read access" on standings for select using (true);
+create policy "Public read access" on head_to_head for select using (true);
 -- push_subscriptions gets no direct anon policies at all (no select,
 -- insert, update, or delete) -- every read/write goes through the
 -- SECURITY DEFINER functions below instead, each of which hardcodes its
