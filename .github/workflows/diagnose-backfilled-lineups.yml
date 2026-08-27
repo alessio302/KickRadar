@@ -1,4 +1,4 @@
-name: Diagnose backfilled lineups
+name: Diagnose lineup coverage
 
 on:
   workflow_dispatch: {}
@@ -14,7 +14,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/lineups/diagnoseBackfilledLineups.js
+      - run: node src/lineups/diagnoseLineupCoverage.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
