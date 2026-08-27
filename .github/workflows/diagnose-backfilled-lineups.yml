@@ -1,4 +1,4 @@
-name: Diagnose lineup coverage
+name: Diagnose uncovered fixture
 
 on:
   workflow_dispatch: {}
@@ -14,7 +14,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/lineups/diagnoseLineupCoverage.js
+      - run: node src/lineups/diagnoseUncoveredFixture.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HIGHLIGHTLY_API_KEY: ${{ secrets.HIGHLIGHTLY_API_KEY }}
