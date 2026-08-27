@@ -227,25 +227,23 @@ function LineupList({ theme, t, row }) {
 function Whistle({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      <rect x="1" y="9" width="9" height="6" rx="3" />
-      <circle cx="17" cy="12" r="6" />
-      <circle cx="17" cy="12.5" r="1.4" />
-      <rect x="15.3" y="4.6" width="3.4" height="2.4" rx="1" />
+      <circle cx="14" cy="12" r="6.2" />
+      <circle cx="14" cy="12.5" r="1.5" />
+      <path d="M11.3 7.3h5.4" />
+      <path d="M8 12H3.3" />
     </svg>
   );
 }
 
-// Top-down half-schematic (boundary, halfway line, centre circle, both
-// penalty boxes open toward the centre) -- same idea as PitchFormation
-// above, just flattened to an icon-sized horizontal pitch.
+// Boundary, halfway line, centre circle -- the penalty boxes were dropped
+// (confirmed live: at icon size their open ends, flush with the rounded
+// outer corners, just read as four stray disconnected lines).
 function PitchIcon({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <rect x="1" y="5" width="22" height="14" rx="2" />
       <path d="M12 5v14" />
       <circle cx="12" cy="12" r="3" />
-      <path d="M5 8H1v8h4" />
-      <path d="M19 8h4v8h-4" />
     </svg>
   );
 }
