@@ -253,33 +253,55 @@ function parseMinute(minute) {
   return base + added;
 }
 
-function MatchEventRow({ theme, t, event, club }) {
+// One column's worth of an event's text content -- reused for both the
+// home (left, right-aligned text) and away (right, left-aligned text)
+// side so the two mirror each other around the centre line.
+function MatchEventContent({ theme, t, event, align }) {
   const labelKey = EVENT_LABEL_KEY[event.type];
   const label = labelKey ? t.matchInfo[labelKey] : event.type;
   const icon = EVENT_ICON[event.type] || '•';
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${theme.border}` }}>
-      <span style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>{icon}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>
-          {label} · {event.player || club?.name || '–'} {event.minute}'
+    <div style={{ textAlign: align }}>
+      <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start' }}>
+        {align !== 'right' && <span style={{ fontSize: '15px', lineHeight: 1 }}>{icon}</span>}
+        <span>{event.player || label}</span>
+        {align === 'right' && <span style={{ fontSize: '15px', lineHeight: 1 }}>{icon}</span>}
+      </p>
+      <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{label}</p>
+      {event.type === 'Substitution' && event.substituted && (
+        <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>
+          {t.matchInfo.substitutionLabel(event.substituted, event.player)}
         </p>
-        {event.type === 'Substitution' && event.substituted && (
-          <p style={{ margin: '2px 0 0', fontSize: '12px', color: theme.textMuted }}>
-            {t.matchInfo.substitutionLabel(event.substituted, event.player)}
-          </p>
-        )}
-        {event.assist && (
-          <p style={{ margin: '2px 0 0', fontSize: '12px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>
-        )}
-      </div>
-      {club && <ClubJersey club={club} size={16} theme={theme} />}
+      )}
+      {event.assist && <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>}
     </div>
   );
 }
 
-function MatchInfoTimeline({ theme, t, fixture, clubsById }) {
+// Home events on the left, away events on the right, hung off a shared
+// vertical line down the middle -- one dot per event, the minute sitting
+// right on the line the way a match-centre timeline reads (confirmed
+// against the FlashScore-style reference this feature was designed
+// against). An event whose team never resolved to a curated club (rare --
+// see syncLineups.js's club_id comment) has nowhere reliable to sit, so it
+// spans the full row instead of guessing a side.
+function MatchEventTimelineRow({ theme, t, event, side }) {
+  return (
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: '48px' }}>
+      <div style={{ flex: 1, paddingRight: '14px' }}>{side === 'home' && <MatchEventContent theme={theme} t={t} event={event} align="right" />}</div>
+
+      <div style={{ flexShrink: 0, width: '38px', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+        <span style={{ fontSize: '10px', fontWeight: 700, color: theme.textMuted, marginBottom: '3px', whiteSpace: 'nowrap' }}>{event.minute}'</span>
+        <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: theme.accent, border: `2px solid ${theme.bg}`, boxShadow: `0 0 0 1px ${theme.border}` }} />
+      </div>
+
+      <div style={{ flex: 1, paddingLeft: '14px' }}>{side === 'away' && <MatchEventContent theme={theme} t={t} event={event} align="left" />}</div>
+    </div>
+  );
+}
+
+function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
   const { events, loading } = useMatchEvents(fixture.id);
 
   if (fixture.status !== 'finished') {
@@ -305,10 +327,22 @@ function MatchInfoTimeline({ theme, t, fixture, clubsById }) {
   const sorted = [...events].sort((a, b) => parseMinute(b.minute) - parseMinute(a.minute));
 
   return (
-    <div style={{ padding: '4px 16px 16px' }}>
-      {sorted.map((event, i) => (
-        <MatchEventRow key={i} theme={theme} t={t} event={event} club={clubsById?.get(event.club_id)} />
-      ))}
+    <div style={{ position: 'relative', padding: '4px 16px 16px' }}>
+      {/* The line itself: one continuous rule behind every row's dot,
+          rather than each row drawing its own segment -- avoids visible
+          seams between rows and keeps the dots' spacing exactly even. */}
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: '2px', background: theme.border, transform: 'translateX(-50%)' }} />
+      {sorted.map((event, i) => {
+        const side = event.club_id === homeClub?.id ? 'home' : event.club_id === awayClub?.id ? 'away' : null;
+        if (!side) {
+          return (
+            <div key={i} style={{ padding: '10px 0', textAlign: 'center' }}>
+              <MatchEventContent theme={theme} t={t} event={event} align="center" />
+            </div>
+          );
+        }
+        return <MatchEventTimelineRow key={i} theme={theme} t={t} event={event} side={side} />;
+      })}
     </div>
   );
 }
@@ -321,7 +355,6 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
 
   const activeClub = side === 'home' ? homeClub : awayClub;
   const activeRow = activeClub ? byClubId.get(activeClub.id) : null;
-  const clubsById = new Map([[homeClub?.id, homeClub], [awayClub?.id, awayClub]]);
 
   // Pointer capture (not window listeners) so move/up events keep routing
   // to the handle even once the finger/cursor drifts off it -- avoids an
@@ -456,7 +489,7 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
           {view === 'lineups' ? (
             <LineupList theme={theme} t={t} row={activeRow} />
           ) : (
-            <MatchInfoTimeline theme={theme} t={t} fixture={fixture} clubsById={clubsById} />
+            <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
           )}
         </div>
       </div>
