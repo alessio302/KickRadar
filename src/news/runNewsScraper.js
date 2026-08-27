@@ -223,6 +223,38 @@ async function scrapeLeague(supabase, league) {
           resolvedFromMatch = realClub;
         }
       }
+    } else if (playerName && !fromClubMatch && toClubMatch) {
+      // The article only named the destination -- common for "official
+      // signing" headlines ("X ficha por Y") that don't mention where the
+      // player came from. Confirmed live: this left the from_club/from_club_id
+      // permanently null for a majority of a single Marca batch (Bouare,
+      // Ratkov, Saliba, Driouech, Jonathan Jesus all null->club), and
+      // useTransfers.js requires both sides non-null to display a card at
+      // all -- real, relevant news was silently invisible in the app
+      // forever, not just until a fuller follow-up (which usually never
+      // comes for this kind of story). Same source-of-truth idea as the
+      // block above, just recovering a missing side instead of correcting a
+      // wrong one: if squad_memberships unambiguously has this player at a
+      // club other than the destination, that's their real prior club.
+      // Squad data only reflects the *current* roster (no transfer-history
+      // concept), so this can't recover a case where the sync already
+      // caught up to the new club -- in that case squadRows[0].club_id
+      // would equal toClubMatch.id and nothing is backfilled, same as
+      // today's behavior.
+      const { data: squadRows, error: squadErr } = await supabase
+        .from('squad_memberships')
+        .select('club_id')
+        .eq('normalized_name', normalize(playerName))
+        .limit(2);
+      if (squadErr) {
+        console.error(`[${league.slug}] squad lookup failed:`, squadErr.message);
+      } else if (squadRows.length === 1 && squadRows[0].club_id !== toClubMatch.id) {
+        const realClub = allClubs.find((c) => c.id === squadRows[0].club_id);
+        if (realClub) {
+          resolvedFromClub = realClub.name;
+          resolvedFromMatch = realClub;
+        }
+      }
     }
 
     // A story whose from/to resolve to the same club isn't a transfer at
