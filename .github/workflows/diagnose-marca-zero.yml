@@ -15,3 +15,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node src/news/diagnoseMarcaZero.js
+      - run: node src/news/diagnoseMarcaSeenState.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
