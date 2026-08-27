@@ -224,18 +224,22 @@ function LineupList({ theme, t, row }) {
 // the installed icon set directly) -- hand-drawn to match lucide's own
 // convention (24x24 viewBox, stroke-only, round caps/joins) so they sit
 // next to the rest of the app's icons without looking out of place.
-// Round chamber with its sound hole, mouthpiece tube pointing left with
-// a rounded (not pointed) end. Traced from a real pea-whistle photo,
-// flattened to outline-only and levelled to horizontal -- earlier
-// rounds either had a sharp-pointed tip or a small ring above the
-// chamber; both, per feedback, read as a bird's head (beak/eye) rather
-// than a whistle, so the tip is now blunt and the ring is dropped.
+// Traced from a real pea-whistle photo (pointed mouthpiece wedge, round
+// chamber with its sound hole, lanyard ring on a short neck) -- per
+// feedback this shape actually reads as a whistle, unlike the rounded
+// no-ring simplification tried in between. Kept as-is and just rotated
+// so the mouthpiece points left instead of the reference photo's
+// original diagonal angle.
 function Whistle({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      <path d="M11 10.5H4.2a1.6 1.6 0 0 0 0 3H11" />
-      <circle cx="15.5" cy="12" r="5" />
-      <circle cx="15.5" cy="12" r="2.4" />
+      <g transform="rotate(32 16.3 11.3)">
+        <path d="M1.5 20.5 12.5 7.5 14.3 10.2 5 22Z" />
+        <circle cx="16.3" cy="11.3" r="5.4" />
+        <circle cx="16.3" cy="12.2" r="2.5" />
+        <circle cx="15" cy="3.8" r="1.9" />
+        <path d="M15 5.5v1.4" />
+      </g>
     </svg>
   );
 }
