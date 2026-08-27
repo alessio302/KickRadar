@@ -14,10 +14,10 @@ import { sendPushToTransferSubscribers } from '../push/sendPush.js';
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
 import kicker from './sources/kicker.js';
 import skysports from './sources/skysports.js';
-import rmcsport from './sources/rmcsport.js';
+import footmercato from './sources/footmercato.js';
 import marca from './sources/marca.js';
 
-const SOURCES = { tuttomercatoweb, kicker, skysports, rmcsport, marca };
+const SOURCES = { tuttomercatoweb, kicker, skysports, footmercato, marca };
 
 function externalIdFor(item) {
   return createHash('sha256').update(item.guid || item.link).digest('hex');

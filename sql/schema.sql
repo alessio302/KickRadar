@@ -48,7 +48,7 @@ create table if not exists transfers (
   from_club_id int references clubs(id), -- set when from_club matched a curated club, else null
   to_club_id int references clubs(id),   -- set when to_club matched a curated club, else null
   is_official boolean not null default false,
-  source text not null,                 -- 'tuttomercatoweb' | 'kicker' | 'skysports' | 'rmcsport' | 'marca'
+  source text not null,                 -- 'tuttomercatoweb' | 'kicker' | 'skysports' | 'footmercato' | 'marca'
   source_url text not null,
   summary text not null,                -- short in-app summary only, never the full article (copyright)
   published_at timestamptz not null,
@@ -178,7 +178,7 @@ insert into leagues (slug, name, country, external_competition_id, news_source) 
   ('serie-a', 'Serie A', 'Italy', 2019, 'tuttomercatoweb'),
   ('bundesliga', 'Bundesliga', 'Germany', 2002, 'kicker'),
   ('premier-league', 'Premier League', 'England', 2021, 'skysports'),
-  ('ligue-1', 'Ligue 1', 'France', 2015, 'rmcsport'),
+  ('ligue-1', 'Ligue 1', 'France', 2015, 'footmercato'),
   ('la-liga', 'LaLiga', 'Spain', 2014, 'marca')
 on conflict (slug) do nothing;
 

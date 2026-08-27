@@ -5,7 +5,7 @@ import * as cheerio from 'cheerio';
 // <body>'s <p> tags, dropping short boilerplate lines) rather than a
 // per-source body selector, so it doesn't need the same kind of ongoing
 // per-site maintenance the list-page selectors already do (marca.js,
-// rmcsport.js have each needed several rounds of that as the sites' markup
+// footmercato.js have each needed several rounds of that as the sites' markup
 // shifted). Never throws -- a failed fetch, block, or empty extraction just
 // means the caller falls back to the item's own title/summary, same as
 // before this existed.

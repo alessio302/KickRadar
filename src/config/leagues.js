@@ -30,7 +30,7 @@ export const LEAGUES = [
     name: 'Ligue 1',
     country: 'France',
     externalCompetitionId: 2015,
-    newsSource: 'rmcsport',
+    newsSource: 'footmercato',
   },
   {
     slug: 'la-liga',

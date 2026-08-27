@@ -129,13 +129,16 @@ internet access) to get right:
   `relevance.js` filters for transfer-shaped keywords before anything is
   classified or stored. Confirmed working live: tuttomercatoweb
   (`?s=calciomercato` section), kicker.de (`/news/bundesliga`), Sky Sports
-  (`sitemap_news_football.xml`, football-only by construction), RMC Sport
-  (`/football/transferts/`), Marca (`/futbol/mercado-fichajes.html`, HTML
+  (`sitemap_news_football.xml`, football-only by construction), Foot Mercato
+  (`/france/ligue-1/transfert`, a dedicated Ligue 1 transfers section --
+  replaced RMC Sport's general `/football/transferts/` hub, which mostly
+  surfaced pan-European storylines rather than Ligue 1-specific ones), Marca
+  (`/futbol/mercado-fichajes.html`, HTML
   scrape of `.ue-c-cover-content__link` teasers -- see marca.js for the
   live-confirmed selector and why the more generic guess tried first
   picked up junk duplicate items). Override any of them via env var
   (`TUTTOMERCATOWEB_RSS_URL`, `KICKER_RSS_URL`, `SKYSPORTS_SITEMAP_URL`,
-  `RMCSPORT_LIST_URL`, `MARCA_LIST_URL`/`MARCA_ITEM_SELECTOR`) if the site
+  `FOOTMERCATO_LIST_URL`, `MARCA_LIST_URL`/`MARCA_ITEM_SELECTOR`) if the site
   structure changes — no code change needed.
 - **Player/club extraction** now runs through `llmExtract.js` (Gemini,
   free tier) as the primary path -- see "Why an LLM for extraction" above.

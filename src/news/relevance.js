@@ -32,14 +32,22 @@ const RELEVANCE_KEYWORDS = {
     'on loan', 'loan move', 'fee', 'medical', 'agree terms', 'bid for',
     'target', 'linked with', 'rumour', 'rumor', 'new club',
   ],
-  rmcsport: [
-    'mercato', 'transfert', 'signe', "s'engage", 'prêt', 'officialise',
-    'rumeur', 'piste', 'intérêt', 'contrat', 'recrue', 'transferts',
-  ],
-  // marca has no entry here on purpose, same reasoning as tuttomercatoweb
-  // above: its feed is already the site's own "Mercado de Fichajes"
-  // section, not a general football feed, so a second keyword gate is
-  // redundant -- and confirmed live (diagnoseMarca.js) actively harmful.
+  // footmercato has no entry here on purpose, same reasoning as
+  // tuttomercatoweb/marca below: its feed is already the site's own
+  // dedicated Ligue 1 transfers section (/france/ligue-1/transfert), not
+  // a general football feed, so a second keyword gate is redundant. Its
+  // predecessor rmcsport.js *did* need one (a general "Transferts" hub,
+  // not Ligue-1-scoped) -- replaced because that scope mismatch, not the
+  // relevance gate, turned out to be the real problem: most of what it
+  // fetched didn't involve a Ligue 1 club at all (confirmed live via
+  // diagnoseLigue1Sources.js/diagnoseLigue1Volume.js), so it burned LLM
+  // calls on pan-European stories that runNewsScraper.js's league gate
+  // would just drop anyway.
+  //
+  // marca has no entry here on purpose, same reasoning: its feed is
+  // already the site's own "Mercado de Fichajes" section, not a general
+  // football feed, so a second keyword gate is redundant -- and
+  // confirmed live (diagnoseMarca.js) actively harmful.
   // A first-draft Spanish keyword list here was dropping real transfer
   // stories wholesale: "El Barça ficha a Livakovic" (bare "ficha", not
   // "ficha por"), "Sivera renueva hasta 2030" ("renueva" vs. the listed

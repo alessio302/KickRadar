@@ -20,7 +20,7 @@ const RULES = {
       'done deal', 'have signed', 'has signed', 'announce the signing',
     ],
   },
-  rmcsport: {
+  footmercato: {
     official: [
       'officiel', "c'est officiel", "s'engage", 'a signé', 'signe',
       'officialise', "en passe de s'engager",

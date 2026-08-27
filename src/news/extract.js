@@ -18,7 +18,7 @@ const DIRECTION_KEYWORDS = {
   tuttomercatoweb: { from: ['da', 'dal', 'dalla', 'dallo'], to: ['al', 'alla', 'allo', 'in', 'verso'] },
   kicker: { from: ['von'], to: ['zu', 'nach'] },
   skysports: { from: ['from'], to: ['to', 'joins', 'signs for', 'signs with'] },
-  rmcsport: { from: ['de', 'du', 'quitte'], to: ['vers', 'au', 'à', 'a rejoint'] },
+  footmercato: { from: ['de', 'du', 'quitte'], to: ['vers', 'au', 'à', 'a rejoint'] },
   marca: { from: ['del', 'de'], to: ['al', 'ficha por', 'al equipo del'] },
 };
 

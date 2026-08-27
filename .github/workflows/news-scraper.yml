@@ -19,7 +19,7 @@ on:
     # exactly this kind of same-tick contention -- confirmed via actual run
     # history: average gap ended up ~70 min instead of 15, with individual
     # gaps up to 5+ hours. For an HTML-scraped source with a bounded
-    # "latest N" list (marca.js, rmcsport.js), that's not just "later" --
+    # "latest N" list (marca.js, footmercato.js), that's not just "later" --
     # a long enough gap during a busy news day can let a genuinely new item
     # scroll off the list before any run ever sees it, i.e. permanently
     # missed, not just delayed. Staggering the three workflows' minutes
