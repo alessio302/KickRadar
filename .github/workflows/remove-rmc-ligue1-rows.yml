@@ -1,14 +1,14 @@
-name: Diagnose leftover RMC Sport rows (one-off)
+name: Remove leftover RMC Sport Ligue 1 rows (one-off)
 
-# Checks how many old rmcsport-sourced Ligue 1 transfer rows still exist
-# and how many are currently visible in the feed, before deciding whether
-# to remove them -- see src/news/diagnoseRmcLeftover.js. Read-only, no DB
-# writes.
+# Deletes the rmcsport-sourced Ligue 1 transfer rows now that
+# footmercato.js is the sole source, per user request -- see
+# src/news/removeRmcLigue1Rows.js. Writes to the transfers table
+# (delete only, scoped to league_id=ligue-1 and source=rmcsport).
 on:
   workflow_dispatch: {}
 
 jobs:
-  diagnose:
+  cleanup:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,7 +18,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/news/diagnoseRmcLeftover.js
+      - run: node src/news/removeRmcLigue1Rows.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
