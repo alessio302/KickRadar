@@ -507,9 +507,22 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
       <span style={{ color: theme.textMuted, flexShrink: 0 }}>
         {new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
       </span>
-      <span style={{ fontWeight: 600, textAlign: 'right' }}>
-        {hostClub?.short_name || hostClub?.name} {meeting.home_score} : {meeting.away_score} {guestClub?.short_name || guestClub?.name}
-      </span>
+      {/* A single fixed-width block anchored to the row's right edge (like
+          Form's circle row and the League Position value), but with its
+          own internal host/score/guest columns so the colon still lines
+          up vertically across rows -- right-aligned as a unit AND
+          column-aligned inside it, not one or the other. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ width: '72px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {hostClub?.short_name || hostClub?.name}
+        </span>
+        <span style={{ width: '40px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>
+          {meeting.home_score} : {meeting.away_score}
+        </span>
+        <span style={{ width: '72px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {guestClub?.short_name || guestClub?.name}
+        </span>
+      </div>
     </div>
   );
 }
