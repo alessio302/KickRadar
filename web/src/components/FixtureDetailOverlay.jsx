@@ -503,12 +503,22 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   const hostClub = meetingIsHomeClubHost ? homeClub : awayClub;
   const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12.5px', padding: '6px 0' }}>
-      <span style={{ color: theme.textMuted, flexShrink: 0, width: '58px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', padding: '6px 0' }}>
+      <span style={{ color: theme.textMuted, flexShrink: 0, width: '52px' }}>
         {new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
       </span>
-      <span style={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>
-        {hostClub?.short_name || hostClub?.name} {meeting.home_score} : {meeting.away_score} {guestClub?.short_name || guestClub?.name}
+      {/* Score sits in its own fixed-width column so the colon lines up
+          vertically across every row -- team names vary in length, so
+          centering the whole "Host X : Y Guest" string as one block (the
+          first attempt) let the score itself drift row to row. */}
+      <span style={{ flex: 1, minWidth: 0, textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {hostClub?.short_name || hostClub?.name}
+      </span>
+      <span style={{ flexShrink: 0, width: '42px', textAlign: 'center', fontWeight: 700 }}>
+        {meeting.home_score} : {meeting.away_score}
+      </span>
+      <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {guestClub?.short_name || guestClub?.name}
       </span>
     </div>
   );
