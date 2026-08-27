@@ -33,21 +33,42 @@ function namesMatch(candidate, candidateNoNum, normName) {
 // matching -- a wrong match (mixing up two different clubs) is worse than
 // no match, and a miss just means the raw string is kept as-is, so nothing
 // is lost, only the FK/canonical-name upgrade.
+//
+// Picks the BEST substring match, not the first one found -- confirmed
+// live: "Barcelona" (Laporta being quoted as Barça's own president, a
+// completely standard short reference) is also a literal substring of RCD
+// Espanyol de Barcelona's full name, so a single greedy first-match pass
+// mismatched a Barcelona transfer story to Espanyol purely because of
+// clubs-table iteration order. Among every club whose name/alias contains
+// (or is contained by) the candidate, the one whose length is closest to
+// the candidate's is preferred -- "FC Barcelona" over "RCD Espanyol de
+// Barcelona" for a "Barcelona" candidate -- since an accidental substring
+// hit on a much longer, unrelated name is essentially always the wrong
+// answer. An exact match (candidate === normName) always wins outright,
+// no need to compare lengths.
 export function resolveClub(candidateName, clubs) {
   if (!candidateName) return null;
   const candidate = normalize(candidateName);
   if (candidate.length < 3) return null; // too short to match safely (e.g. "OM")
   const candidateNoNum = stripNumbers(candidate);
 
+  let bestMatch = null;
+  let bestDiff = Infinity;
+
   for (const club of clubs) {
     const names = [club.name, ...(club.aliases || [])];
     for (const name of names) {
       const normName = normalize(name);
       if (normName.length < 3) continue;
+      if (candidate === normName) return club;
       if (namesMatch(candidate, candidateNoNum, normName)) {
-        return club;
+        const diff = Math.abs(normName.length - candidate.length);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestMatch = club;
+        }
       }
     }
   }
-  return null;
+  return bestMatch;
 }
