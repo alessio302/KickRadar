@@ -58,7 +58,6 @@ const de = {
     redCard: 'Rote Karte',
     substitution: 'Wechsel',
     assistLabel: (name) => `Vorlage: ${name}`,
-    substitutionLabel: (offName, onName) => `${offName} raus, ${onName} rein`,
   },
   settings: {
     appearance: 'Darstellung',
@@ -137,7 +136,6 @@ const en = {
     redCard: 'Red Card',
     substitution: 'Substitution',
     assistLabel: (name) => `Assist: ${name}`,
-    substitutionLabel: (offName, onName) => `${offName} off, ${onName} on`,
   },
   settings: {
     appearance: 'Appearance',
@@ -216,7 +214,6 @@ const it = {
     redCard: 'Cartellino rosso',
     substitution: 'Sostituzione',
     assistLabel: (name) => `Assist: ${name}`,
-    substitutionLabel: (offName, onName) => `${offName} esce, ${onName} entra`,
   },
   settings: {
     appearance: 'Aspetto',
@@ -295,7 +292,6 @@ const fr = {
     redCard: 'Carton rouge',
     substitution: 'Changement',
     assistLabel: (name) => `Passe décisive : ${name}`,
-    substitutionLabel: (offName, onName) => `${offName} sort, ${onName} entre`,
   },
   settings: {
     appearance: 'Apparence',
@@ -374,7 +370,6 @@ const es = {
     redCard: 'Tarjeta roja',
     substitution: 'Cambio',
     assistLabel: (name) => `Asistencia: ${name}`,
-    substitutionLabel: (offName, onName) => `${offName} sale, ${onName} entra`,
   },
   settings: {
     appearance: 'Apariencia',

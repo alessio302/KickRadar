@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Users, CalendarClock } from 'lucide-react';
+import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import { useLineups } from '../hooks/useLineups.js';
@@ -253,10 +253,45 @@ function parseMinute(minute) {
   return base + added;
 }
 
+const SUBSTITUTION_IN_COLOR = '#22c55e';
+const SUBSTITUTION_OUT_COLOR = '#ef4444';
+
+// Substitution gets its own compact layout -- confirmed live: the
+// sentence form ("X esce, Y entra") routinely wrapped to two lines and
+// crowded the timeline. A green up-arrow next to the player coming on and
+// a red down-arrow next to the one going off (matching a standard
+// match-centre reference the user pointed to) reads just as clearly with
+// no sentence needed at all.
+function SubstitutionContent({ theme, event, align }) {
+  const justify = align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start';
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: '5px', justifyContent: justify };
+  // Icon always leads the name (both rows), regardless of side -- reading
+  // "arrow then name" stays consistent whether the block sits on the left
+  // or right of the centre line, rather than mirroring icon position too.
+  return (
+    <div>
+      <div style={rowStyle}>
+        <ArrowUpCircle size={14} color={SUBSTITUTION_IN_COLOR} style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: '13px', fontWeight: 700 }}>{event.player}</span>
+      </div>
+      {event.substituted && (
+        <div style={{ ...rowStyle, marginTop: '2px' }}>
+          <ArrowDownCircle size={14} color={SUBSTITUTION_OUT_COLOR} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', color: theme.textMuted }}>{event.substituted}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // One column's worth of an event's text content -- reused for both the
 // home (left, right-aligned text) and away (right, left-aligned text)
 // side so the two mirror each other around the centre line.
 function MatchEventContent({ theme, t, event, align }) {
+  if (event.type === 'Substitution') {
+    return <SubstitutionContent theme={theme} event={event} align={align} />;
+  }
+
   const labelKey = EVENT_LABEL_KEY[event.type];
   const label = labelKey ? t.matchInfo[labelKey] : event.type;
   const icon = EVENT_ICON[event.type] || '•';
@@ -269,11 +304,6 @@ function MatchEventContent({ theme, t, event, align }) {
         {align === 'right' && <span style={{ fontSize: '15px', lineHeight: 1 }}>{icon}</span>}
       </p>
       <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{label}</p>
-      {event.type === 'Substitution' && event.substituted && (
-        <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>
-          {t.matchInfo.substitutionLabel(event.substituted, event.player)}
-        </p>
-      )}
       {event.assist && <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>}
     </div>
   );
