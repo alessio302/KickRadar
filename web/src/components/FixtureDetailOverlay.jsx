@@ -270,7 +270,7 @@ function MatchInfoFooter({ theme, t, fixture, homeClub }) {
       {fixture.referee && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
           <Whistle size={15} style={{ flexShrink: 0 }} />
-          <span>{t.matchInfo.refereeLabel(fixture.referee)}</span>
+          <span>{fixture.referee}</span>
         </div>
       )}
       {homeClub?.venue && (
