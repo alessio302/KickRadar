@@ -32,35 +32,40 @@ function dedupeKey(text) {
   return normalize(text || '').replace(/[^a-z0-9]/g, '');
 }
 
-// Looks up a player's real current club from football-data.org's synced
-// squad data (source of truth for direction corrections/backfills below).
+// Looks up a player's real current club (+ real full name) from
+// football-data.org's synced squad data (source of truth for direction
+// corrections/backfills below) -- syncSquads.js stores both normalized_name
+// and the original, properly-cased player_name from football-data.org's own
+// squad list, so the same lookup that recovers the club can recover the
+// full name too, essentially for free.
+//
 // Tries an exact normalized-name match first; if extraction only produced
 // a bare surname -- a headline like "Ricci al Como" is completely normal,
 // especially in Italian sports media -- falls back to a surname-suffix
 // match instead, but only when it's unambiguous (exactly one row either
 // way, same "don't guess" discipline as everywhere else in this file).
-// Confirmed live: "Ricci" had a real, exact "samuele ricci" row in
+// Confirmed live: "Ricci" had a real, exact "Samuele Ricci" row in
 // squad_memberships, but a plain equality check could never see it,
-// silently leaving from_club null on a story where the origin club was
-// perfectly recoverable.
-async function lookupSquadClubId(supabase, playerName) {
+// silently leaving from_club null (and the card showing just "Ricci") on a
+// story where both were perfectly recoverable.
+async function lookupSquadMembership(supabase, playerName) {
   const normName = normalize(playerName);
   const { data: exactRows, error: exactErr } = await supabase
     .from('squad_memberships')
-    .select('club_id')
+    .select('club_id, player_name')
     .eq('normalized_name', normName)
     .limit(2);
   if (exactErr) throw exactErr;
-  if (exactRows.length === 1) return exactRows[0].club_id;
+  if (exactRows.length === 1) return { clubId: exactRows[0].club_id, fullName: exactRows[0].player_name };
   if (exactRows.length > 1 || normName.includes(' ')) return null; // ambiguous, or already a full name with no surname fallback to try
 
   const { data: suffixRows, error: suffixErr } = await supabase
     .from('squad_memberships')
-    .select('club_id')
+    .select('club_id, player_name')
     .ilike('normalized_name', `% ${normName}`)
     .limit(2);
   if (suffixErr) throw suffixErr;
-  return suffixRows.length === 1 ? suffixRows[0].club_id : null;
+  return suffixRows.length === 1 ? { clubId: suffixRows[0].club_id, fullName: suffixRows[0].player_name } : null;
 }
 
 // resolvePlayerProfile() matches players by an EXACT normalized_name
@@ -213,44 +218,46 @@ async function scrapeLeague(supabase, league) {
       continue;
     }
 
-    let playerId = null;
-    if (playerName) {
-      try {
-        const player = await resolvePlayerProfile(supabase, playerName);
-        playerId = player.id;
-      } catch (err) {
-        console.warn(`[${league.slug}] player profile resolution failed for "${playerName}":`, err.message);
-      }
-    }
-
-    // Cross-check direction against football-data.org's synced squad data
-    // (see squad_memberships / syncSquads.js) -- the actual source of truth
-    // for which club a player really plays for, rather than trusting
+    // Cross-check direction (+ recover the player's full name, see
+    // lookupSquadMembership()) against football-data.org's synced squad
+    // data (see squad_memberships / syncSquads.js) -- the actual source of
+    // truth for which club a player really plays for, rather than trusting
     // whichever of two independent articles about the same player got the
     // direction right. Confirmed live: two RMC Sport stories had Facundo
     // Medina going both Marseille->Leverkusen and Leverkusen->Marseille at
     // once. Only acts when both sides already resolved to a real club and
     // the squad lookup is unambiguous (exactly one match) -- with no clean
     // signal, the extracted direction is left as-is rather than guessed at.
+    //
+    // Runs before resolvePlayerProfile() below on purpose: that function
+    // creates a new `players` row (and searches transfermarkt.de) using
+    // whatever name it's given verbatim. Confirmed live: "Ricci" alone
+    // would search transfermarkt for "Ricci" and could easily land on a
+    // *different* real footballer who happens to share the surname --
+    // resolving the full name here first, before that search ever runs,
+    // fixes it at the source instead of only patching the displayed name
+    // afterwards.
     let resolvedFromClub = fromClub;
     let resolvedToClub = toClub;
     let resolvedFromMatch = fromClubMatch;
     let resolvedToMatch = toClubMatch;
+    let resolvedPlayerName = playerName;
     if (playerName && fromClubMatch && toClubMatch) {
-      let squadClubId;
+      let membership;
       try {
-        squadClubId = await lookupSquadClubId(supabase, playerName);
+        membership = await lookupSquadMembership(supabase, playerName);
       } catch (err) {
         console.error(`[${league.slug}] squad lookup failed:`, err.message);
       }
-      if (squadClubId === toClubMatch.id) {
+      if (membership) resolvedPlayerName = membership.fullName;
+      if (membership?.clubId === toClubMatch.id) {
         // The extracted story has the player leaving for the club they're
         // actually already at -- backwards. Flip it.
         resolvedFromClub = toClub;
         resolvedToClub = fromClub;
         resolvedFromMatch = toClubMatch;
         resolvedToMatch = fromClubMatch;
-      } else if (squadClubId != null && squadClubId !== fromClubMatch.id && squadClubId !== toClubMatch.id) {
+      } else if (membership && membership.clubId !== fromClubMatch.id && membership.clubId !== toClubMatch.id) {
         // The player is confirmed at a *third* club, matching neither side
         // of the extracted story. Same principle as the flip above -- squad
         // data is the source of truth -- applied to the other axis: correct
@@ -260,7 +267,7 @@ async function scrapeLeague(supabase, league) {
         // Inter -- Fiorentina interest is real, newsworthy rumor content;
         // "Parma" was simply stale/wrong and is cheaply fixable, so fix it
         // rather than throw the whole story away.
-        const realClub = allClubs.find((c) => c.id === squadClubId);
+        const realClub = allClubs.find((c) => c.id === membership.clubId);
         if (realClub) {
           resolvedFromClub = realClub.name;
           resolvedFromMatch = realClub;
@@ -283,18 +290,29 @@ async function scrapeLeague(supabase, league) {
       // concept), so this can't recover a case where the sync already
       // caught up to the new club -- in that case the lookup returns
       // toClubMatch.id and nothing is backfilled, same as today's behavior.
-      let squadClubId;
+      let membership;
       try {
-        squadClubId = await lookupSquadClubId(supabase, playerName);
+        membership = await lookupSquadMembership(supabase, playerName);
       } catch (err) {
         console.error(`[${league.slug}] squad lookup failed:`, err.message);
       }
-      if (squadClubId != null && squadClubId !== toClubMatch.id) {
-        const realClub = allClubs.find((c) => c.id === squadClubId);
+      if (membership) resolvedPlayerName = membership.fullName;
+      if (membership && membership.clubId !== toClubMatch.id) {
+        const realClub = allClubs.find((c) => c.id === membership.clubId);
         if (realClub) {
           resolvedFromClub = realClub.name;
           resolvedFromMatch = realClub;
         }
+      }
+    }
+
+    let playerId = null;
+    if (resolvedPlayerName) {
+      try {
+        const player = await resolvePlayerProfile(supabase, resolvedPlayerName);
+        playerId = player.id;
+      } catch (err) {
+        console.warn(`[${league.slug}] player profile resolution failed for "${resolvedPlayerName}":`, err.message);
       }
     }
 
@@ -335,7 +353,7 @@ async function scrapeLeague(supabase, league) {
     // when it didn't, so "Al Jazira" and "Al-Jazira" still count as the
     // same destination instead of silently bypassing dedup entirely.
     let duplicateOf = null;
-    if (playerName) {
+    if (resolvedPlayerName) {
       // Scoped by from-club (not player_id, see isNameVariant() above) and
       // recency-bounded, so a name-variant fragmented across two `players`
       // rows still gets caught. .eq('from_club', null) would NOT match real
@@ -365,7 +383,7 @@ async function scrapeLeague(supabase, league) {
           candidates.find((c) => {
             const sameTo = resolvedToMatch ? c.to_club_id === resolvedToMatch.id : dedupeKey(c.to_club) === targetToKey;
             if (!sameTo) return false;
-            return (playerId && c.player_id === playerId) || isNameVariant(playerName, c.player_name);
+            return (playerId && c.player_id === playerId) || isNameVariant(resolvedPlayerName, c.player_name);
           }) ?? null;
       }
     }
@@ -399,7 +417,7 @@ async function scrapeLeague(supabase, league) {
         {
           league_id: dbLeague.id,
           player_id: playerId,
-          player_name: playerName,
+          player_name: resolvedPlayerName,
           from_club: finalFromClub,
           to_club: finalToClub,
           from_club_id: resolvedFromMatch?.id ?? null,
@@ -428,9 +446,9 @@ async function scrapeLeague(supabase, league) {
     // claimed that match existed; the actual condition below just checked
     // playerName and let incomplete rows notify anyway. Requiring all
     // three here now actually enforces it.
-    if (playerName && finalFromClub && finalToClub) {
+    if (resolvedPlayerName && finalFromClub && finalToClub) {
       notifiable.push({
-        playerName,
+        playerName: resolvedPlayerName,
         fromClub: finalFromClub,
         toClub: finalToClub,
         league: league.name,
