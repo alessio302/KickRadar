@@ -19,13 +19,45 @@ const PAGE_SIZE = 50;
 // transfer", so they don't belong in a transfer feed even though the
 // relevance filter (deliberately broad, backend-side) let them through.
 //
-// Also requires both from_club and to_club: a single-sided entry is
-// usually an earlier, less complete article about the same saga as a
-// later one that names both clubs (confirmed live: the "Alvarez"
-// single-club card was redundant with a fuller "Julian Alvarez,
-// Atletico Madrid -> Arsenal" card already in the feed) -- keeping only
-// complete rows removes that duplication instead of just softening how
-// the incomplete ones are displayed.
+// from_club/to_club are NOT required anymore: confirmed live (Ligue 1,
+// 2026-08-27) that requiring both sides can hide essentially an entire
+// league's worth of genuinely fresh news when its current cycle is
+// dominated by single-sided rumors (a saga that only names the buying OR
+// the selling club so far) -- the feed then looks stale even though the
+// database has items from the last hour. dedupeSupersededSingleSided()
+// below keeps the original filter's actual goal (don't show a bare
+// single-club card when a fuller both-clubs card already covers the same
+// player's story) without hiding single-sided news that has no fuller
+// counterpart yet.
+function normalizePlayerName(name) {
+  return (name ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim();
+}
+
+function dedupeSupersededSingleSided(rows) {
+  const hasCompleteByPlayer = new Set();
+  for (const t of rows) {
+    if (t.from_club && t.to_club) hasCompleteByPlayer.add(normalizePlayerName(t.player_name));
+  }
+  const seenIncompletePlayer = new Set();
+  return rows.filter((t) => {
+    if (t.from_club && t.to_club) return true;
+    const key = normalizePlayerName(t.player_name);
+    // A fuller card already tells this player's story -- drop the bare one.
+    if (hasCompleteByPlayer.has(key)) return false;
+    // No fuller card exists yet: keep only the most recent single-sided
+    // card per player (rows already arrive published_at desc), so a saga
+    // that gets re-reported a few times doesn't produce several
+    // near-duplicate incomplete cards.
+    if (seenIncompletePlayer.has(key)) return false;
+    seenIncompletePlayer.add(key);
+    return true;
+  });
+}
+
 export function useTransfers(leagueSlug, { officialOnly } = {}) {
   const leagueId = useLeagueId(leagueSlug);
   const [transfers, setTransfers] = useState([]);
@@ -40,8 +72,6 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
       )
       .eq('league_id', leagueId)
       .not('player_name', 'is', null)
-      .not('from_club', 'is', null)
-      .not('to_club', 'is', null)
       .order('published_at', { ascending: false })
       .limit(PAGE_SIZE);
 
@@ -62,7 +92,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
         console.error('Failed to load transfers for league', leagueSlug, error);
         setTransfers([]);
       } else {
-        setTransfers(data);
+        setTransfers(dedupeSupersededSingleSided(data));
       }
       setLoading(false);
     });
@@ -84,7 +114,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     if (error) {
       console.error('Failed to refresh transfers for league', leagueSlug, error);
     } else {
-      setTransfers(data);
+      setTransfers(dedupeSupersededSingleSided(data));
     }
     setRefreshing(false);
   }, [leagueId, leagueSlug, buildQuery]);
