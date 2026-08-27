@@ -224,13 +224,17 @@ function LineupList({ theme, t, row }) {
 // the installed icon set directly) -- hand-drawn to match lucide's own
 // convention (24x24 viewBox, stroke-only, round caps/joins) so they sit
 // next to the rest of the app's icons without looking out of place.
+// Traced from a real pea-whistle photo reference per feedback (pointed
+// mouthpiece wedge, round chamber with its sound hole, small lanyard
+// ring on top) -- flattened to outline-only, no fill/bevel facets, to
+// match the rest of the app's icons.
 function Whistle({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      <circle cx="14" cy="12" r="6.2" />
-      <circle cx="14" cy="12.5" r="1.5" />
-      <path d="M11.3 7.3h5.4" />
-      <path d="M8 12H3.3" />
+      <path d="M1.5 19.5 13 7 14.8 10 4 21.2Z" />
+      <circle cx="16.5" cy="11" r="5.3" />
+      <circle cx="16.5" cy="12" r="2.6" />
+      <circle cx="15.2" cy="3.6" r="1.7" />
     </svg>
   );
 }
