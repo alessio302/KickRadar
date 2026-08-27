@@ -115,7 +115,7 @@ async function fixDirections(supabase) {
 async function main() {
   const supabase = getSupabaseClient();
 
-  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, aliases, league_id');
+  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, short_name, aliases, league_id');
   if (clubsErr) throw clubsErr;
 
   await backfillClubIds(supabase, allClubs);

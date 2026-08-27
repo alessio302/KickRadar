@@ -56,7 +56,14 @@ export function resolveClub(candidateName, clubs) {
   let bestDiff = Infinity;
 
   for (const club of clubs) {
-    const names = [club.name, ...(club.aliases || [])];
+    // short_name matters here for the exact same reason aliases does: a
+    // real colloquial name in everyday use ("Man City", "Barça", "HSV",
+    // "M'gladbach", "Atleti") that ISN'T a literal substring of the
+    // official name -- confirmed live: "Man City" produced a duplicate
+    // transfer card against "Manchester City FC" because resolveClub()
+    // only ever checked club.name/aliases, never club.short_name, even
+    // though the exact right value was sitting right there unused.
+    const names = [club.name, club.short_name, ...(club.aliases || [])].filter(Boolean);
     for (const name of names) {
       const normName = normalize(name);
       if (normName.length < 3) continue;

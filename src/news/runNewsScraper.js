@@ -128,7 +128,7 @@ async function scrapeLeague(supabase, league) {
   // work with. league_id is carried along so the "does this story actually
   // involve a club from *this* league" gate below can still tell resolved
   // clubs apart by which league they're really in.
-  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, aliases, league_id');
+  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, short_name, aliases, league_id');
   if (clubsErr) throw clubsErr;
 
   // Only ever process genuinely new items -- avoids re-running the LLM call

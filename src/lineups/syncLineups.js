@@ -113,7 +113,7 @@ export async function syncLineups() {
   if (leaguesErr) throw leaguesErr;
   const leagueSlugById = new Map(dbLeagues.map((l) => [l.id, l.slug]));
 
-  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, aliases, league_id');
+  const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, short_name, aliases, league_id');
   if (clubsErr) throw clubsErr;
   const clubById = new Map(allClubs.map((c) => [c.id, c]));
 
