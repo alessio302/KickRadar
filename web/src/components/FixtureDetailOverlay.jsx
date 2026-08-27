@@ -561,6 +561,7 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
                   onClick={() => setSide(key)}
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     padding: '8px',
                     fontSize: '13px',
                     fontWeight: side === key ? 700 : 600,
@@ -569,6 +570,9 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
                     cursor: 'pointer',
                     background: side === key ? theme.surfaceRaised : 'transparent',
                     color: side === key ? theme.text : theme.textMuted,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
                   {club?.name ?? '–'}
