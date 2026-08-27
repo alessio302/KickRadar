@@ -10,7 +10,21 @@ on:
     # how often this runs -- seen_news_items already dedupes those, so a
     # shorter interval mostly means fewer new items per run, not more
     # total calls per day.
-    - cron: '*/15 * * * *'
+    #
+    # Offset to :04/:19/:34/:49, not the round :00/:15/:30/:45 marks --
+    # confirmed live: this workflow, live-scores.yml and lineups-sync.yml
+    # all sharing the literal "*/15 * * * *" pattern meant three scheduled
+    # runs queuing at the exact same instant, every 15 minutes, all day.
+    # GitHub Actions' scheduler is documented best-effort and deprioritizes
+    # exactly this kind of same-tick contention -- confirmed via actual run
+    # history: average gap ended up ~70 min instead of 15, with individual
+    # gaps up to 5+ hours. For an HTML-scraped source with a bounded
+    # "latest N" list (marca.js, rmcsport.js), that's not just "later" --
+    # a long enough gap during a busy news day can let a genuinely new item
+    # scroll off the list before any run ever sees it, i.e. permanently
+    # missed, not just delayed. Staggering the three workflows' minutes
+    # apart is the standard mitigation for this.
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch: {}
 
 jobs:

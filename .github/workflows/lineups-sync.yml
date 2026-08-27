@@ -10,7 +10,14 @@ on:
     # every run were instant, since GitHub Actions bills whole minutes per
     # job) needs the repo to be public -- a private repo's free tier is
     # only 2,000 min/month total, and this alone would likely exceed it.
-    - cron: '*/15 * * * *'
+    #
+    # Offset to :14/:29/:44/:59, not the round :00/:15/:30/:45 marks -- see
+    # news-scraper.yml's schedule comment: three workflows sharing the
+    # literal "*/15 * * * *" pattern caused GitHub Actions' scheduler to
+    # throttle them hard (confirmed live via run history: average gap
+    # ~70 min instead of 15, up to 5+ hours). Staggering the minutes apart
+    # is the standard mitigation.
+    - cron: '14,29,44,59 * * * *'
   workflow_dispatch: {}
 
 jobs:

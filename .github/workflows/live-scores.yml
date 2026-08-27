@@ -11,7 +11,13 @@ name: Live scores
 # already exits before the timeout would).
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Offset to :09/:24/:39/:54, not the round :00/:15/:30/:45 marks --
+    # see news-scraper.yml's schedule comment: three workflows sharing the
+    # literal "*/15 * * * *" pattern caused GitHub Actions' scheduler to
+    # throttle them hard (confirmed live: this workflow's first scheduled
+    # run didn't fire until ~3.5h after the workflow was added). Staggering
+    # the minutes apart is the standard mitigation.
+    - cron: '9,24,39,54 * * * *'
   workflow_dispatch: {}
 
 concurrency:
