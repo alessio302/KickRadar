@@ -1,0 +1,27 @@
+name: Fix cross-language club names (one-off)
+
+# Adds well-established cross-language club-name aliases (see
+# src/news/fixCrossLanguageClubNames.js for the full list and reasoning),
+# backfills from_club_id/to_club_id + display text on existing transfer
+# rows that failed to resolve because of it, and merges the duplicates
+# that produced. Triggered by a reported duplicate (Terem Moffi, "OGC
+# Nizza" vs "OGC Nice"). Writes to clubs.aliases and transfers -- manual
+# trigger only, deleted after the fix is applied and confirmed.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/fixCrossLanguageClubNames.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
