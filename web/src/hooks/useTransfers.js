@@ -19,16 +19,26 @@ const PAGE_SIZE = 50;
 // transfer", so they don't belong in a transfer feed even though the
 // relevance filter (deliberately broad, backend-side) let them through.
 //
-// from_club/to_club are NOT required anymore: confirmed live (Ligue 1,
-// 2026-08-27) that requiring both sides can hide essentially an entire
-// league's worth of genuinely fresh news when its current cycle is
-// dominated by single-sided rumors (a saga that only names the buying OR
-// the selling club so far) -- the feed then looks stale even though the
-// database has items from the last hour. dedupeSupersededSingleSided()
-// below keeps the original filter's actual goal (don't show a bare
-// single-club card when a fuller both-clubs card already covers the same
-// player's story) without hiding single-sided news that has no fuller
-// counterpart yet.
+// to_club (the interested/destination club) is still required -- a card
+// that doesn't say which other club wants the player has no content: the
+// player's current club is background, not news. from_club is NOT
+// required anymore: confirmed live (Ligue 1, 2026-08-27) that requiring
+// both sides can hide essentially an entire league's worth of genuinely
+// fresh news when its current cycle is dominated by "player X linked with
+// club Y" stories that don't (yet) restate where X currently plays --
+// the feed then looks stale even though the database has items from the
+// last hour. The backend (runNewsScraper.js's lookupSquadMembership) already
+// tries to backfill from_club from synced squad data whenever an article
+// only named the destination, so most of these still arrive complete;
+// this only affects the remainder it couldn't resolve (a player not in any
+// synced squad, or an ambiguous name).
+//
+// dedupeSupersededSingleSided() below keeps the original filter's actual
+// goal (don't show a bare "linked with Y" card once a fuller card naming
+// both clubs covers the same player+destination) without hiding
+// single-sided news that has no fuller counterpart yet. Keyed by player+
+// destination, not just player, so a player genuinely linked with two
+// different clubs still gets two cards.
 function normalizePlayerName(name) {
   return (name ?? '')
     .toLowerCase()
@@ -37,23 +47,28 @@ function normalizePlayerName(name) {
     .trim();
 }
 
+function storyKey(t) {
+  const dest = t.to_club_id != null ? `id:${t.to_club_id}` : `text:${normalizePlayerName(t.to_club)}`;
+  return `${normalizePlayerName(t.player_name)}|${dest}`;
+}
+
 function dedupeSupersededSingleSided(rows) {
-  const hasCompleteByPlayer = new Set();
+  const hasCompleteForStory = new Set();
   for (const t of rows) {
-    if (t.from_club && t.to_club) hasCompleteByPlayer.add(normalizePlayerName(t.player_name));
+    if (t.from_club) hasCompleteForStory.add(storyKey(t));
   }
-  const seenIncompletePlayer = new Set();
+  const seenIncompleteStory = new Set();
   return rows.filter((t) => {
-    if (t.from_club && t.to_club) return true;
-    const key = normalizePlayerName(t.player_name);
-    // A fuller card already tells this player's story -- drop the bare one.
-    if (hasCompleteByPlayer.has(key)) return false;
+    if (t.from_club) return true;
+    const key = storyKey(t);
+    // A fuller card already tells this exact player+destination story.
+    if (hasCompleteForStory.has(key)) return false;
     // No fuller card exists yet: keep only the most recent single-sided
-    // card per player (rows already arrive published_at desc), so a saga
-    // that gets re-reported a few times doesn't produce several
-    // near-duplicate incomplete cards.
-    if (seenIncompletePlayer.has(key)) return false;
-    seenIncompletePlayer.add(key);
+    // card per player+destination (rows already arrive published_at
+    // desc), so a story that gets re-reported a few times doesn't produce
+    // several near-duplicate incomplete cards.
+    if (seenIncompleteStory.has(key)) return false;
+    seenIncompleteStory.add(key);
     return true;
   });
 }
@@ -72,6 +87,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
       )
       .eq('league_id', leagueId)
       .not('player_name', 'is', null)
+      .not('to_club', 'is', null)
       .order('published_at', { ascending: false })
       .limit(PAGE_SIZE);
 
