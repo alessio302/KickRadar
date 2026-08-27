@@ -226,15 +226,16 @@ function LineupList({ theme, t, row }) {
 // next to the rest of the app's icons without looking out of place.
 // Traced from a real pea-whistle photo reference per feedback (pointed
 // mouthpiece wedge, round chamber with its sound hole, small lanyard
-// ring on top) -- flattened to outline-only, no fill/bevel facets, to
-// match the rest of the app's icons.
+// ring on top), flattened to outline-only (no fill/bevel facets), then
+// levelled from that reference's diagonal angle to horizontal so it
+// reads left-to-right in a text row like PitchIcon does.
 function Whistle({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      <path d="M1.5 19.5 13 7 14.8 10 4 21.2Z" />
-      <circle cx="16.5" cy="11" r="5.3" />
-      <circle cx="16.5" cy="12" r="2.6" />
-      <circle cx="15.2" cy="3.6" r="1.7" />
+      <path d="M1 12 11.5 10.3 11.5 13.7Z" />
+      <circle cx="16" cy="12" r="5.3" />
+      <circle cx="16" cy="12" r="2.6" />
+      <circle cx="16" cy="4.2" r="1.7" />
     </svg>
   );
 }
