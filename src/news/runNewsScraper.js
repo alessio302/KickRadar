@@ -5,6 +5,7 @@ import { classifyOfficial } from './classify.js';
 import { isTransferRelevant } from './relevance.js';
 import { extractTransferInfo } from './extract.js';
 import { llmExtractTransferInfo } from './llmExtract.js';
+import { fetchArticleText } from './articleBody.js';
 import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 import { normalize } from '../util/normalize.js';
@@ -129,7 +130,23 @@ async function scrapeLeague(supabase, league) {
       continue;
     }
 
-    const { playerName, fromClub, toClub, isOfficial } = await extractInfo(item, allClubs, league.newsSource);
+    // Extract from the actual article body, not just the headline (+ up to
+    // 400 chars of RSS description for tuttomercatoweb/kicker -- marca,
+    // rmcsport and skysports had only the headline at all, since list/
+    // sitemap pages don't carry per-item body text). Confirmed live: a
+    // headline-only item ("Joan Laporta: 'Seguimos muy interesados en
+    // Julián Alvarez'") gave the LLM nothing but the bare word "Barcelona"
+    // to work with for the destination club, and no from_club at all --
+    // both are routinely stated explicitly in the article body itself.
+    // Only fetched here, after the known-item and relevance gates above, so
+    // this never costs a request for an item that wouldn't have reached
+    // the LLM anyway. A failed fetch (network error, block, empty page)
+    // just falls back to the headline/RSS summary as before -- extraction
+    // is never blocked on this succeeding.
+    const articleText = await fetchArticleText(item.link);
+    const extractionItem = articleText ? { ...item, summary: articleText } : item;
+
+    const { playerName, fromClub, toClub, isOfficial } = await extractInfo(extractionItem, allClubs, league.newsSource);
 
     // Mark as seen right after paying the LLM cost, regardless of what
     // happens below -- an item rejected for an unrelated league (or a
