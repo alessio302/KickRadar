@@ -46,7 +46,7 @@ export function useFixtures(leagueSlug) {
 
     supabase
       .from('fixtures')
-      .select('id, matchday, home_club_id, away_club_id, kickoff_at, status, home_score, away_score')
+      .select('id, matchday, home_club_id, away_club_id, kickoff_at, status, home_score, away_score, referee')
       .eq('league_id', leagueId)
       .gte('kickoff_at', cutoff)
       .order('kickoff_at', { ascending: true })

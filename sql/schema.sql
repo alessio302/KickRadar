@@ -21,6 +21,7 @@ create table if not exists clubs (
   short_code text not null,            -- e.g. 'JUV', 'BVB' -- used for the badge in the UI
   external_team_id int,                -- football-data.org team id
   aliases text[] not null default '{}', -- alternate spellings seen in news text, for matching
+  venue text,                          -- home stadium, from football-data.org's /teams (team.venue)
   unique (league_id, short_code)
 );
 create index if not exists idx_clubs_league on clubs(league_id);
@@ -71,6 +72,7 @@ create table if not exists fixtures (
   home_score int,
   away_score int,
   external_fixture_id bigint unique not null, -- football-data.org match id
+  referee text, -- from football-data.org's match.referees[0].name, nullable (not always assigned/reported)
   events_synced_at timestamptz, -- set once match_events has been fetched for this fixture (see syncLineups.js) -- marks "already tried", since a 0-0 draw with no cards legitimately has 0 events
   updated_at timestamptz not null default now()
 );

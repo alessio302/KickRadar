@@ -30,6 +30,7 @@ export async function syncClubsForLeague(supabase, league) {
     name: team.name,
     short_code: (team.tla || fallbackShortCode(team.name)).slice(0, 5),
     external_team_id: team.id,
+    venue: team.venue || null,
   }));
 
   const { error } = await supabase

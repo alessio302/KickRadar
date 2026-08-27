@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle, Flag, MapPin } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import { useLineups } from '../hooks/useLineups.js';
@@ -215,6 +215,32 @@ function LineupList({ theme, t, row }) {
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// Referee is fixture-level; venue is really club-level (football-data.org's
+// free tier has no per-match venue, only a team's static home stadium --
+// see diagnoseVenueReferee.js), so this always shows the home club's
+// stadium regardless of which side's lineup is toggled above it. Sits
+// below the lineup/bench, independent of whether a lineup exists yet.
+function MatchInfoFooter({ theme, t, fixture, homeClub }) {
+  if (!fixture.referee && !homeClub?.venue) return null;
+
+  return (
+    <div style={{ margin: '0 16px 16px', paddingTop: '14px', borderTop: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {fixture.referee && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
+          <Flag size={15} style={{ flexShrink: 0 }} />
+          <span>{t.matchInfo.refereeLabel(fixture.referee)}</span>
+        </div>
+      )}
+      {homeClub?.venue && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
+          <MapPin size={15} style={{ flexShrink: 0 }} />
+          <span>{homeClub.venue}</span>
+        </div>
       )}
     </div>
   );
@@ -517,7 +543,10 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {view === 'lineups' ? (
-            <LineupList theme={theme} t={t} row={activeRow} />
+            <>
+              <LineupList theme={theme} t={t} row={activeRow} />
+              <MatchInfoFooter theme={theme} t={t} fixture={fixture} homeClub={homeClub} />
+            </>
           ) : (
             <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
           )}

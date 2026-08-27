@@ -13,7 +13,7 @@ export function useClubs(leagueSlug) {
     setLoading(true);
     supabase
       .from('clubs')
-      .select('id, name, short_code')
+      .select('id, name, short_code, venue')
       .eq('league_id', leagueId)
       .order('name')
       .then(({ data, error }) => {

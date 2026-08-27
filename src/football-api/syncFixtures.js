@@ -53,6 +53,7 @@ export async function syncFixturesForLeague(supabase, league) {
       home_score: m.score?.fullTime?.home ?? null,
       away_score: m.score?.fullTime?.away ?? null,
       external_fixture_id: m.id,
+      referee: m.referees?.find((r) => r.type === 'REFEREE')?.name ?? m.referees?.[0]?.name ?? null,
       updated_at: new Date().toISOString(),
     }));
 

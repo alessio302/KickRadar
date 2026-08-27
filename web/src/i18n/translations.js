@@ -58,6 +58,7 @@ const de = {
     redCard: 'Rote Karte',
     substitution: 'Wechsel',
     assistLabel: (name) => `Vorlage: ${name}`,
+    refereeLabel: (name) => `Schiedsrichter: ${name}`,
   },
   settings: {
     appearance: 'Darstellung',
@@ -136,6 +137,7 @@ const en = {
     redCard: 'Red Card',
     substitution: 'Substitution',
     assistLabel: (name) => `Assist: ${name}`,
+    refereeLabel: (name) => `Referee: ${name}`,
   },
   settings: {
     appearance: 'Appearance',
@@ -214,6 +216,7 @@ const it = {
     redCard: 'Cartellino rosso',
     substitution: 'Sostituzione',
     assistLabel: (name) => `Assist: ${name}`,
+    refereeLabel: (name) => `Arbitro: ${name}`,
   },
   settings: {
     appearance: 'Aspetto',
@@ -292,6 +295,7 @@ const fr = {
     redCard: 'Carton rouge',
     substitution: 'Changement',
     assistLabel: (name) => `Passe décisive : ${name}`,
+    refereeLabel: (name) => `Arbitre : ${name}`,
   },
   settings: {
     appearance: 'Apparence',
@@ -370,6 +374,7 @@ const es = {
     redCard: 'Tarjeta roja',
     substitution: 'Cambio',
     assistLabel: (name) => `Asistencia: ${name}`,
+    refereeLabel: (name) => `Árbitro: ${name}`,
   },
   settings: {
     appearance: 'Apariencia',
