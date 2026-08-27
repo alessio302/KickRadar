@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
+import StandingsTab from './components/StandingsTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
@@ -237,6 +238,7 @@ export default function App() {
             onConsumedInitialFixture={() => setInitialFixtureId(null)}
           />
         )}
+        {tab === 'tabelle' && <StandingsTab theme={theme} t={t} league={league} onSelectLeague={selectLeague} />}
         {tab === 'einstellungen' && (
           <SettingsTab
             theme={theme}

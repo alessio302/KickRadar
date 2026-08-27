@@ -167,6 +167,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
           theme={theme}
           t={t}
           language={language}
+          league={league}
           fixture={selectedFixture}
           homeClub={clubsById.get(selectedFixture.home_club_id)}
           awayClub={clubsById.get(selectedFixture.away_club_id)}

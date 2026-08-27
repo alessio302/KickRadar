@@ -11,7 +11,7 @@
 // (kicker, tuttomercatoweb, marca, ...), and the "KickRadar" brand name.
 
 const de = {
-  nav: { transfers: 'Transfers', fixtures: 'Spiele', settings: 'Einstellungen' },
+  nav: { transfers: 'Transfers', fixtures: 'Spiele', standings: 'Tabelle', settings: 'Einstellungen' },
   common: { loading: 'Lädt…', chooseClub: 'Verein wählen…', notSupported: 'nicht unterstützt', vs: 'vs', cancel: 'Abbrechen' },
   transfers: {
     officialOnly: 'Nur offizielle Transfers',
@@ -49,6 +49,7 @@ const de = {
   matchInfo: {
     tabLineups: 'Aufstellungen',
     tabInfo: 'Spielinfo',
+    tabStats: 'Statistiken',
     notFinished: 'Die Ereignisübersicht ist verfügbar, sobald das Spiel beendet ist.',
     noEvents: 'Keine nennenswerten Ereignisse.',
     goal: 'Tor',
@@ -58,6 +59,23 @@ const de = {
     redCard: 'Rote Karte',
     substitution: 'Wechsel',
     assistLabel: (name) => `Vorlage: ${name}`,
+  },
+  standings: {
+    empty: 'Tabelle noch nicht verfügbar.',
+    played: 'Sp',
+    won: 'S',
+    draw: 'U',
+    lost: 'N',
+    points: 'Pkt',
+    goalDiff: 'Tordiff.',
+  },
+  stats: {
+    form: 'Form',
+    noForm: 'Noch keine Spiele in dieser Saison.',
+    headToHead: 'Direkter Vergleich',
+    noHeadToHead: 'Noch kein Duell in dieser Saison.',
+    standing: 'Tabellenplatz',
+    positionLabel: (pos, total) => `${pos}. von ${total}`,
   },
   settings: {
     appearance: 'Darstellung',
@@ -89,7 +107,7 @@ const de = {
 };
 
 const en = {
-  nav: { transfers: 'Transfers', fixtures: 'Fixtures', settings: 'Settings' },
+  nav: { transfers: 'Transfers', fixtures: 'Fixtures', standings: 'Table', settings: 'Settings' },
   common: { loading: 'Loading…', chooseClub: 'Choose club…', notSupported: 'not supported', vs: 'vs', cancel: 'Cancel' },
   transfers: {
     officialOnly: 'Official transfers only',
@@ -127,6 +145,7 @@ const en = {
   matchInfo: {
     tabLineups: 'Lineups',
     tabInfo: 'Match Info',
+    tabStats: 'Stats',
     notFinished: 'The event timeline is available once the match has finished.',
     noEvents: 'No notable events.',
     goal: 'Goal',
@@ -136,6 +155,23 @@ const en = {
     redCard: 'Red Card',
     substitution: 'Substitution',
     assistLabel: (name) => `Assist: ${name}`,
+  },
+  standings: {
+    empty: 'Table not available yet.',
+    played: 'P',
+    won: 'W',
+    draw: 'D',
+    lost: 'L',
+    points: 'Pts',
+    goalDiff: 'GD',
+  },
+  stats: {
+    form: 'Form',
+    noForm: 'No matches played yet this season.',
+    headToHead: 'Head-to-Head',
+    noHeadToHead: 'No meetings yet this season.',
+    standing: 'League Position',
+    positionLabel: (pos, total) => `${pos} of ${total}`,
   },
   settings: {
     appearance: 'Appearance',
@@ -167,7 +203,7 @@ const en = {
 };
 
 const it = {
-  nav: { transfers: 'Trasferimenti', fixtures: 'Partite', settings: 'Impostazioni' },
+  nav: { transfers: 'Trasferimenti', fixtures: 'Partite', standings: 'Classifica', settings: 'Impostazioni' },
   common: { loading: 'Caricamento…', chooseClub: 'Scegli squadra…', notSupported: 'non supportato', vs: 'vs', cancel: 'Annulla' },
   transfers: {
     officialOnly: 'Solo trasferimenti ufficiali',
@@ -205,6 +241,7 @@ const it = {
   matchInfo: {
     tabLineups: 'Formazioni',
     tabInfo: 'Cronaca',
+    tabStats: 'Statistiche',
     notFinished: "La cronologia degli eventi sarà disponibile a fine partita.",
     noEvents: 'Nessun evento rilevante.',
     goal: 'Gol',
@@ -214,6 +251,23 @@ const it = {
     redCard: 'Cartellino rosso',
     substitution: 'Sostituzione',
     assistLabel: (name) => `Assist: ${name}`,
+  },
+  standings: {
+    empty: 'Classifica non ancora disponibile.',
+    played: 'PG',
+    won: 'V',
+    draw: 'N',
+    lost: 'P',
+    points: 'Pt',
+    goalDiff: 'DR',
+  },
+  stats: {
+    form: 'Forma',
+    noForm: 'Nessuna partita ancora giocata in questa stagione.',
+    headToHead: 'Scontri diretti',
+    noHeadToHead: 'Nessun precedente in questa stagione.',
+    standing: 'Posizione in classifica',
+    positionLabel: (pos, total) => `${pos}° su ${total}`,
   },
   settings: {
     appearance: 'Aspetto',
@@ -245,7 +299,7 @@ const it = {
 };
 
 const fr = {
-  nav: { transfers: 'Transferts', fixtures: 'Matchs', settings: 'Réglages' },
+  nav: { transfers: 'Transferts', fixtures: 'Matchs', standings: 'Classement', settings: 'Réglages' },
   common: { loading: 'Chargement…', chooseClub: 'Choisir un club…', notSupported: 'non pris en charge', vs: 'vs', cancel: 'Annuler' },
   transfers: {
     officialOnly: 'Transferts officiels uniquement',
@@ -283,6 +337,7 @@ const fr = {
   matchInfo: {
     tabLineups: 'Compositions',
     tabInfo: 'Résumé',
+    tabStats: 'Statistiques',
     notFinished: 'Le fil des événements sera disponible une fois le match terminé.',
     noEvents: 'Aucun événement notable.',
     goal: 'But',
@@ -292,6 +347,23 @@ const fr = {
     redCard: 'Carton rouge',
     substitution: 'Changement',
     assistLabel: (name) => `Passe décisive : ${name}`,
+  },
+  standings: {
+    empty: 'Classement pas encore disponible.',
+    played: 'J',
+    won: 'G',
+    draw: 'N',
+    lost: 'P',
+    points: 'Pts',
+    goalDiff: 'Diff',
+  },
+  stats: {
+    form: 'Forme',
+    noForm: 'Aucun match joué cette saison pour le moment.',
+    headToHead: 'Confrontation directe',
+    noHeadToHead: 'Aucune confrontation cette saison.',
+    standing: 'Place au classement',
+    positionLabel: (pos, total) => `${pos}${pos === 1 ? 're' : 'e'} sur ${total}`,
   },
   settings: {
     appearance: 'Apparence',
@@ -323,7 +395,7 @@ const fr = {
 };
 
 const es = {
-  nav: { transfers: 'Traspasos', fixtures: 'Partidos', settings: 'Ajustes' },
+  nav: { transfers: 'Traspasos', fixtures: 'Partidos', standings: 'Clasificación', settings: 'Ajustes' },
   common: { loading: 'Cargando…', chooseClub: 'Elegir club…', notSupported: 'no compatible', vs: 'vs', cancel: 'Cancelar' },
   transfers: {
     officialOnly: 'Solo traspasos oficiales',
@@ -361,6 +433,7 @@ const es = {
   matchInfo: {
     tabLineups: 'Alineaciones',
     tabInfo: 'Info del partido',
+    tabStats: 'Estadísticas',
     notFinished: 'La cronología de eventos estará disponible cuando termine el partido.',
     noEvents: 'Sin eventos destacados.',
     goal: 'Gol',
@@ -370,6 +443,23 @@ const es = {
     redCard: 'Tarjeta roja',
     substitution: 'Cambio',
     assistLabel: (name) => `Asistencia: ${name}`,
+  },
+  standings: {
+    empty: 'Clasificación aún no disponible.',
+    played: 'PJ',
+    won: 'G',
+    draw: 'E',
+    lost: 'P',
+    points: 'Pts',
+    goalDiff: 'DG',
+  },
+  stats: {
+    form: 'Forma',
+    noForm: 'Aún no se han jugado partidos esta temporada.',
+    headToHead: 'Enfrentamientos directos',
+    noHeadToHead: 'Sin enfrentamientos esta temporada.',
+    standing: 'Posición en la clasificación',
+    positionLabel: (pos, total) => `${pos}º de ${total}`,
   },
   settings: {
     appearance: 'Apariencia',

@@ -1,9 +1,12 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import { useLineups } from '../hooks/useLineups.js';
 import { useMatchEvents } from '../hooks/useMatchEvents.js';
+import { useTeamForm } from '../hooks/useTeamForm.js';
+import { useHeadToHead } from '../hooks/useHeadToHead.js';
+import { useStandings } from '../hooks/useStandings.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 // Drag distance past which releasing counts as "dismiss" rather than
@@ -440,8 +443,143 @@ function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
   );
 }
 
-export default function FixtureDetailOverlay({ theme, t, language, fixture, homeClub, awayClub, onClose }) {
-  const [view, setView] = useState('lineups'); // 'lineups' | 'info'
+const SECTION_LABEL_STYLE = (theme) => ({
+  fontSize: '11px',
+  fontWeight: 700,
+  color: theme.textMuted,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  margin: '0 0 10px',
+});
+const HINT_STYLE = (theme) => ({ fontSize: '13px', color: theme.textMuted, margin: '0 0 4px', padding: '4px 0' });
+
+// W green / L red / D grey, exactly the FlashScore-style convention this
+// was modeled on -- letters stay the fixed English W/D/L abbreviations
+// regardless of app language (per feedback), only the section labels
+// around them are translated.
+const FORM_COLOR = { W: '#22c55e', L: '#ef4444', D: '#8a8f98' };
+
+function FormCircle({ result }) {
+  return (
+    <div
+      style={{
+        width: '22px',
+        height: '22px',
+        borderRadius: '50%',
+        background: FORM_COLOR[result],
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: '11px', fontWeight: 800, color: '#fff' }}>{result}</span>
+    </div>
+  );
+}
+
+// Oldest-to-newest left-to-right (useTeamForm.js already returns them in
+// that order) -- the most recent result reads as the rightmost circle.
+function FormRow({ theme, club, form }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+      <span style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+        {club?.short_name || club?.name}
+      </span>
+      <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+        {form.map((f) => (
+          <FormCircle key={f.fixtureId} result={f.result} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// meeting.home_club_id/away_club_id can be either of the two overlay clubs
+// depending on which one hosted that particular past meeting -- resolved
+// against the overlay's own homeClub/awayClub rather than assumed fixed.
+function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
+  const meetingIsHomeClubHost = meeting.home_club_id === homeClub?.id;
+  const hostClub = meetingIsHomeClubHost ? homeClub : awayClub;
+  const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', padding: '6px 0' }}>
+      <span style={{ color: theme.textMuted }}>{new Date(meeting.kickoff_at).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+      <span style={{ fontWeight: 600 }}>
+        {hostClub?.short_name || hostClub?.name} {meeting.home_score} : {meeting.away_score} {guestClub?.short_name || guestClub?.name}
+      </span>
+    </div>
+  );
+}
+
+function StandingRow({ theme, t, club, entry, total }) {
+  if (!entry) return null;
+  const gd = entry.goal_difference > 0 ? `+${entry.goal_difference}` : entry.goal_difference;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '5px 0' }}>
+      <span style={{ fontWeight: 600 }}>{club?.short_name || club?.name}</span>
+      <span style={{ color: theme.textMuted }}>
+        {t.stats.positionLabel(entry.position, total)} · {entry.points} {t.standings.points} · {gd} {t.standings.goalDiff}
+      </span>
+    </div>
+  );
+}
+
+function MatchStatsTab({ theme, t, language, league, homeClub, awayClub }) {
+  const locale = DATE_LOCALES[language];
+  const { form: homeForm, loading: homeFormLoading } = useTeamForm(homeClub?.id);
+  const { form: awayForm, loading: awayFormLoading } = useTeamForm(awayClub?.id);
+  const { meetings, loading: h2hLoading } = useHeadToHead(homeClub?.id, awayClub?.id);
+  const { table: standingsTable, loading: standingsLoading } = useStandings(league);
+  const standingsByClubId = useMemo(() => new Map(standingsTable.map((row) => [row.club_id, row])), [standingsTable]);
+
+  const formLoading = homeFormLoading || awayFormLoading;
+  const noForm = !formLoading && homeForm.length === 0 && awayForm.length === 0;
+
+  return (
+    <div style={{ padding: '4px 16px 20px' }}>
+      <p style={SECTION_LABEL_STYLE(theme)}>{t.stats.form}</p>
+      {formLoading ? (
+        <p style={HINT_STYLE(theme)}>{t.common.loading}</p>
+      ) : noForm ? (
+        <p style={HINT_STYLE(theme)}>{t.stats.noForm}</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
+          <FormRow theme={theme} club={homeClub} form={homeForm} />
+          <FormRow theme={theme} club={awayClub} form={awayForm} />
+        </div>
+      )}
+
+      <p style={SECTION_LABEL_STYLE(theme)}>{t.stats.headToHead}</p>
+      {h2hLoading ? (
+        <p style={HINT_STYLE(theme)}>{t.common.loading}</p>
+      ) : meetings.length === 0 ? (
+        <p style={HINT_STYLE(theme)}>{t.stats.noHeadToHead}</p>
+      ) : (
+        <div style={{ marginBottom: '22px' }}>
+          {meetings.map((m) => (
+            <HeadToHeadRow key={m.id} theme={theme} meeting={m} homeClub={homeClub} awayClub={awayClub} locale={locale} />
+          ))}
+        </div>
+      )}
+
+      <p style={SECTION_LABEL_STYLE(theme)}>{t.stats.standing}</p>
+      {standingsLoading ? (
+        <p style={HINT_STYLE(theme)}>{t.common.loading}</p>
+      ) : standingsByClubId.size === 0 ? (
+        <p style={HINT_STYLE(theme)}>{t.standings.empty}</p>
+      ) : (
+        <div>
+          <StandingRow theme={theme} t={t} club={homeClub} entry={standingsByClubId.get(homeClub?.id)} total={standingsTable.length} />
+          <StandingRow theme={theme} t={t} club={awayClub} entry={standingsByClubId.get(awayClub?.id)} total={standingsTable.length} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function FixtureDetailOverlay({ theme, t, language, league, fixture, homeClub, awayClub, onClose }) {
+  const [view, setView] = useState('lineups'); // 'lineups' | 'info' | 'stats'
   const [side, setSide] = useState('home');
   const { byClubId } = useLineups(fixture.id);
   const locale = DATE_LOCALES[language];
@@ -533,7 +671,7 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
               row rather than folding "Spielinfo" in as a third side
               option. */}
           <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
-            {[['lineups', t.matchInfo.tabLineups], ['info', t.matchInfo.tabInfo]].map(([key, label]) => (
+            {[['lineups', t.matchInfo.tabLineups], ['info', t.matchInfo.tabInfo], ['stats', t.matchInfo.tabStats]].map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setView(key)}
@@ -583,13 +721,17 @@ export default function FixtureDetailOverlay({ theme, t, language, fixture, home
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {view === 'lineups' ? (
+          {view === 'lineups' && (
             <>
               <LineupList theme={theme} t={t} row={activeRow} />
               <MatchInfoFooter theme={theme} t={t} fixture={fixture} homeClub={homeClub} />
             </>
-          ) : (
+          )}
+          {view === 'info' && (
             <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
+          )}
+          {view === 'stats' && (
+            <MatchStatsTab theme={theme} t={t} language={language} league={league} homeClub={homeClub} awayClub={awayClub} />
           )}
         </div>
       </div>
