@@ -503,9 +503,11 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   const hostClub = meetingIsHomeClubHost ? homeClub : awayClub;
   const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', padding: '6px 0' }}>
-      <span style={{ color: theme.textMuted }}>{new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
-      <span style={{ fontWeight: 600 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12.5px', padding: '6px 0' }}>
+      <span style={{ color: theme.textMuted, flexShrink: 0, width: '58px' }}>
+        {new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
+      </span>
+      <span style={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>
         {hostClub?.short_name || hostClub?.name} {meeting.home_score} : {meeting.away_score} {guestClub?.short_name || guestClub?.name}
       </span>
     </div>
@@ -514,13 +516,10 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
 
 function StandingRow({ theme, t, club, entry, total }) {
   if (!entry) return null;
-  const gd = entry.goal_difference > 0 ? `+${entry.goal_difference}` : entry.goal_difference;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '5px 0' }}>
       <span style={{ fontWeight: 600 }}>{club?.short_name || club?.name}</span>
-      <span style={{ color: theme.textMuted }}>
-        {t.stats.positionLabel(entry.position, total)} · {entry.points} {t.standings.points} · {gd} {t.standings.goalDiff}
-      </span>
+      <span style={{ color: theme.textMuted }}>{t.stats.positionLabel(entry.position, total)}</span>
     </div>
   );
 }
