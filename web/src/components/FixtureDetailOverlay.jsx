@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle, Flag, MapPin } from 'lucide-react';
+import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import { useLineups } from '../hooks/useLineups.js';
@@ -220,6 +220,36 @@ function LineupList({ theme, t, row }) {
   );
 }
 
+// Neither a whistle nor a top-down pitch exists in lucide-react (checked
+// the installed icon set directly) -- hand-drawn to match lucide's own
+// convention (24x24 viewBox, stroke-only, round caps/joins) so they sit
+// next to the rest of the app's icons without looking out of place.
+function Whistle({ size = 16, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <rect x="1" y="9" width="9" height="6" rx="3" />
+      <circle cx="17" cy="12" r="6" />
+      <circle cx="17" cy="12.5" r="1.4" />
+      <rect x="15.3" y="4.6" width="3.4" height="2.4" rx="1" />
+    </svg>
+  );
+}
+
+// Top-down half-schematic (boundary, halfway line, centre circle, both
+// penalty boxes open toward the centre) -- same idea as PitchFormation
+// above, just flattened to an icon-sized horizontal pitch.
+function PitchIcon({ size = 16, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <rect x="1" y="5" width="22" height="14" rx="2" />
+      <path d="M12 5v14" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M5 8H1v8h4" />
+      <path d="M19 8h4v8h-4" />
+    </svg>
+  );
+}
+
 // Referee is fixture-level; venue is really club-level (football-data.org's
 // free tier has no per-match venue, only a team's static home stadium --
 // see diagnoseVenueReferee.js), so this always shows the home club's
@@ -232,13 +262,13 @@ function MatchInfoFooter({ theme, t, fixture, homeClub }) {
     <div style={{ margin: '0 16px 16px', paddingTop: '14px', borderTop: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {fixture.referee && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
-          <Flag size={15} style={{ flexShrink: 0 }} />
+          <Whistle size={15} style={{ flexShrink: 0 }} />
           <span>{t.matchInfo.refereeLabel(fixture.referee)}</span>
         </div>
       )}
       {homeClub?.venue && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
-          <MapPin size={15} style={{ flexShrink: 0 }} />
+          <PitchIcon size={15} style={{ flexShrink: 0 }} />
           <span>{homeClub.venue}</span>
         </div>
       )}
