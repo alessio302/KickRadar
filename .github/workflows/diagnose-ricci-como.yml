@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  diagnose:
+  backfill:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -14,7 +14,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/news/diagnoseRicciFromClub.js
+      - run: node src/news/backfillMissingFromClubV2.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

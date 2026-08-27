@@ -32,6 +32,37 @@ function dedupeKey(text) {
   return normalize(text || '').replace(/[^a-z0-9]/g, '');
 }
 
+// Looks up a player's real current club from football-data.org's synced
+// squad data (source of truth for direction corrections/backfills below).
+// Tries an exact normalized-name match first; if extraction only produced
+// a bare surname -- a headline like "Ricci al Como" is completely normal,
+// especially in Italian sports media -- falls back to a surname-suffix
+// match instead, but only when it's unambiguous (exactly one row either
+// way, same "don't guess" discipline as everywhere else in this file).
+// Confirmed live: "Ricci" had a real, exact "samuele ricci" row in
+// squad_memberships, but a plain equality check could never see it,
+// silently leaving from_club null on a story where the origin club was
+// perfectly recoverable.
+async function lookupSquadClubId(supabase, playerName) {
+  const normName = normalize(playerName);
+  const { data: exactRows, error: exactErr } = await supabase
+    .from('squad_memberships')
+    .select('club_id')
+    .eq('normalized_name', normName)
+    .limit(2);
+  if (exactErr) throw exactErr;
+  if (exactRows.length === 1) return exactRows[0].club_id;
+  if (exactRows.length > 1 || normName.includes(' ')) return null; // ambiguous, or already a full name with no surname fallback to try
+
+  const { data: suffixRows, error: suffixErr } = await supabase
+    .from('squad_memberships')
+    .select('club_id')
+    .ilike('normalized_name', `% ${normName}`)
+    .limit(2);
+  if (suffixErr) throw suffixErr;
+  return suffixRows.length === 1 ? suffixRows[0].club_id : null;
+}
+
 // resolvePlayerProfile() matches players by an EXACT normalized_name
 // lookup, so two articles about the same real player using different name
 // forms ("Kristjan Asllani" in one, just "Asllani" -- a shorter follow-up
@@ -206,25 +237,20 @@ async function scrapeLeague(supabase, league) {
     let resolvedFromMatch = fromClubMatch;
     let resolvedToMatch = toClubMatch;
     if (playerName && fromClubMatch && toClubMatch) {
-      const { data: squadRows, error: squadErr } = await supabase
-        .from('squad_memberships')
-        .select('club_id')
-        .eq('normalized_name', normalize(playerName))
-        .limit(2);
-      if (squadErr) {
-        console.error(`[${league.slug}] squad lookup failed:`, squadErr.message);
-      } else if (squadRows.length === 1 && squadRows[0].club_id === toClubMatch.id) {
+      let squadClubId;
+      try {
+        squadClubId = await lookupSquadClubId(supabase, playerName);
+      } catch (err) {
+        console.error(`[${league.slug}] squad lookup failed:`, err.message);
+      }
+      if (squadClubId === toClubMatch.id) {
         // The extracted story has the player leaving for the club they're
         // actually already at -- backwards. Flip it.
         resolvedFromClub = toClub;
         resolvedToClub = fromClub;
         resolvedFromMatch = toClubMatch;
         resolvedToMatch = fromClubMatch;
-      } else if (
-        squadRows.length === 1 &&
-        squadRows[0].club_id !== fromClubMatch.id &&
-        squadRows[0].club_id !== toClubMatch.id
-      ) {
+      } else if (squadClubId != null && squadClubId !== fromClubMatch.id && squadClubId !== toClubMatch.id) {
         // The player is confirmed at a *third* club, matching neither side
         // of the extracted story. Same principle as the flip above -- squad
         // data is the source of truth -- applied to the other axis: correct
@@ -234,7 +260,7 @@ async function scrapeLeague(supabase, league) {
         // Inter -- Fiorentina interest is real, newsworthy rumor content;
         // "Parma" was simply stale/wrong and is cheaply fixable, so fix it
         // rather than throw the whole story away.
-        const realClub = allClubs.find((c) => c.id === squadRows[0].club_id);
+        const realClub = allClubs.find((c) => c.id === squadClubId);
         if (realClub) {
           resolvedFromClub = realClub.name;
           resolvedFromMatch = realClub;
@@ -255,18 +281,16 @@ async function scrapeLeague(supabase, league) {
       // club other than the destination, that's their real prior club.
       // Squad data only reflects the *current* roster (no transfer-history
       // concept), so this can't recover a case where the sync already
-      // caught up to the new club -- in that case squadRows[0].club_id
-      // would equal toClubMatch.id and nothing is backfilled, same as
-      // today's behavior.
-      const { data: squadRows, error: squadErr } = await supabase
-        .from('squad_memberships')
-        .select('club_id')
-        .eq('normalized_name', normalize(playerName))
-        .limit(2);
-      if (squadErr) {
-        console.error(`[${league.slug}] squad lookup failed:`, squadErr.message);
-      } else if (squadRows.length === 1 && squadRows[0].club_id !== toClubMatch.id) {
-        const realClub = allClubs.find((c) => c.id === squadRows[0].club_id);
+      // caught up to the new club -- in that case the lookup returns
+      // toClubMatch.id and nothing is backfilled, same as today's behavior.
+      let squadClubId;
+      try {
+        squadClubId = await lookupSquadClubId(supabase, playerName);
+      } catch (err) {
+        console.error(`[${league.slug}] squad lookup failed:`, err.message);
+      }
+      if (squadClubId != null && squadClubId !== toClubMatch.id) {
+        const realClub = allClubs.find((c) => c.id === squadClubId);
         if (realClub) {
           resolvedFromClub = realClub.name;
           resolvedFromMatch = realClub;
