@@ -45,6 +45,25 @@ async function run() {
     console.log('html length:', html.length);
     console.log('contains "non trovata"?', html.includes('non trovata'));
     console.log('<title>:', html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]);
+
+    console.log('\n--- trying URL variants ---');
+    const variants = [
+      url.replace('//?action=read', '/?action=read'), // single slash
+      url.replace('www.tuttomercatoweb.com//', 'www.tuttomercatoweb.com/news/'),
+    ];
+    for (const variant of variants) {
+      try {
+        const r = await fetch(variant, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          },
+        });
+        console.log(`  ${variant} -> ${r.status}`);
+      } catch (err) {
+        console.log(`  ${variant} -> fetch error: ${err.message}`);
+      }
+    }
   }
 }
 
