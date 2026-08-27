@@ -10,6 +10,25 @@
 // Ligue 1, LaLiga -- official spellings per lib/leagues.js), source names
 // (kicker, tuttomercatoweb, marca, ...), and the "KickRadar" brand name.
 
+// English ordinal suffix (1st, 2nd, 3rd, 4th, 11th, 21st, ...) -- used by
+// en.stats.positionLabel. The other languages' ordinal marks are fixed
+// (German ".", Italian "°", Spanish "º") or a simple 1-vs-rest split
+// (French "er"/"e"), so only English needs real logic.
+function ordinalEn(n) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
 const de = {
   nav: { transfers: 'Transfers', fixtures: 'Spiele', standings: 'Tabelle', settings: 'Einstellungen' },
   common: { loading: 'Lädt…', chooseClub: 'Verein wählen…', notSupported: 'nicht unterstützt', vs: 'vs', cancel: 'Abbrechen' },
@@ -75,7 +94,7 @@ const de = {
     headToHead: 'Direkter Vergleich',
     noHeadToHead: 'Noch kein Duell in dieser Saison.',
     standing: 'Tabellenplatz',
-    positionLabel: (pos, total) => `${pos}. von ${total}`,
+    positionLabel: (pos) => `${pos}.`,
   },
   settings: {
     appearance: 'Darstellung',
@@ -171,7 +190,7 @@ const en = {
     headToHead: 'Head-to-Head',
     noHeadToHead: 'No meetings yet this season.',
     standing: 'League Position',
-    positionLabel: (pos, total) => `${pos} of ${total}`,
+    positionLabel: (pos) => ordinalEn(pos),
   },
   settings: {
     appearance: 'Appearance',
@@ -267,7 +286,7 @@ const it = {
     headToHead: 'Scontri diretti',
     noHeadToHead: 'Nessun precedente in questa stagione.',
     standing: 'Posizione in classifica',
-    positionLabel: (pos, total) => `${pos}° su ${total}`,
+    positionLabel: (pos) => `${pos}°`,
   },
   settings: {
     appearance: 'Aspetto',
@@ -363,7 +382,7 @@ const fr = {
     headToHead: 'Confrontation directe',
     noHeadToHead: 'Aucune confrontation cette saison.',
     standing: 'Place au classement',
-    positionLabel: (pos, total) => `${pos}${pos === 1 ? 're' : 'e'} sur ${total}`,
+    positionLabel: (pos) => `${pos}${pos === 1 ? 're' : 'e'}`,
   },
   settings: {
     appearance: 'Apparence',
@@ -459,7 +478,7 @@ const es = {
     headToHead: 'Enfrentamientos directos',
     noHeadToHead: 'Sin enfrentamientos esta temporada.',
     standing: 'Posición en la clasificación',
-    positionLabel: (pos, total) => `${pos}º de ${total}`,
+    positionLabel: (pos) => `${pos}º`,
   },
   settings: {
     appearance: 'Apariencia',

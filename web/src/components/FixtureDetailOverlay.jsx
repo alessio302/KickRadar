@@ -514,12 +514,12 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   );
 }
 
-function StandingRow({ theme, t, club, entry, total }) {
+function StandingRow({ theme, t, club, entry }) {
   if (!entry) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '5px 0' }}>
       <span style={{ fontWeight: 600 }}>{club?.short_name || club?.name}</span>
-      <span style={{ color: theme.textMuted }}>{t.stats.positionLabel(entry.position, total)}</span>
+      <span style={{ color: theme.textMuted }}>{t.stats.positionLabel(entry.position)}</span>
     </div>
   );
 }
@@ -569,8 +569,8 @@ function MatchStatsTab({ theme, t, language, league, homeClub, awayClub }) {
         <p style={HINT_STYLE(theme)}>{t.standings.empty}</p>
       ) : (
         <div>
-          <StandingRow theme={theme} t={t} club={homeClub} entry={standingsByClubId.get(homeClub?.id)} total={standingsTable.length} />
-          <StandingRow theme={theme} t={t} club={awayClub} entry={standingsByClubId.get(awayClub?.id)} total={standingsTable.length} />
+          <StandingRow theme={theme} t={t} club={homeClub} entry={standingsByClubId.get(homeClub?.id)} />
+          <StandingRow theme={theme} t={t} club={awayClub} entry={standingsByClubId.get(awayClub?.id)} />
         </div>
       )}
     </div>
