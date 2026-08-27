@@ -19,34 +19,49 @@
 // "official" adjective from web/src/i18n/translations.js's
 // lineup.official field, just pluralized, for consistency with the rest
 // of the app's own word choice.
+//
+// rumor: also confirmed live -- and also caught the same mistake as
+// lineupTitle originally had. This first read "Neues Gerücht"/"New
+// rumor"/"Nuova voce di mercato"/"Nouvelle rumeur"/"Nuevo rumor", a "new
+// X" prefix invented without checking real usage, inconsistent with
+// `official` right next to it (which was already bare). Real transfer
+// coverage uses the bare noun as a category tag, not "new + noun": kicker.de
+// and sport1.de's own transfer tickers are literally headed "Transfers &
+// Gerüchte"; RMC Sport/Foot Mercato (the exact sites this project scrapes
+// -- see footmercato.js) label their own stories "RUMEUR" bare, alongside
+// "INFO" and "OFFICIEL"; Italian transfer sites use "voce/voci di
+// mercato" bare; Spanish coverage the same ("Rumores y noticias de
+// fichajes"). Now reuses each language's own bare noun from
+// translations.js's transfers.rumor field, matching `official` being
+// bare too.
 export const PUSH_STRINGS = {
   de: {
     official: 'Offiziell',
-    rumor: 'Neues Gerücht',
+    rumor: 'Gerücht',
     summaryTitle: (n) => `${n} neue Transfer-Meldungen`,
     lineupTitle: 'Offizielle Aufstellungen',
   },
   en: {
     official: 'Official',
-    rumor: 'New rumor',
+    rumor: 'Rumor',
     summaryTitle: (n) => `${n} new transfer updates`,
     lineupTitle: 'Official lineups',
   },
   it: {
     official: 'Ufficiale',
-    rumor: 'Nuova voce di mercato',
+    rumor: 'Voce di mercato',
     summaryTitle: (n) => `${n} nuovi aggiornamenti di mercato`,
     lineupTitle: 'Formazioni ufficiali',
   },
   fr: {
     official: 'Officiel',
-    rumor: 'Nouvelle rumeur',
+    rumor: 'Rumeur',
     summaryTitle: (n) => `${n} nouvelles infos transferts`,
     lineupTitle: 'Compositions officielles',
   },
   es: {
     official: 'Oficial',
-    rumor: 'Nuevo rumor',
+    rumor: 'Rumor',
     summaryTitle: (n) => `${n} nuevas noticias de fichajes`,
     lineupTitle: 'Alineaciones oficiales',
   },
