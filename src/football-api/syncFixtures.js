@@ -15,7 +15,16 @@ const FIXTURE_WINDOW_DAYS = Number(process.env.FIXTURE_WINDOW_DAYS || 21);
 // own display-query window (useFixtures.js's PAST_WINDOW_DAYS) needs to
 // stay at least this wide too, or a backfilled fixture would sync here
 // but still not be queried back out for display.
-const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 15);
+//
+// Widened well past that for the "Statistiken" tab's last-5-results form
+// (useTeamForm.js): at ~1 match/week, 5 results span ~35 days, further
+// once byes/international breaks are involved. This is still just ONE
+// wider date-range query per league per sync (football-data.org's free
+// tier caps requests/minute, not response size), so it costs nothing --
+// unlike the frontend's own PAST_WINDOW_DAYS, which stays at 15 and is
+// unrelated (that one bounds what shows in the Spiele tab's list, not
+// what's available for a club-scoped stats query).
+const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 60);
 
 function toDateString(date) {
   return date.toISOString().slice(0, 10);

@@ -55,6 +55,16 @@ export async function getMatchesForDate({ competitionIds, date }) {
   return data.matches;
 }
 
+// TOTAL-only on the free tier -- confirmed live (diagnoseStandings.js, this
+// session): the response's `standings` array has just one group
+// (type: 'TOTAL', stage: 'REGULAR_SEASON'), no separate HOME/AWAY split,
+// and every entry's own `form` field is always null despite being present
+// in the response shape.
+export async function getStandings({ competitionId }) {
+  const data = await call(`/competitions/${competitionId}/standings`);
+  return data.standings.find((s) => s.type === 'TOTAL')?.table ?? [];
+}
+
 // Shared between syncFixtures.js (a few times a day) and syncLiveScores.js
 // (every ~75s during a live window) so the two never drift apart on what a
 // given football-data.org status actually means for us.
