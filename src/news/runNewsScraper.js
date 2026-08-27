@@ -48,7 +48,7 @@ function dedupeKey(text) {
 // squad_memberships, but a plain equality check could never see it,
 // silently leaving from_club null (and the card showing just "Ricci") on a
 // story where both were perfectly recoverable.
-async function lookupSquadMembership(supabase, playerName) {
+export async function lookupSquadMembership(supabase, playerName) {
   const normName = normalize(playerName);
   const { data: exactRows, error: exactErr } = await supabase
     .from('squad_memberships')
