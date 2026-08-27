@@ -1,0 +1,23 @@
+name: Diagnose article fetch failures (one-off)
+
+# Two rows (Patouillet, Touba) consistently fail fetchArticleText() across
+# two backfill runs even with request spacing -- see
+# src/news/diagnoseArticleFetch.js. Read-only, no DB writes.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseArticleFetch.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
