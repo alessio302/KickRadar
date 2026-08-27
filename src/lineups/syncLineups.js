@@ -3,6 +3,7 @@ import { LEAGUES } from '../config/leagues.js';
 import { getMatches, getLineups, getEvents } from './highlightlyClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
+import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
 // Highlightly's own league.name for each of our leagues -- confirmed live
 // via diagnoseHighlightly.js for the original 4 (Serie A id 115669,
@@ -254,13 +255,19 @@ export async function syncLineups() {
   const pushResults = [];
   for (const { fixtureId, homeClub, awayClub, leagueSlug } of newlyConfirmedFixtures) {
     try {
-      pushResults.push(
-        await sendPushToLineupSubscribers({
-          title: 'Aufstellung bestätigt',
+      // Club names stay untranslated (same policy as everywhere else in
+      // the app); only the "Aufstellung bestätigt"/"Lineup confirmed"/...
+      // title varies per subscriber's stored language -- see
+      // push_subscriptions.language / sendPushToLineupSubscribers.
+      const byLanguage = {};
+      for (const lang of SUPPORTED_PUSH_LANGUAGES) {
+        byLanguage[lang] = {
+          title: pushStringsFor(lang).lineupTitle,
           body: `${homeClub.name} vs ${awayClub.name}`,
           url: `/?league=${leagueSlug}&fixture=${fixtureId}`,
-        })
-      );
+        };
+      }
+      pushResults.push(await sendPushToLineupSubscribers(byLanguage));
     } catch (err) {
       console.error('Lineup push send failed:', err.message);
     }

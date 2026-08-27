@@ -18,8 +18,11 @@ export const NOTIFICATIONS_DENIED = 'notifications-denied';
 // Creates the browser subscription + DB row if one doesn't exist yet,
 // otherwise returns the existing one. Used by usePushSubscription.js
 // (the two blanket notify_transfers/notify_lineups toggles) as a
-// precondition before it can write anything.
-export async function ensurePushSubscription() {
+// precondition before it can write anything. `language` is stored
+// alongside the subscription so sendPush.js (backend) can send this
+// subscriber their notifications in the app language they're actually
+// using -- see push_subscriptions.language / pushI18n.js.
+export async function ensurePushSubscription(language) {
   const registration = await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
   if (existing) return existing;
@@ -47,6 +50,7 @@ export async function ensurePushSubscription() {
     p_endpoint: endpoint,
     p_p256dh: keys.p256dh,
     p_auth: keys.auth,
+    p_language: language,
   });
   if (upsertErr) throw upsertErr;
 

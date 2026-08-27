@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { getSupabaseClient } from '../db/supabaseClient.js';
+import { SUPPORTED_PUSH_LANGUAGES } from './pushI18n.js';
 
 // VAPID identifies the sender to the browser's push service (Apple/Google) --
 // required by the Web Push protocol, not something specific to this app.
@@ -57,6 +58,34 @@ async function sendToSubscriptions(supabase, subs, payload) {
   return { sent, failed, removed: staleIds.length };
 }
 
+// Splits subs by their stored language (push_subscriptions.language,
+// defaulting unset/unrecognized values to 'de' the same way the frontend's
+// detectDefaultLanguage() does) and sends each group the payload variant
+// the caller prepared for that language (payloadsByLanguage, keyed by
+// language code -- see runNewsScraper.js/syncLineups.js) -- so a
+// subscriber gets their notification in the app language they're actually
+// using, not whatever language happened to be hardcoded server-side.
+async function sendToSubscriptionsByLanguage(supabase, subs, payloadsByLanguage) {
+  const groups = new Map();
+  for (const sub of subs) {
+    const lang = SUPPORTED_PUSH_LANGUAGES.includes(sub.language) ? sub.language : 'de';
+    if (!groups.has(lang)) groups.set(lang, []);
+    groups.get(lang).push(sub);
+  }
+
+  let sent = 0;
+  let failed = 0;
+  let removed = 0;
+  for (const [lang, groupSubs] of groups) {
+    const payload = payloadsByLanguage[lang] ?? payloadsByLanguage.de;
+    const result = await sendToSubscriptions(supabase, groupSubs, payload);
+    sent += result.sent;
+    failed += result.failed;
+    removed += result.removed;
+  }
+  return { sent, failed, removed };
+}
+
 // Sends to literally every stored subscription, ignoring both category
 // preferences -- only for testPush.js's manual pipeline smoke test, never
 // for a real notification category. A subscription that comes back
@@ -78,24 +107,24 @@ export async function sendPushToAll(payload) {
 // subscribing via either one satisfied both toggles' on-condition at once,
 // since a fresh row's other column defaults true regardless of which
 // toggle the subscriber actually touched.
-export async function sendPushToTransferSubscribers(payload) {
+export async function sendPushToTransferSubscribers(payloadsByLanguage) {
   ensureConfigured();
   const supabase = getSupabaseClient();
   const { data: subs, error } = await supabase
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth')
+    .select('id, endpoint, p256dh, auth, language')
     .eq('notify_transfers', true);
   if (error) throw error;
-  return sendToSubscriptions(supabase, subs, payload);
+  return sendToSubscriptionsByLanguage(supabase, subs, payloadsByLanguage);
 }
 
-export async function sendPushToLineupSubscribers(payload) {
+export async function sendPushToLineupSubscribers(payloadsByLanguage) {
   ensureConfigured();
   const supabase = getSupabaseClient();
   const { data: subs, error } = await supabase
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth')
+    .select('id, endpoint, p256dh, auth, language')
     .eq('notify_lineups', true);
   if (error) throw error;
-  return sendToSubscriptions(supabase, subs, payload);
+  return sendToSubscriptionsByLanguage(supabase, subs, payloadsByLanguage);
 }

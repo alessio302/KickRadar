@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { ensurePushSubscription, NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 
@@ -21,7 +21,7 @@ export { NOTIFICATIONS_DENIED };
 // torn down from here -- turning both preferences off just stops any
 // push from being sent, the row stays so re-enabling either one doesn't
 // need to re-subscribe.
-export function usePushSubscription() {
+export function usePushSubscription(language) {
   const [supported] = useState(
     () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
   );
@@ -30,6 +30,29 @@ export function usePushSubscription() {
   const [notifyLineups, setNotifyLineupsState] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Keeps an already-subscribed browser's stored language current: once
+  // when a subscription is first discovered on load (covers a browser
+  // that subscribed before this language tracking existed, or before
+  // switching to its current language -- ensureSubscribed() below only
+  // upserts, including language, the moment a subscription is *created*,
+  // never on a later load of an existing one) and again on every actual
+  // language change afterwards. prevLanguageRef starts at null (not
+  // `language`) specifically so the first render after `subscribed`
+  // becomes true still counts as "changed" and fires once.
+  const prevLanguageRef = useRef(null);
+  useEffect(() => {
+    if (!subscribed || language === prevLanguageRef.current) return;
+    prevLanguageRef.current = language;
+    navigator.serviceWorker.ready
+      .then((registration) => registration.pushManager.getSubscription())
+      .then((existing) => {
+        if (!existing) return;
+        const { endpoint, keys } = existing.toJSON();
+        return supabase.rpc('set_push_language', { p_endpoint: endpoint, p_auth: keys.auth, p_language: language });
+      })
+      .catch((err) => console.error('Failed to sync push language:', err.message));
+  }, [language, subscribed]);
 
   useEffect(() => {
     if (!supported) {
@@ -61,10 +84,10 @@ export function usePushSubscription() {
   }, [supported]);
 
   const ensureSubscribed = useCallback(async () => {
-    const subscription = await ensurePushSubscription();
+    const subscription = await ensurePushSubscription(language);
     setSubscribed(true);
     return subscription;
-  }, []);
+  }, [language]);
 
   const setNotifyTransfers = useCallback(async (value) => {
     setError(null);

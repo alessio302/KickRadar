@@ -10,6 +10,7 @@ import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
 import { normalize } from '../util/normalize.js';
 import { sendPushToTransferSubscribers } from '../push/sendPush.js';
+import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
 import tuttomercatoweb from './sources/tuttomercatoweb.js';
 import kicker from './sources/kicker.js';
@@ -476,6 +477,12 @@ async function scrapeLeague(supabase, league) {
 // it in practice).
 const MAX_INDIVIDUAL_NOTIFICATIONS = 8;
 
+// Returns an array of payloadsByLanguage maps (one per notification to
+// send, each itself keyed by language code -- de/en/it/fr/es) rather than
+// a single fixed-language payload, so sendPushToTransferSubscribers can
+// hand each subscriber the variant matching their own stored language
+// (push_subscriptions.language). Club/player/league names are never
+// translated here, same policy as the frontend's own translations.js.
 function buildNotificationPayloads(notifiable) {
   if (notifiable.length === 0) return [];
   if (notifiable.length > MAX_INDIVIDUAL_NOTIFICATIONS) {
@@ -484,15 +491,23 @@ function buildNotificationPayloads(notifiable) {
       countByLeague.set(t.league, (countByLeague.get(t.league) || 0) + 1);
     }
     const body = [...countByLeague.entries()].map(([league, count]) => `${league} (${count})`).join(', ');
-    return [{ title: `${notifiable.length} neue Transfer-Meldungen`, body, url: '/' }];
+    const byLanguage = {};
+    for (const lang of SUPPORTED_PUSH_LANGUAGES) {
+      byLanguage[lang] = { title: pushStringsFor(lang).summaryTitle(notifiable.length), body, url: '/' };
+    }
+    return [byLanguage];
   }
   return notifiable.map((t) => {
     // Both clubs are guaranteed non-null here -- notifiable only ever
     // collects rows that satisfy useTransfers.js's own display filter,
     // see where it's built above.
     const body = `${t.fromClub} → ${t.toClub} (${t.league})`;
-    const prefix = t.isOfficial ? 'Offiziell' : 'Neues Gerücht';
-    return { title: `${prefix}: ${t.playerName}`, body, url: `/?league=${t.leagueSlug}` };
+    const byLanguage = {};
+    for (const lang of SUPPORTED_PUSH_LANGUAGES) {
+      const prefix = t.isOfficial ? pushStringsFor(lang).official : pushStringsFor(lang).rumor;
+      byLanguage[lang] = { title: `${prefix}: ${t.playerName}`, body, url: `/?league=${t.leagueSlug}` };
+    }
+    return byLanguage;
   });
 }
 

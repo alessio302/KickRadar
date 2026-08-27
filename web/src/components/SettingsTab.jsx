@@ -30,7 +30,7 @@ export default function SettingsTab({
     error: pushError,
     setNotifyTransfers,
     setNotifyLineups,
-  } = usePushSubscription();
+  } = usePushSubscription(language);
 
   const themeOptions = [
     ['system', t.settings.appearanceSystem],

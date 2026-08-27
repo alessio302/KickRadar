@@ -168,6 +168,7 @@ create table if not exists push_subscriptions (
   quick_filter_club_ids int[] not null default '{}',
   notify_lineups boolean not null default true,
   notify_transfers boolean not null default true,
+  language text not null default 'de',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -215,18 +216,42 @@ create policy "Public read access" on head_to_head for select using (true);
 create or replace function upsert_push_subscription(
   p_endpoint text,
   p_p256dh text,
-  p_auth text
+  p_auth text,
+  p_language text default 'de'
 ) returns void
 language sql
 security definer
 set search_path = public
 as $$
-  insert into push_subscriptions (endpoint, p256dh, auth, updated_at)
-  values (p_endpoint, p_p256dh, p_auth, now())
+  insert into push_subscriptions (endpoint, p256dh, auth, language, updated_at)
+  values (p_endpoint, p_p256dh, p_auth, p_language, now())
   on conflict (endpoint) do update
     set p256dh = excluded.p256dh,
         auth = excluded.auth,
+        language = excluded.language,
         updated_at = now();
+$$;
+
+-- Keeps an already-subscribed browser's stored language in sync when the
+-- user changes the app language later -- ensurePushSubscription.js only
+-- runs the upsert above once per browser (it returns the existing
+-- PushManager subscription immediately without re-upserting on later
+-- calls), so without this a subscriber who switches languages after
+-- first subscribing would keep getting notifications in their old
+-- language forever.
+create or replace function set_push_language(
+  p_endpoint text,
+  p_auth text,
+  p_language text
+) returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update push_subscriptions
+  set language = p_language,
+      updated_at = now()
+  where endpoint = p_endpoint and auth = p_auth;
 $$;
 
 create or replace function get_push_preferences(
@@ -259,9 +284,11 @@ as $$
   where endpoint = p_endpoint and auth = p_auth;
 $$;
 
-revoke all on function upsert_push_subscription(text, text, text) from public;
+revoke all on function upsert_push_subscription(text, text, text, text) from public;
 revoke all on function get_push_preferences(text, text) from public;
 revoke all on function set_push_preference(text, text, boolean, boolean) from public;
-grant execute on function upsert_push_subscription(text, text, text) to anon;
+revoke all on function set_push_language(text, text, text) from public;
+grant execute on function upsert_push_subscription(text, text, text, text) to anon;
 grant execute on function get_push_preferences(text, text) to anon;
 grant execute on function set_push_preference(text, text, boolean, boolean) to anon;
+grant execute on function set_push_language(text, text, text) to anon;
