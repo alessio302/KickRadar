@@ -33,18 +33,28 @@ const base = createHtmlSource({
 
 // Confirmed live: the page repeats the same set of articles across two
 // widgets (a featured list and a "recent" ticker), each formatted
-// differently -- "<headline> HH:MM - <competition>" in one, "HH:MM
+// differently -- "<headline> HH:MM - <competition>" (today's items) or
+// "<headline> DD/MM - <competition>" (older ones) in one, "HH:MM
 // <headline>" in the other -- but linking to the exact same article URL.
 // Deduping by link here (not just relying on runNewsScraper.js's
 // seen-item check, which only guards *across* runs -- the in-memory
 // knownIds set it builds isn't updated mid-run, so two same-URL items in
 // one fetch both slip past it) avoids two near-identical LLM calls for
 // literally the same story on every single scrape.
-const TIME_PREFIX = /^\d{2}:\d{2}\s*/;
-const TIME_SUFFIX = /\s+\d{2}:\d{2}\s*-\s*.+$/;
+//
+// Anchors also wrap other inline elements (an "Exclu FM" exclusive badge,
+// the timestamp/competition tag itself), so .text() -- confirmed live --
+// concatenates their text nodes with the source markup's original
+// whitespace/newlines intact, not just the visible label. Collapsing
+// whitespace first is what makes the timestamp/date pattern below
+// reliably matchable at all.
+const STAMP = /\d{2}:\d{2}|\d{2}\/\d{2}/;
+const STAMP_PREFIX = new RegExp(`^(?:${STAMP.source})\\s*`);
+const STAMP_SUFFIX = new RegExp(`\\s+(?:${STAMP.source})\\s*-\\s*.+$`);
 
 function cleanTitle(title) {
-  return title.replace(TIME_PREFIX, '').replace(TIME_SUFFIX, '').trim();
+  const collapsed = title.replace(/\s+/g, ' ').trim();
+  return collapsed.replace(STAMP_PREFIX, '').replace(STAMP_SUFFIX, '').trim();
 }
 
 export default {
