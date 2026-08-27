@@ -1,0 +1,24 @@
+name: Diagnose leftover RMC Sport rows (one-off)
+
+# Checks how many old rmcsport-sourced Ligue 1 transfer rows still exist
+# and how many are currently visible in the feed, before deciding whether
+# to remove them -- see src/news/diagnoseRmcLeftover.js. Read-only, no DB
+# writes.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseRmcLeftover.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
