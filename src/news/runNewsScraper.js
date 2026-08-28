@@ -115,6 +115,20 @@ async function extractInfo(item, clubs, sourceKey) {
   }
 }
 
+// aiSummary is either null (regex fallback, or the LLM decided this isn't
+// really a single-player transfer story) or an object with all 5 language
+// keys -- either way, spreads into the 5 actual `ai_summary_<lang>` DB
+// columns without the caller needing to know which case it is.
+function aiSummaryColumns(aiSummary) {
+  return {
+    ai_summary_de: aiSummary?.de ?? null,
+    ai_summary_en: aiSummary?.en ?? null,
+    ai_summary_it: aiSummary?.it ?? null,
+    ai_summary_fr: aiSummary?.fr ?? null,
+    ai_summary_es: aiSummary?.es ?? null,
+  };
+}
+
 async function scrapeLeague(supabase, league) {
   const source = SOURCES[league.newsSource];
   if (!source) throw new Error(`No source module for "${league.newsSource}"`);
@@ -404,7 +418,7 @@ async function scrapeLeague(supabase, league) {
         .update({
           published_at: newerPublishedAt,
           summary: item.summary || item.title,
-          ai_summary: aiSummary,
+          ...aiSummaryColumns(aiSummary),
           source: league.newsSource,
           source_url: item.link,
           // Once confirmed official, a later, less-certain rumor-flavored
@@ -435,7 +449,7 @@ async function scrapeLeague(supabase, league) {
           source: league.newsSource,
           source_url: item.link,
           summary: item.summary || item.title,
-          ai_summary: aiSummary,
+          ...aiSummaryColumns(aiSummary),
           published_at: item.publishedAt,
           external_id: externalId,
         },

@@ -51,7 +51,11 @@ create table if not exists transfers (
   source text not null,                 -- 'tuttomercatoweb' | 'kicker' | 'skysports' | 'footmercato' | 'marca'
   source_url text not null,
   summary text not null,                -- short in-app summary only, never the full article (copyright)
-  ai_summary text,                      -- Gemini-generated 2-3 sentence summary, in German, shown in the "AI Summary" overlay; null on regex-fallback extraction
+  ai_summary_de text,                   -- Gemini-generated 2-3 sentence summary, one per app language, shown in the "AI Summary" overlay; null on regex-fallback extraction
+  ai_summary_en text,
+  ai_summary_it text,
+  ai_summary_fr text,
+  ai_summary_es text,
   published_at timestamptz not null,
   external_id text not null,            -- stable id/hash from the source, used for de-dup on re-scrape
   created_at timestamptz not null default now(),

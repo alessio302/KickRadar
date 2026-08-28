@@ -215,6 +215,7 @@ export default function App() {
           <TransfersTab
             theme={theme}
             t={t}
+            language={language}
             league={league}
             onSelectLeague={selectLeague}
             favoriteClub={favoriteClub}

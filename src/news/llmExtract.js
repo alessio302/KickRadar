@@ -38,11 +38,27 @@ const RESPONSE_SCHEMA = {
       type: Type.BOOLEAN,
       description: 'True only if the deal is confirmed/done (e.g. "ufficiale", "offiziell", "confirmed", "signs", "s\'engage", "officiel"). False for rumors, negotiations, links, or interest.',
     },
+    // One summary per app language (see web/src/i18n/languages.js), not
+    // one field -- a transfer row is shown to every viewer regardless of
+    // their own app language, so a single-language summary would only
+    // ever serve readers of that one language. Asking for all 5 here costs
+    // no extra API calls (still one request per article), just a larger
+    // JSON response -- cheap on Flash-Lite's free tier compared to the
+    // 15 req/min *request* ceiling this whole pipeline is actually
+    // throttled by (see MIN_CALL_INTERVAL_MS below).
     aiSummary: {
-      type: Type.STRING,
+      type: Type.OBJECT,
       nullable: true,
       description:
-        "A 2-3 sentence summary of the article's actual content, IN GERMAN regardless of the article's own language, covering what's concretely stated (interest, talks, fee, contract length, quotes) -- not just restating the headline. Written in your own words, not copied sentences from the source. Null under the same condition playerName is null (not really a single-player transfer story).",
+        "A 2-3 sentence summary of the article's actual content -- what's concretely stated (interest, talks, fee, contract length, quotes), not just restating the headline -- written independently in EACH of the 5 languages below, not translated from one draft (so idiom/tone reads naturally in each). Null under the same condition playerName is null (not really a single-player transfer story); when null, leave every language field null too.",
+      properties: {
+        de: { type: Type.STRING, nullable: true, description: 'German summary.' },
+        en: { type: Type.STRING, nullable: true, description: 'English summary.' },
+        it: { type: Type.STRING, nullable: true, description: 'Italian summary.' },
+        fr: { type: Type.STRING, nullable: true, description: 'French summary.' },
+        es: { type: Type.STRING, nullable: true, description: 'Spanish summary.' },
+      },
+      required: ['de', 'en', 'it', 'fr', 'es'],
     },
   },
   required: ['playerName', 'fromClub', 'toClub', 'isOfficial', 'aiSummary'],

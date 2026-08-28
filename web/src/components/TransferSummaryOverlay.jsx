@@ -10,7 +10,8 @@ import { relativeTime } from '../lib/relativeTime.js';
 // into one shared component would need as many special cases as it'd save.
 const DISMISS_THRESHOLD_PX = 100;
 
-export default function TransferSummaryOverlay({ theme, t, transfer, onClose }) {
+export default function TransferSummaryOverlay({ theme, t, language, transfer, onClose }) {
+  const summaryText = transfer[`ai_summary_${language}`];
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   let dragStartY = null;
@@ -129,7 +130,7 @@ export default function TransferSummaryOverlay({ theme, t, transfer, onClose }) 
             <Sparkles size={11} /> AI Summary
           </span>
 
-          <p style={{ fontSize: '14.5px', lineHeight: 1.62, margin: 0 }}>{transfer.ai_summary}</p>
+          <p style={{ fontSize: '14.5px', lineHeight: 1.62, margin: 0 }}>{summaryText}</p>
         </div>
 
         <div

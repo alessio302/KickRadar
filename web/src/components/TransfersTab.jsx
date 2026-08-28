@@ -23,6 +23,7 @@ function dampen(rawDelta) {
 export default function TransfersTab({
   theme,
   t,
+  language,
   league,
   onSelectLeague,
   favoriteClub,
@@ -265,7 +266,7 @@ export default function TransfersTab({
                     <User size={13} /> {t.transfers.searchPlayer}
                   </a>
                 )}
-                {transfer.ai_summary && (
+                {transfer[`ai_summary_${language}`] && (
                   <button
                     onClick={() => setSummaryTransfer(transfer)}
                     style={{
@@ -293,7 +294,9 @@ export default function TransfersTab({
       </div>
       </div>
 
-      {summaryTransfer && <TransferSummaryOverlay theme={theme} t={t} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />}
+      {summaryTransfer && (
+        <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />
+      )}
     </div>
   );
 }
