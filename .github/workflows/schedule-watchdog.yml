@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check last scheduled runs and re-trigger any that are stale
+      - name: Check last successful runs and re-trigger any that are stale
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -53,10 +53,17 @@ jobs:
             local workflow="$1"
             local threshold_min="$2"
             local last_run
-            last_run=$(gh api "repos/$REPO/actions/workflows/$workflow/runs?event=schedule&status=success&per_page=1" --jq '.workflow_runs[0].created_at // empty')
+            # No event=schedule filter here -- a successful run is a
+            # successful run, whatever triggered it. Confirmed live: with
+            # the filter, this kept comparing against the last run GitHub's
+            # own (broken) scheduler happened to fire, so it re-dispatched
+            # on every single watchdog tick even seconds after this exact
+            # function had just dispatched a successful run itself --
+            # harmless (syncLineups.js etc. are idempotent) but pointless.
+            last_run=$(gh api "repos/$REPO/actions/workflows/$workflow/runs?status=success&per_page=1" --jq '.workflow_runs[0].created_at // empty')
 
             if [ -z "$last_run" ]; then
-              echo "$workflow: no prior successful scheduled run found -- skipping."
+              echo "$workflow: no prior successful run found -- skipping."
               return
             fi
 
@@ -64,7 +71,7 @@ jobs:
             last_epoch=$(date -u -d "$last_run" +%s)
             now_epoch=$(date -u +%s)
             gap_min=$(( (now_epoch - last_epoch) / 60 ))
-            echo "$workflow: last successful scheduled run $last_run ($gap_min min ago, threshold ${threshold_min}m)"
+            echo "$workflow: last successful run $last_run ($gap_min min ago, threshold ${threshold_min}m)"
 
             if [ "$gap_min" -gt "$threshold_min" ]; then
               echo "$workflow: gap exceeds threshold -- dispatching manually."
