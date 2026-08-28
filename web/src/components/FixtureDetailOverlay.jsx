@@ -19,14 +19,16 @@ function formatKickoff(iso, locale) {
   return new Date(iso).toLocaleString(locale, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-// Confirmed live against a real populated Highlightly response (Kazakhstan
-// Premier League, FK Tobol Kostanay vs Kaisar, 2026-08-25): initialLineup
-// is an array of arrays -- one per formation row (GK, then each tactical
-// line) -- not a flat list, and each player is { name, number, position,
-// id }. substitutes is a flat array of the same player shape. Keys here
-// are the Highlightly API's own English enum values and must stay as-is;
-// t.lineup.positions (see i18n/translations.js) supplies the translated
-// value per language for the same keys.
+// initialLineup is an array of arrays -- one per formation row (GK, then
+// each tactical line, forwards last) -- not a flat list, and each player
+// is { name, number, position, id }. substitutes is a flat array of the
+// same player shape. This grouping is built server-side in
+// syncLineups.js's groupByPositionRows() (GOAL API's own lineup data is a
+// flat list with a broad position category per player, not pre-grouped by
+// tactical line), so this frontend contract stays fixed regardless of
+// which upstream provider is behind it. position uses the English enum
+// keys Goalkeeper/Defender/Midfielder/Forward -- t.lineup.positions (see
+// i18n/translations.js) supplies the translated value per language.
 function playerLabel(p, t) {
   const pos = t.lineup.positions[p.position] || p.position;
   return (

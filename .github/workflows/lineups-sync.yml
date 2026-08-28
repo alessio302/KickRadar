@@ -3,8 +3,8 @@ name: Lineups sync
 on:
   schedule:
     # Every 15 min: lineups become available close to kickoff (confirmed
-    # live around actual kickoff time, not strictly the "30 min before"
-    # Highlightly's docs describe) -- hourly like the news scraper used to
+    # live around actual kickoff time, not strictly the "30 min before" a
+    # provider's own docs describe) -- hourly like the news scraper used to
     # run would easily miss the ~45-minute window entirely depending on
     # kickoff time. Running this often (96 runs/day, ~2,880/month even if
     # every run were instant, since GitHub Actions bills whole minutes per
@@ -42,6 +42,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          HIGHLIGHTLY_API_KEY: ${{ secrets.HIGHLIGHTLY_API_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

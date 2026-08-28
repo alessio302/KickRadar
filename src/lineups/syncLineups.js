@@ -1,31 +1,17 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getMatches, getLineups, getEvents } from './highlightlyClient.js';
+import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
-// Highlightly's own league.name for each of our leagues -- confirmed live
-// via diagnoseHighlightly.js for the original 4 (Serie A id 115669,
-// Bundesliga 67162, Premier League 33973, Ligue 1 52695) and via
-// diagnoseHighlightlySpain.js for La Liga (id 119924). Filtering by this
-// (not just countryName) matters: each country also returns lower
-// divisions, women's/youth competitions and cups sharing the same country
-// (confirmed for Spain too: Segunda División, Primera División Femenina).
-const HIGHLIGHTLY_LEAGUE_NAME = {
-  'serie-a': 'Serie A',
-  bundesliga: 'Bundesliga',
-  'premier-league': 'Premier League',
-  'ligue-1': 'Ligue 1',
-  'la-liga': 'La Liga',
-};
-
-// Confirmed live (Kazakhstan Premier League, 2026-08-25): a real lineup
-// becomes available right around kickoff, not necessarily the full
-// "30 min before" Highlightly's docs describe -- and a fixture is worth
-// re-checking a bit past kickoff too, since the two sides don't always
-// submit at exactly the same time. Wide enough to catch that without
-// polling fixtures that are nowhere close yet.
+// Confirmed live (Kazakhstan Premier League, 2026-08-25, still true after
+// switching providers from Highlightly to GOAL API): a real lineup becomes
+// available right around kickoff, not necessarily the full "30 min before"
+// a provider's own docs describe -- and a fixture is worth re-checking a
+// bit past kickoff too, since the two sides don't always submit at exactly
+// the same time. Wide enough to catch that without polling fixtures that
+// are nowhere close yet.
 const LOOKAHEAD_MIN = 45;
 const LOOKBACK_MIN = 20;
 
@@ -34,11 +20,10 @@ const LOOKBACK_MIN = 20;
 // that's still missing a lineup or hasn't had its events fetched yet.
 // Confirmed live: the near-kickoff window above is a one-shot pass -- a
 // fixture whose lineup didn't confirm in that ~65-minute window (a delayed
-// run, a late-submitting club) was never looked at again, and 46 of the
-// last 47 finished fixtures had no lineup at all. Match resolution
-// (getMatches, grouped by country+date) is shared between the lineup and
-// events work below, so this doesn't double the request cost of covering
-// both.
+// run, a late-submitting club) was never looked at again. Match resolution
+// (getLeagueFixtures, grouped by league+date) is shared between the
+// lineup and events work below, so this doesn't double the request cost
+// of covering both.
 const PAST_WINDOW_DAYS = 15;
 
 function toDateString(date) {
@@ -53,12 +38,114 @@ function confirmedKey(fixtureId, clubId) {
   return `${fixtureId}:${clubId}`;
 }
 
-// Same dedup-key shape the earlier (since-reverted) live-event notifier
-// used -- kept here since it's a reasonable, already-proven way to
-// identify "the same event" without relying on Highlightly handing out a
-// stable per-event id.
-function eventKey(event) {
-  return `${event.type}|${event.team?.id ?? ''}|${event.player ?? ''}|${event.time ?? ''}`;
+// GOAL API's own singular/plural mismatch with this app's existing
+// position keys (web/src/i18n/translations.js's t.lineup.positions,
+// inherited from Highlightly's enum) -- confirmed live GOAL API returns
+// "Goalkeepers"/"Defenders"/"Midfielders"/"Forwards" (plural) per player,
+// not the singular keys the frontend already translates. Normalized here
+// so the frontend contract doesn't need to change for a provider swap.
+const POSITION_SINGULAR = {
+  Goalkeepers: 'Goalkeeper',
+  Defenders: 'Defender',
+  Midfielders: 'Midfielder',
+  Forwards: 'Forward',
+};
+const ROW_ORDER = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
+
+function normalizePlayer(entry) {
+  return {
+    id: entry.playerId,
+    name: entry.lineupPlayer,
+    number: entry.lineupNumber ? Number(entry.lineupNumber) : null,
+    position: POSITION_SINGULAR[entry.playerPosition] || entry.playerPosition || null,
+  };
+}
+
+// GOAL API's lineup entries are a flat list (confirmed live), not
+// pre-grouped by formation line the way Highlightly's initialLineup was.
+// Bucketing into the 4 broad position categories (GK/DF/MF/FW), rather
+// than also splitting by the formation string's own sub-lines (e.g.
+// "4-2-3-1"'s 2 defensive mid + 3 attacking mid), is a deliberate
+// simplification: correct player membership, just one row per category
+// instead of matching the exact tactical shape -- PitchFormation
+// (FixtureDetailOverlay.jsx) renders whatever rows it's given either way.
+function groupByPositionRows(entries) {
+  const players = (entries ?? []).map(normalizePlayer);
+  return ROW_ORDER.map((pos) => players.filter((p) => p.position === pos)).filter((row) => row.length > 0);
+}
+
+function buildLineupTeam(section) {
+  if (!section) return null;
+  return {
+    formation: null, // set by the caller from homeFormation/awayFormation, shared per fixture not per section
+    initialLineup: groupByPositionRows(section.startingLineups),
+    substitutes: (section.substitutes ?? []).map(normalizePlayer),
+  };
+}
+
+// Normalizes GOAL API's 3 separate endpoints (events=goals only, cards,
+// substitutions -- confirmed live there's no single call that returns all
+// three) into this app's existing match_events row shape, unchanged since
+// the Highlightly era so the frontend (FixtureDetailOverlay.jsx) needs no
+// changes for the provider swap. event_key uses GOAL API's own row id
+// (stable, confirmed live) rather than reconstructing a synthetic key from
+// field values.
+function buildEventRows(fixtureId, homeClubId, awayClubId, { goals, cards, substitutions }) {
+  const rows = [];
+
+  for (const g of goals) {
+    if (g.type !== 'GOAL') continue;
+    const isHomeField = g.homeScorer != null;
+    const rawName = isHomeField ? g.homeScorer : g.awayScorer;
+    const assist = isHomeField ? g.homeAssist : g.awayAssist;
+    if (!rawName) continue;
+    const isOwnGoal = /\(o\.g\.\)/i.test(rawName);
+    rows.push({
+      fixture_id: fixtureId,
+      club_id: isHomeField ? homeClubId : awayClubId,
+      type: isOwnGoal ? 'Own Goal' : 'Goal',
+      minute: String(g.time ?? ''),
+      player: rawName,
+      assist: assist || null,
+      substituted: null,
+      event_key: `goal:${g.id}`,
+    });
+  }
+
+  for (const c of cards) {
+    const isHomeField = c.homeFault != null;
+    const player = isHomeField ? c.homeFault : c.awayFault;
+    if (!player) continue;
+    rows.push({
+      fixture_id: fixtureId,
+      club_id: isHomeField ? homeClubId : awayClubId,
+      type: /red/i.test(c.card || '') ? 'Red Card' : 'Yellow Card',
+      minute: String(c.time ?? ''),
+      player,
+      assist: null,
+      substituted: null,
+      event_key: `card:${c.id}`,
+    });
+  }
+
+  for (const s of substitutions) {
+    // "OUT | IN" per GOAL API's own docs -- confirmed live
+    // (substitution: "N. Brown | I. Saibari").
+    const [outName, inName] = (s.substitution || '').split('|').map((p) => p.trim());
+    if (!inName) continue;
+    rows.push({
+      fixture_id: fixtureId,
+      club_id: s.team === 'home' ? homeClubId : awayClubId,
+      type: 'Substitution',
+      minute: String(s.time ?? ''),
+      player: inName,
+      assist: null,
+      substituted: outName || null,
+      event_key: `sub:${s.id}`,
+    });
+  }
+
+  return rows;
 }
 
 export async function syncLineups() {
@@ -123,39 +210,40 @@ export async function syncLineups() {
   let eventsFetched = 0;
   const newlyConfirmedFixtures = [];
 
-  // Group by (country, date) to reuse one Highlightly /matches call across
-  // every fixture that shares it, instead of one call per fixture -- stays
-  // comfortably inside the free plan's 100 req/day even on a busy matchday.
-  // Shared between the lineup and events work below.
+  // Group by (league, date) -- one GOAL API fixtures call covers every
+  // pending fixture in that league on that date, instead of one call per
+  // fixture. Simpler than the old Highlightly grouping (by country+date,
+  // since Highlightly's /matches was country-scoped): GOAL API's fixtures
+  // endpoint is already scoped to one league, and our own league_id maps
+  // 1:1 to it via LEAGUES' goalApiLeagueId.
   const groups = new Map();
   for (const f of pending) {
     const leagueSlug = leagueSlugById.get(f.league_id);
     const league = LEAGUES.find((l) => l.slug === leagueSlug);
     if (!league) continue;
     const dateStr = toDateString(new Date(f.kickoff_at));
-    const key = `${league.country}|${dateStr}`;
-    if (!groups.has(key)) groups.set(key, { country: league.country, dateStr, leagueSlug, fixtures: [] });
+    const key = `${league.slug}|${dateStr}`;
+    if (!groups.has(key)) groups.set(key, { league, dateStr, fixtures: [] });
     groups.get(key).fixtures.push(f);
   }
 
-  for (const { country, dateStr, leagueSlug, fixtures: groupFixtures } of groups.values()) {
-    let hlMatches;
+  for (const { league, dateStr, fixtures: groupFixtures } of groups.values()) {
+    let apiFixtures;
     try {
-      const data = await getMatches({ date: dateStr, countryName: country });
-      const all = Array.isArray(data) ? data : data.data || data.matches || [];
-      hlMatches = all.filter((m) => m.league?.name === HIGHLIGHTLY_LEAGUE_NAME[leagueSlug]);
+      apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
     } catch (err) {
-      console.error(`Highlightly /matches failed for ${country} ${dateStr}:`, err.message);
+      console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
       continue;
     }
+
+    const leagueClubs = allClubs.filter((c) => c.league_id === groupFixtures[0]?.league_id);
 
     for (const f of groupFixtures) {
       const homeClub = clubById.get(f.home_club_id);
       const awayClub = clubById.get(f.away_club_id);
       if (!homeClub || !awayClub) continue;
 
-      const leagueClubs = allClubs.filter((c) => c.league_id === f.league_id);
-      const match = hlMatches.find((m) => {
+      const match = apiFixtures.find((m) => {
         const homeMatch = resolveClub(m.homeTeam?.name, leagueClubs)?.id === homeClub.id;
         const awayMatch = resolveClub(m.awayTeam?.name, leagueClubs)?.id === awayClub.id;
         return homeMatch && awayMatch;
@@ -167,13 +255,18 @@ export async function syncLineups() {
       if (lineupNeeded(f)) {
         let lineups;
         try {
-          lineups = await getLineups(match.id);
+          lineups = await getFixtureLineups(match.id);
         } catch (err) {
-          console.error(`Highlightly /lineups failed for match ${match.id}:`, err.message);
+          console.error(`GOAL API lineups failed for match ${match.id}:`, err.message);
           lineups = null;
         }
 
-        if (lineups) {
+        if (lineups?.hasLineups) {
+          const homeTeam = buildLineupTeam(lineups.home);
+          const awayTeam = buildLineupTeam(lineups.away);
+          if (homeTeam) homeTeam.formation = lineups.homeFormation || null;
+          if (awayTeam) awayTeam.formation = lineups.awayFormation || null;
+
           // Pushes once per fixture per run when it goes from "not
           // confirmed" to "at least one side confirmed" -- known, accepted
           // gap: if the two sides' sheets land in different runs a few
@@ -185,8 +278,8 @@ export async function syncLineups() {
           // target would otherwise fire a push about a days-old lineup.
           let fixtureNewlyConfirmed = false;
           for (const { club, team } of [
-            { club: homeClub, team: lineups.homeTeam },
-            { club: awayClub, team: lineups.awayTeam },
+            { club: homeClub, team: homeTeam },
+            { club: awayClub, team: awayTeam },
           ]) {
             if (!teamIsPopulated(team)) continue;
             const wasConfirmed = alreadyConfirmed.has(confirmedKey(f.id, club.id));
@@ -195,7 +288,7 @@ export async function syncLineups() {
                 fixture_id: f.id,
                 club_id: club.id,
                 confirmed: true,
-                formation: team.formation && team.formation !== 'Unknown' ? team.formation : null,
+                formation: team.formation,
                 players: { initialLineup: team.initialLineup, substitutes: team.substitutes },
                 published_at: new Date().toISOString(),
               },
@@ -209,34 +302,26 @@ export async function syncLineups() {
             if (!wasConfirmed) fixtureNewlyConfirmed = true;
           }
           if (fixtureNewlyConfirmed && nearKickoffIds.has(f.id)) {
-            newlyConfirmedFixtures.push({ fixtureId: f.id, homeClub, awayClub, leagueSlug });
+            newlyConfirmedFixtures.push({ fixtureId: f.id, homeClub, awayClub, leagueSlug: league.slug });
           }
         }
       }
 
       if (eventsNeeded(f)) {
-        let events;
+        let goals, cards, substitutions;
         try {
-          events = await getEvents(match.id);
+          [goals, cards, substitutions] = await Promise.all([
+            getFixtureEvents(match.id),
+            getFixtureCards(match.id),
+            getFixtureSubstitutions(match.id),
+          ]);
         } catch (err) {
-          console.error(`Highlightly /events failed for match ${match.id}:`, err.message);
-          events = null;
+          console.error(`GOAL API events/cards/substitutions failed for match ${match.id}:`, err.message);
+          goals = null;
         }
 
-        if (events) {
-          const rows = (Array.isArray(events) ? events : events.data || []).map((event) => {
-            const club = resolveClub(event.team?.name, leagueClubs);
-            return {
-              fixture_id: f.id,
-              club_id: club?.id ?? null,
-              type: event.type,
-              minute: String(event.time ?? ''),
-              player: event.player ?? null,
-              assist: event.assist ?? null,
-              substituted: event.substituted ?? null,
-              event_key: eventKey(event),
-            };
-          });
+        if (goals) {
+          const rows = buildEventRows(f.id, homeClub.id, awayClub.id, { goals, cards, substitutions });
           if (rows.length > 0) {
             const { error: eventsErr } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
             if (eventsErr) console.error(`Failed to store events for fixture ${f.id}:`, eventsErr.message);

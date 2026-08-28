@@ -42,7 +42,7 @@ jobs) at the repo root; the frontend lives in `web/` (see `web/README.md`).
    npm run scrape:news
    ```
 7. **GitHub Actions**: add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `FOOTBALL_DATA_API_KEY`, `GEMINI_API_KEY`, `HIGHLIGHTLY_API_KEY`, and
+   `FOOTBALL_DATA_API_KEY`, `GEMINI_API_KEY`, `GOAL_API_KEY`, and
    the VAPID push keys as repository secrets (Settings → Secrets and
    variables → Actions). The workflows in `.github/workflows/` then run
    on their own schedule:

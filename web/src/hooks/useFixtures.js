@@ -110,7 +110,7 @@ export function useFixtures(leagueSlug) {
 
   // Re-queries Supabase directly for pull-to-refresh -- same rationale as
   // useTransfers.js's own refetch(): this never touches football-data.org
-  // or Highlightly, just re-reads whatever the last sync already stored.
+  // or GOAL API, just re-reads whatever the last sync already stored.
   const refetch = useCallback(async () => {
     if (leagueId == null) return;
     setRefreshing(true);

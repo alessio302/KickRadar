@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 
-// Nothing writes to the `lineups` table yet (the Highlightly sync is still
-// being verified, see backend README) -- this always resolves to an empty
-// map for now, which the overlay reads as "not yet available". No
-// frontend change will be needed once the sync exists; rows just start
-// showing up.
+// Rows are written by src/lineups/syncLineups.js once a fixture's lineup
+// is confirmed (or stays absent until then, which the overlay reads as
+// "not yet available").
 export function useLineups(fixtureId) {
   const [byClubId, setByClubId] = useState(new Map());
   const [loading, setLoading] = useState(true);
