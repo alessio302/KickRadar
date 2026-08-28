@@ -2,29 +2,29 @@ name: News scraper
 
 on:
   schedule:
-    # Every 15 min, not hourly -- only safe to run this often because the
-    # repo is public (unlimited GitHub Actions minutes; a private repo's
-    # free 2,000 min/month was already at risk of being exceeded by
-    # lineups-sync's own 15-min cadence alone, see its own comment).
-    # Gemini calls scale with how many genuinely new items exist, not with
-    # how often this runs -- seen_news_items already dedupes those, so a
-    # shorter interval mostly means fewer new items per run, not more
-    # total calls per day.
+    # Every 30 min, not 15 -- per user's own call: at 15 min, a lot of runs
+    # simply find nothing new. Gemini calls scale with how many genuinely
+    # new items exist, not with how often this runs, so the shorter
+    # interval wasn't costing extra API calls, just extra empty runs.
     #
-    # Offset to :04/:19/:34/:49, not the round :00/:15/:30/:45 marks --
-    # confirmed live: this workflow, live-scores.yml and lineups-sync.yml
-    # all sharing the literal "*/15 * * * *" pattern meant three scheduled
-    # runs queuing at the exact same instant, every 15 minutes, all day.
-    # GitHub Actions' scheduler is documented best-effort and deprioritizes
-    # exactly this kind of same-tick contention -- confirmed via actual run
-    # history: average gap ended up ~70 min instead of 15, with individual
-    # gaps up to 5+ hours. For an HTML-scraped source with a bounded
-    # "latest N" list (marca.js, footmercato.js), that's not just "later" --
-    # a long enough gap during a busy news day can let a genuinely new item
-    # scroll off the list before any run ever sees it, i.e. permanently
-    # missed, not just delayed. Staggering the three workflows' minutes
-    # apart is the standard mitigation for this.
-    - cron: '4,19,34,49 * * * *'
+    # Offset to :04/:34, not the round :00/:30 marks -- confirmed live:
+    # this workflow, live-scores.yml and lineups-sync.yml all sharing the
+    # literal "*/15 * * * *" pattern meant three scheduled runs queuing at
+    # the exact same instant, every 15 minutes, all day. GitHub Actions'
+    # scheduler is documented best-effort and deprioritizes exactly this
+    # kind of same-tick contention -- confirmed via actual run history:
+    # average gap ended up ~70 min instead of 15, with individual gaps up
+    # to 5+ hours. Staggering the workflows' minutes apart is the standard
+    # mitigation for this, and still applies at 30 min: :04/:34 doesn't
+    # collide with live-scores' :09/:24/:39/:54 or lineups-sync's
+    # :14/:29/:44/:59. For an HTML-scraped source with a bounded "latest N"
+    # list (marca.js, footmercato.js), a long enough gap during a busy news
+    # day can still let a genuinely new item scroll off the list before any
+    # run ever sees it -- worth knowing this raises that risk somewhat
+    # versus 15 min, though real-world gaps were already averaging ~70 min
+    # even at the old nominal 15-min setting, so 30 min mostly matches
+    # observed reality rather than meaningfully widening it.
+    - cron: '4,34 * * * *'
   workflow_dispatch: {}
 
 jobs:
