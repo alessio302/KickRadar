@@ -1,0 +1,20 @@
+name: Diagnose Highlightly referee field (one-off)
+
+# See src/lineups/diagnoseHighlightlyReferee.js. Read-only, no DB writes.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/diagnoseHighlightlyReferee.js
+        env:
+          HIGHLIGHTLY_API_KEY: ${{ secrets.HIGHLIGHTLY_API_KEY }}
