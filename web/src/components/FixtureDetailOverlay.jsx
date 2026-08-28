@@ -290,15 +290,25 @@ function MatchInfoFooter({ theme, t, fixture, homeClub }) {
 
 // Football-specific emoji rather than a generic lucide shape -- matches
 // the FlashScore-style reference this feature was designed against, and
-// reads instantly as "goal"/"card"/"sub" without needing a legend.
+// reads instantly as "goal"/"card"/"sub" without needing a legend. Cards
+// are drawn separately below (CardIcon) instead of via emoji -- lucide has
+// no football-card icon, and 🟨/🟥 render as plain squares, not a card's
+// actual narrow-rectangle shape.
 const EVENT_ICON = {
   Goal: '⚽',
   'Own Goal': '⚽',
   Penalty: '⚽',
-  'Yellow Card': '🟨',
-  'Red Card': '🟥',
   Substitution: '🔄',
 };
+
+const CARD_COLOR = {
+  'Yellow Card': '#facc15',
+  'Red Card': '#ef4444',
+};
+
+function CardIcon({ color }) {
+  return <span style={{ display: 'inline-block', width: '10px', height: '14px', borderRadius: '2px', background: color, flexShrink: 0 }} />;
+}
 
 const EVENT_LABEL_KEY = {
   Goal: 'goal',
@@ -372,17 +382,18 @@ function MatchEventContent({ theme, t, event, align }) {
 
   const labelKey = EVENT_LABEL_KEY[event.type];
   // Only used as a fallback when an event has no player name (rare) --
-  // the icon itself (⚽/🟨/🟥) already says what happened, so it's no
+  // the icon itself (⚽/card/🔄) already says what happened, so it's no
   // longer also spelled out as a second line under the name.
   const label = labelKey ? t.matchInfo[labelKey] : event.type;
-  const icon = EVENT_ICON[event.type] || '•';
+  const cardColor = CARD_COLOR[event.type];
+  const iconEl = cardColor ? <CardIcon color={cardColor} /> : <span style={{ fontSize: '15px', lineHeight: 1 }}>{EVENT_ICON[event.type] || '•'}</span>;
 
   return (
     <div style={{ textAlign: align }}>
       <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start' }}>
-        {align !== 'right' && <span style={{ fontSize: '15px', lineHeight: 1 }}>{icon}</span>}
+        {align !== 'right' && iconEl}
         <span>{event.player || label}</span>
-        {align === 'right' && <span style={{ fontSize: '15px', lineHeight: 1 }}>{icon}</span>}
+        {align === 'right' && iconEl}
       </p>
       {event.assist && <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>}
     </div>
