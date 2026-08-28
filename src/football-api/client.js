@@ -43,18 +43,6 @@ export async function getMatches({ competitionId, dateFrom, dateTo }) {
   return data.matches;
 }
 
-// The global (non-competition-scoped) /matches endpoint, not the
-// per-competition one above -- accepts a comma-separated `competitions`
-// list, so every tracked league's matches for one date come back in a
-// SINGLE request instead of one per league. Confirmed live via
-// diagnoseLiveMatches.js. Built for live-score polling (syncLiveScores.js),
-// where request count matters most: the free tier's 10 req/min cap would
-// otherwise limit how often a multi-league poll loop can run.
-export async function getMatchesForDate({ competitionIds, date }) {
-  const data = await call('/matches', { competitions: competitionIds.join(','), dateFrom: date, dateTo: date });
-  return data.matches;
-}
-
 // TOTAL-only on the free tier -- confirmed live (diagnoseStandings.js, this
 // session): the response's `standings` array has just one group
 // (type: 'TOTAL', stage: 'REGULAR_SEASON'), no separate HOME/AWAY split,

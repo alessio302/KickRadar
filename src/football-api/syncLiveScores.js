@@ -1,13 +1,22 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getMatchesForDate, sleep, STATUS_MAP } from './client.js';
+import { getMatches, sleep, STATUS_MAP } from './client.js';
 
-const COMPETITION_IDS = LEAGUES.map((l) => l.externalCompetitionId);
-
-// Free tier: 10 req/min. One poll = one request (see getMatchesForDate),
-// so 75s between polls is nowhere near the ceiling even run back-to-back;
-// the real reason it isn't faster is that live-score providers generally
-// don't refresh more often than this anyway, paid or not.
+// Confirmed live (Bayern-Stuttgart, 2026-08-28): the global, multi-
+// competition /matches endpoint (getMatchesForDate) silently returned 0
+// matches all through a live Bundesliga matchday, while the per-competition
+// /competitions/{id}/matches endpoint (same as syncFixtures.js already
+// uses) correctly showed status=IN_PLAY with the real score at the same
+// moment -- confirmed side by side in one diagnostic run. This had likely
+// made every live-score update silently a no-op since the feature was
+// built, not just for this one match: pollOnce() only ever saw whatever
+// the global endpoint returned, and that was always empty. Switched to one
+// per-competition call per league (5 calls/poll, 1500ms apart like
+// syncFixtures.js's own loop) -- more requests per poll, but still
+// comfortably inside the free tier's 10 req/min cap.
+//
+// Free tier: 10 req/min. One poll = 5 requests (see pollOnce), spaced
+// 1500ms apart -- 75s between polls leaves huge margin even so.
 const POLL_INTERVAL_MS = 75_000;
 
 // Bounded below the workflow's own 15-min job timeout so the process exits
@@ -58,12 +67,18 @@ async function hasFixtureStartingSoon(supabase) {
 // Deliberately not scoped to status=LIVE -- a match that just finished
 // would silently drop out of that filter on the very next poll, leaving
 // its final score/status un-written until the next 4x-daily fixtures-sync
-// run (hours later) instead of within this same ~75s cycle. Fetching
-// today's full match list once and updating every live-or-finished row in
-// it catches that transition for free, no extra request or cross-poll
-// state needed.
+// run (hours later) instead of within this same ~75s cycle. Fetching each
+// league's full match list once and updating every live-or-finished row in
+// it catches that transition for free, no cross-poll state needed.
 async function pollOnce(supabase) {
-  const matches = await getMatchesForDate({ competitionIds: COMPETITION_IDS, date: toDateString(new Date()) });
+  const date = toDateString(new Date());
+  const matches = [];
+  for (const league of LEAGUES) {
+    const leagueMatches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: date, dateTo: date });
+    matches.push(...leagueMatches);
+    await sleep(1500); // stay well under the free tier's 10 req/min, same spacing as syncFixtures.js
+  }
+
   let updated = 0;
   let stillLive = false;
 
