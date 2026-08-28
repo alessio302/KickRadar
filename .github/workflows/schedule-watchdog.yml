@@ -82,7 +82,20 @@ jobs:
           }
 
           # Threshold = own cadence + slack for a run landing a bit late.
+          #
+          # live-scores.yml is the exception: it self-loops for up to 13
+          # minutes straight while a match is live (see JOB_BUDGET_MS in
+          # syncLiveScores.js), and "last successful run" here means that
+          # run's *start* time, not when it finished. Confirmed live
+          # (Bayern-Stuttgart, 2026-08-28): with a 25-min threshold, a run
+          # that started at :00 and finished at :13 wasn't seen as stale
+          # again until :25+ -- a real ~16-minute gap with nobody polling,
+          # right as the match hit its 5th goal and full time. A much
+          # tighter threshold (just over the run's own ~13-min duration)
+          # costs nothing on quiet days -- live-scores.yml exits in ~1-2s
+          # when nothing is live -- so there's no reason not to check it
+          # aggressively.
           check_and_trigger news-scraper.yml 50     # cadence 30 min
           check_and_trigger lineups-sync.yml 25     # cadence 15 min
-          check_and_trigger live-scores.yml 25      # cadence 15 min
+          check_and_trigger live-scores.yml 14      # self-loops ~13 min while live; see comment above
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
