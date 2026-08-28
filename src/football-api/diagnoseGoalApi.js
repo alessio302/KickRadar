@@ -23,8 +23,15 @@ async function call(path) {
 
 async function main() {
   console.log('--- Leagues ---');
-  const leaguesResp = await call('/leagues?limit=200');
-  const leagues = leaguesResp?.data ?? [];
+  let leagues = [];
+  let offset = 0;
+  for (let page = 0; page < 10; page++) {
+    const resp = await call(`/leagues?limit=100&offset=${offset}`);
+    if (!resp) break;
+    leagues = leagues.concat(resp.data ?? []);
+    if (!resp.pagination?.hasMore) break;
+    offset += 100;
+  }
   console.log(`Total leagues returned: ${leagues.length}`);
   const wanted = ['bundesliga', 'serie a', 'premier league', 'ligue 1', 'la liga', 'laliga'];
   const matches = leagues.filter((l) => wanted.some((w) => (l.name || '').toLowerCase().includes(w)));
