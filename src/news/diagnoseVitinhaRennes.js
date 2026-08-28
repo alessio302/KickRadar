@@ -14,7 +14,7 @@ async function main() {
   const supabase = getSupabaseClient();
   const { data: rows, error } = await supabase
     .from('transfers')
-    .select('id, player_name, from_club, to_club, from_club_id, to_club_id, source, source_url, published_at, created_at, updated_at')
+    .select('id, player_name, from_club, to_club, from_club_id, to_club_id, source, source_url, published_at, created_at')
     .ilike('player_name', '%vitinha%');
   if (error) throw error;
 
