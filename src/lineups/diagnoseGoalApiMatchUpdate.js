@@ -15,16 +15,15 @@ async function call(path) {
 }
 
 async function main() {
-  console.log('--- Finding a live match worldwide ---');
+  console.log('--- Finding live matches worldwide ---');
   const liveResp = await call('/fixtures/live');
-  const live = liveResp.data ?? [];
-  console.log(`${live.length} live fixtures found.`);
+  const live = (liveResp.data ?? []).slice(0, 25); // FREE plan's own max subscriptions
+  console.log(`${live.length} live fixtures found (subscribing to all of them to raise the odds of catching a real event).`);
   if (live.length === 0) {
     console.log('No live match anywhere right now -- nothing to listen to.');
     return;
   }
-  const match = live[0];
-  console.log(`Listening to: ${match.homeTeam?.name} vs ${match.awayTeam?.name} (id=${match.id}, status=${match.status})`);
+  for (const m of live) console.log(`  ${m.id}: ${m.homeTeam?.name} vs ${m.awayTeam?.name}`);
 
   const apiKey = process.env.GOAL_API_KEY;
   const tokenRes = await fetch(`${BASE_URL}/ws/token`, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` } });
@@ -46,8 +45,9 @@ async function main() {
     const timeout = setTimeout(() => {
       console.log('Listening window elapsed -- closing.');
       finish();
-    }, 25000);
+    }, 120000);
 
+    let matchUpdateCount = 0;
     ws.addEventListener('open', () => {
       ws.send(JSON.stringify({ type: 'auth', token: tokenData.token }));
     });
@@ -60,8 +60,10 @@ async function main() {
         return;
       }
       if (msg.type === 'auth_success') {
-        console.log('Authenticated, subscribing to match', match.id);
-        ws.send(JSON.stringify({ type: 'subscribe', resource: 'match', matchId: String(match.id) }));
+        console.log(`Authenticated, subscribing to ${live.length} matches...`);
+        for (const m of live) {
+          ws.send(JSON.stringify({ type: 'subscribe', resource: 'match', matchId: String(m.id) }));
+        }
         return;
       }
       if (msg.type === 'subscribe_response') {
@@ -69,8 +71,14 @@ async function main() {
         return;
       }
       if (msg.type === 'match_update') {
-        console.log('=== match_update ===');
+        matchUpdateCount += 1;
+        console.log(`=== match_update #${matchUpdateCount} ===`);
         console.log(JSON.stringify(msg.data, null, 2));
+        if (matchUpdateCount >= 3) {
+          console.log('Got 3 samples -- that is enough to see the shape, closing early.');
+          clearTimeout(timeout);
+          finish();
+        }
         return;
       }
       console.log('Other message:', JSON.stringify(msg));
