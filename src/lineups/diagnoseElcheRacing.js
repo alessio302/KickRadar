@@ -17,6 +17,7 @@ async function main() {
   if (clubsErr) throw clubsErr;
   console.log('Matching clubs:', JSON.stringify(clubs, null, 2));
 
+  const clubById = new Map(clubs.map((c) => [c.id, c.name]));
   const clubIds = clubs.map((c) => c.id);
   const { data: fixtures, error: fixturesErr } = await supabase
     .from('fixtures')
@@ -24,20 +25,23 @@ async function main() {
     .or(`home_club_id.in.(${clubIds.join(',')}),away_club_id.in.(${clubIds.join(',')})`)
     .order('kickoff_at', { ascending: true });
   if (fixturesErr) throw fixturesErr;
-  console.log('Matching fixtures:', JSON.stringify(fixtures, null, 2));
 
   const now = new Date();
   for (const f of fixtures) {
     const kickoff = new Date(f.kickoff_at);
     const minsUntilKickoff = (kickoff - now) / 60000;
-    console.log(`Fixture ${f.id}: kickoff in ${minsUntilKickoff.toFixed(1)} min (LOOKAHEAD window is +45/-20)`);
+    const home = clubById.get(f.home_club_id) ?? f.home_club_id;
+    const away = clubById.get(f.away_club_id) ?? f.away_club_id;
+    console.log(
+      `Fixture ${f.id}: ${home} vs ${away}, status=${f.status}, kickoff in ${minsUntilKickoff.toFixed(1)} min (LOOKAHEAD window is +45/-20)`
+    );
 
     const { data: lineups, error: lineupsErr } = await supabase
       .from('lineups')
-      .select('*')
+      .select('id, club_id, confirmed, formation, published_at, created_at')
       .eq('fixture_id', f.id);
     if (lineupsErr) throw lineupsErr;
-    console.log(`  lineups rows: ${JSON.stringify(lineups, null, 2)}`);
+    console.log(`  lineups rows: ${JSON.stringify(lineups)}`);
   }
 }
 
