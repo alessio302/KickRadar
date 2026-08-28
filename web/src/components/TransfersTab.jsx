@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRightCircle, RefreshCw, User, ExternalLink } from 'lucide-react';
+import { ArrowRightCircle, RefreshCw, User, Sparkles } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import QuickFilters from './QuickFilters.jsx';
+import TransferSummaryOverlay from './TransferSummaryOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
+import { relativeTime } from '../lib/relativeTime.js';
 
 // Distance the indicator has to be pulled past before releasing triggers a
 // refresh, and the cap on how far it visually travels while dragging.
@@ -16,17 +18,6 @@ const PULL_MAX = 90;
 // enough, can barely pull it."
 function dampen(rawDelta) {
   return Math.min(PULL_MAX, Math.sqrt(rawDelta) * 6);
-}
-
-function relativeTime(iso, t) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return t.transfers.justNow;
-  if (mins < 60) return t.transfers.minutesAgo(mins);
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return t.transfers.hoursAgo(hours);
-  const days = Math.round(hours / 24);
-  return t.transfers.daysAgo(days);
 }
 
 export default function TransfersTab({
@@ -45,6 +36,7 @@ export default function TransfersTab({
 }) {
   const { clubs } = useClubs(league);
   const { transfers, loading, refreshing, refetch } = useTransfers(league, { officialOnly });
+  const [summaryTransfer, setSummaryTransfer] = useState(null);
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
@@ -273,21 +265,35 @@ export default function TransfersTab({
                     <User size={13} /> {t.transfers.searchPlayer}
                   </a>
                 )}
-                <a
-                  href={transfer.source_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={t.transfers.articleTitle}
-                  style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
-                >
-                  <ExternalLink size={13} /> {t.transfers.article}
-                </a>
+                {transfer.ai_summary && (
+                  <button
+                    onClick={() => setSummaryTransfer(transfer)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: theme.accent,
+                      background: `${theme.accent}24`,
+                      border: 'none',
+                      borderRadius: '999px',
+                      padding: '4px 9px 4px 7px',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <Sparkles size={12} /> AI Summary
+                  </button>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
       </div>
+
+      {summaryTransfer && <TransferSummaryOverlay theme={theme} t={t} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />}
     </div>
   );
 }

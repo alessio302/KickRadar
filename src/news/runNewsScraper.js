@@ -108,7 +108,10 @@ async function extractInfo(item, clubs, sourceKey) {
     console.warn(`[${sourceKey}] LLM extraction failed, falling back to regex heuristic:`, err.message);
     const isOfficial = classifyOfficial(sourceKey, `${item.title} ${item.summary || ''}`);
     const { playerName, fromClub, toClub } = extractTransferInfo(item.title, clubs, sourceKey);
-    return { playerName, fromClub, toClub, isOfficial, source: 'regex' };
+    // The regex heuristic has no way to produce real prose -- aiSummary
+    // stays null rather than faking one from the headline alone, same
+    // "don't guess" policy as everywhere else in this fallback path.
+    return { playerName, fromClub, toClub, isOfficial, aiSummary: null, source: 'regex' };
   }
 }
 
@@ -187,7 +190,7 @@ async function scrapeLeague(supabase, league) {
     const articleText = await fetchArticleText(item.link);
     const extractionItem = articleText ? { ...item, summary: articleText } : item;
 
-    const { playerName, fromClub, toClub, isOfficial } = await extractInfo(extractionItem, allClubs, league.newsSource);
+    const { playerName, fromClub, toClub, isOfficial, aiSummary } = await extractInfo(extractionItem, allClubs, league.newsSource);
 
     // Mark as seen right after paying the LLM cost, regardless of what
     // happens below -- an item rejected for an unrelated league (or a
@@ -401,6 +404,7 @@ async function scrapeLeague(supabase, league) {
         .update({
           published_at: newerPublishedAt,
           summary: item.summary || item.title,
+          ai_summary: aiSummary,
           source: league.newsSource,
           source_url: item.link,
           // Once confirmed official, a later, less-certain rumor-flavored
@@ -431,6 +435,7 @@ async function scrapeLeague(supabase, league) {
           source: league.newsSource,
           source_url: item.link,
           summary: item.summary || item.title,
+          ai_summary: aiSummary,
           published_at: item.publishedAt,
           external_id: externalId,
         },

@@ -38,11 +38,17 @@ const RESPONSE_SCHEMA = {
       type: Type.BOOLEAN,
       description: 'True only if the deal is confirmed/done (e.g. "ufficiale", "offiziell", "confirmed", "signs", "s\'engage", "officiel"). False for rumors, negotiations, links, or interest.',
     },
+    aiSummary: {
+      type: Type.STRING,
+      nullable: true,
+      description:
+        "A 2-3 sentence summary of the article's actual content, IN GERMAN regardless of the article's own language, covering what's concretely stated (interest, talks, fee, contract length, quotes) -- not just restating the headline. Written in your own words, not copied sentences from the source. Null under the same condition playerName is null (not really a single-player transfer story).",
+    },
   },
-  required: ['playerName', 'fromClub', 'toClub', 'isOfficial'],
+  required: ['playerName', 'fromClub', 'toClub', 'isOfficial', 'aiSummary'],
 };
 
-const SYSTEM_INSTRUCTION = `You extract structured data from a single football (soccer) transfer-market news headline and summary, written in Italian, German, English, or French. Use the names as they commonly appear in football media (don't translate them). If the story isn't really about one specific player's transfer (e.g. it's a roundup of several players, a match report, an interview with no transfer content), set playerName, fromClub, and toClub to null and isOfficial to false.
+const SYSTEM_INSTRUCTION = `You extract structured data from a single football (soccer) transfer-market news headline and summary, written in Italian, German, English, or French. Use player/club names as they commonly appear in football media (don't translate those). If the story isn't really about one specific player's transfer (e.g. it's a roundup of several players, a match report, an interview with no transfer content), set playerName, fromClub, toClub, and aiSummary to null and isOfficial to false.
 
 Be careful with direction: when a headline is about a club selling, being open to selling, or trying to offload a player -- with no specific buying club named -- that club is fromClub, never toClub, even though it's the only club mentioned. toClub is exclusively the destination the player would move to.`;
 
