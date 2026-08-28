@@ -20,7 +20,8 @@ const RESPONSE_SCHEMA = {
     playerName: {
       type: Type.STRING,
       nullable: true,
-      description: "The player's full name this story is centrally about, or null if no single player is clearly identifiable (multi-player roundup, non-transfer story, etc.).",
+      description:
+        "The player's full name this story is centrally about, or null if no single player is clearly identifiable (multi-player roundup, non-transfer story, etc.). Use the fullest form of the name found anywhere in the given text -- if the headline only gives a bare surname (e.g. \"Pedersen\") but the summary text spells out the full name (e.g. \"Marcus Pedersen\"), extract the full form, not just whatever the headline itself literally says. Only fall back to the shorter form if the full name never appears anywhere in the given text.",
     },
     fromClub: {
       type: Type.STRING,
