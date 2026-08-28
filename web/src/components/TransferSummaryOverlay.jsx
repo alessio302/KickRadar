@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Sparkles, ArrowRightCircle, ExternalLink } from 'lucide-react';
 import { relativeTime } from '../lib/relativeTime.js';
 
@@ -14,16 +14,21 @@ export default function TransferSummaryOverlay({ theme, t, language, transfer, o
   const summaryText = transfer[`ai_summary_${language}`];
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
-  let dragStartY = null;
+  // useRef, not a plain local variable -- confirmed live: a plain `let`
+  // gets reset to null on every re-render, and handlePointerDown's own
+  // setDragging(true) triggers exactly that re-render before
+  // handlePointerMove ever reads it, so the drag silently never started.
+  // A ref's .current survives re-renders, same as FixtureDetailOverlay's.
+  const dragStartY = useRef(null);
 
   const handlePointerDown = (e) => {
-    dragStartY = e.clientY;
+    dragStartY.current = e.clientY;
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const handlePointerMove = (e) => {
-    if (dragStartY == null) return;
-    const delta = e.clientY - dragStartY;
+    if (dragStartY.current == null) return;
+    const delta = e.clientY - dragStartY.current;
     if (delta > 0) setDragY(delta);
   };
   const handlePointerUp = () => {
@@ -33,7 +38,7 @@ export default function TransferSummaryOverlay({ theme, t, language, transfer, o
       setDragY(0);
     }
     setDragging(false);
-    dragStartY = null;
+    dragStartY.current = null;
   };
 
   return (
