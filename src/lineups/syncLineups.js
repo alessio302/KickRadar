@@ -74,7 +74,7 @@ function groupByPositionRows(entries) {
   return ROW_ORDER.map((pos) => players.filter((p) => p.position === pos)).filter((row) => row.length > 0);
 }
 
-export function buildLineupTeam(section) {
+function buildLineupTeam(section) {
   if (!section) return null;
   return {
     formation: null, // set by the caller from homeFormation/awayFormation, shared per fixture not per section
