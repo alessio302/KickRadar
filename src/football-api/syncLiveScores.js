@@ -16,13 +16,15 @@ import { getMatches, sleep, STATUS_MAP } from './client.js';
 // comfortably inside the free tier's 10 req/min cap.
 //
 // Free tier: 10 req/min, shared across every football-data.org caller in
-// the repo (fixtures-sync, standings-sync, head-to-head-sync too, though
-// those run far less often). One poll = 5 requests (see pollOnce), taking
-// ~7.5s on their own; 45s between polls keeps the sustained rate to
-// roughly 5-6 req/min, leaving real headroom for one of those other jobs
-// happening to overlap a live window, while updating noticeably more often
-// than the previous 75s.
-const POLL_INTERVAL_MS = 45_000;
+// the repo -- head-to-head-sync.js in particular already runs itself at
+// ~9.2 req/min whenever it's active (4x/day, short windows), so an overlap
+// with that job can still push the shared account-wide total over the cap
+// even with this file's own rate kept modest. 30s between polls keeps
+// pollOnce's own sustained rate to roughly 8 req/min; pollOnce() below is
+// resilient to a single league's request failing (a 429 from exactly that
+// kind of overlap, or any transient error) so a rate-limit hit skips just
+// that league for one cycle instead of aborting the whole 13-minute loop.
+const POLL_INTERVAL_MS = 30_000;
 
 // Bounded below the workflow's own 15-min job timeout so the process exits
 // cleanly on its own before GitHub Actions would kill it mid-request, and
@@ -79,8 +81,16 @@ async function pollOnce(supabase) {
   const date = toDateString(new Date());
   const matches = [];
   for (const league of LEAGUES) {
-    const leagueMatches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: date, dateTo: date });
-    matches.push(...leagueMatches);
+    try {
+      const leagueMatches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: date, dateTo: date });
+      matches.push(...leagueMatches);
+    } catch (err) {
+      // A single league's request failing (rate limit, transient network
+      // error) shouldn't cost the whole poll -- the other 4 leagues' data
+      // is still worth writing, and the next poll (30s away) tries this
+      // league again anyway.
+      console.error(`Failed to fetch live matches for ${league.slug}:`, err.message);
+    }
     await sleep(1500); // stay well under the free tier's 10 req/min, same spacing as syncFixtures.js
   }
 
