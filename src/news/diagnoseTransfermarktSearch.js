@@ -8,7 +8,7 @@
 import * as cheerio from 'cheerio';
 
 const TRANSFERMARKT_BASE = 'https://www.transfermarkt.de';
-const NAMES = ['Ronaldo', 'Vitinha', 'João', 'Danilo'];
+const NAMES = ['Ronaldo'];
 
 function quickSearchUrl(playerName) {
   return `${TRANSFERMARKT_BASE}/schnellsuche/ergebnis/schnellsuche?query=${encodeURIComponent(playerName)}`;
@@ -23,8 +23,11 @@ async function inspect(playerName) {
     },
   });
   console.log(`\n=== "${playerName}" -> ${url} (HTTP ${res.status}) ===`);
-  if (!res.ok) return;
+  console.log('headers:', JSON.stringify(Object.fromEntries(res.headers.entries())));
   const html = await res.text();
+  console.log(`body length: ${html.length}`);
+  console.log(`body[0:800]: ${html.slice(0, 800).replace(/\s+/g, ' ')}`);
+  if (!res.ok) return;
   const $ = cheerio.load(html);
 
   const profileLinks = $('a[href*="/profil/spieler/"]');
