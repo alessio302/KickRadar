@@ -328,22 +328,32 @@ const SUBSTITUTION_OUT_COLOR = '#ef4444';
 // a red down-arrow next to the one going off (matching a standard
 // match-centre reference the user pointed to) reads just as clearly with
 // no sentence needed at all.
+//
+// Icon placement mirrors side (same idea as MatchEventContent's goal/card
+// icon below) rather than always leading the name -- confirmed live that
+// "icon always first" left the arrows drifting left/right per row on the
+// right-aligned (home) side, since a right-aligned block's leading edge
+// floats with however wide that row's player name happens to be, so the
+// fixed-width arrow never lands at the same x twice. Placing the icon as
+// the *inner* element (closest to the centre line) on both sides instead
+// anchors it to a fixed edge regardless of name length, so arrows actually
+// line up in one vertical column on each side.
 function SubstitutionContent({ theme, event, align }) {
   const justify = align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start';
   const rowStyle = { display: 'flex', alignItems: 'center', gap: '5px', justifyContent: justify };
-  // Icon always leads the name (both rows), regardless of side -- reading
-  // "arrow then name" stays consistent whether the block sits on the left
-  // or right of the centre line, rather than mirroring icon position too.
+  const iconFirst = align !== 'right';
   return (
     <div>
       <div style={rowStyle}>
-        <ArrowUpCircle size={14} color={SUBSTITUTION_IN_COLOR} style={{ flexShrink: 0 }} />
+        {iconFirst && <ArrowUpCircle size={14} color={SUBSTITUTION_IN_COLOR} style={{ flexShrink: 0 }} />}
         <span style={{ fontSize: '13px', fontWeight: 700 }}>{event.player}</span>
+        {!iconFirst && <ArrowUpCircle size={14} color={SUBSTITUTION_IN_COLOR} style={{ flexShrink: 0 }} />}
       </div>
       {event.substituted && (
         <div style={{ ...rowStyle, marginTop: '2px' }}>
-          <ArrowDownCircle size={14} color={SUBSTITUTION_OUT_COLOR} style={{ flexShrink: 0 }} />
+          {iconFirst && <ArrowDownCircle size={14} color={SUBSTITUTION_OUT_COLOR} style={{ flexShrink: 0 }} />}
           <span style={{ fontSize: '12px', color: theme.textMuted }}>{event.substituted}</span>
+          {!iconFirst && <ArrowDownCircle size={14} color={SUBSTITUTION_OUT_COLOR} style={{ flexShrink: 0 }} />}
         </div>
       )}
     </div>
@@ -359,6 +369,9 @@ function MatchEventContent({ theme, t, event, align }) {
   }
 
   const labelKey = EVENT_LABEL_KEY[event.type];
+  // Only used as a fallback when an event has no player name (rare) --
+  // the icon itself (⚽/🟨/🟥) already says what happened, so it's no
+  // longer also spelled out as a second line under the name.
   const label = labelKey ? t.matchInfo[labelKey] : event.type;
   const icon = EVENT_ICON[event.type] || '•';
 
@@ -369,7 +382,6 @@ function MatchEventContent({ theme, t, event, align }) {
         <span>{event.player || label}</span>
         {align === 'right' && <span style={{ fontSize: '15px', lineHeight: 1 }}>{icon}</span>}
       </p>
-      <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{label}</p>
       {event.assist && <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>}
     </div>
   );
