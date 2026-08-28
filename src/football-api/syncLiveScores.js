@@ -21,6 +21,17 @@ const JOB_BUDGET_MS = 13 * 60 * 1000;
 // late starts), so this needs some slack either side.
 const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
 
+// Confirmed live (Bayern-Stuttgart, 2026-08-28): a run that starts right at
+// kickoff_at can catch football-data.org before it has flipped the match to
+// IN_PLAY yet -- its own status update lags kickoff by up to a few minutes.
+// Without this, that fixture's kickoff_at is already in the past, so it no
+// longer counts as "starting soon" and the loop exits after that one
+// premature poll, never coming back until a whole separate job invocation
+// happens to run again. Symmetric slack on the past side keeps polling for
+// a fixture that's still "scheduled" in our own data shortly after its
+// kickoff, giving the source time to catch up within the same job run.
+const RECENT_KICKOFF_WINDOW_MS = 15 * 60 * 1000;
+
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -32,12 +43,13 @@ function toDateString(date) {
 // waiting", independent of whether anything is live played right now.
 async function hasFixtureStartingSoon(supabase) {
   const now = new Date();
+  const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
   const { count, error } = await supabase
     .from('fixtures')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'scheduled')
-    .gte('kickoff_at', now.toISOString())
+    .gte('kickoff_at', recently)
     .lte('kickoff_at', soon);
   if (error) throw error;
   return (count ?? 0) > 0;
