@@ -31,7 +31,16 @@ function ordinalEn(n) {
 
 const de = {
   nav: { transfers: 'Transfers', fixtures: 'Spiele', standings: 'Tabelle', settings: 'Einstellungen' },
-  common: { loading: 'Lädt…', chooseClub: 'Verein wählen…', notSupported: 'nicht unterstützt', vs: 'vs', cancel: 'Abbrechen' },
+  common: {
+    loading: 'Lädt…',
+    chooseClub: 'Verein wählen…',
+    notSupported: 'nicht unterstützt',
+    vs: 'vs',
+    cancel: 'Abbrechen',
+    refreshing: 'Aktualisiert…',
+    releaseToRefresh: 'Loslassen zum Aktualisieren',
+    pullToRefresh: 'Zum Aktualisieren ziehen',
+  },
   transfers: {
     officialOnly: 'Nur offizielle Transfers',
     officialOnlyToggle: 'Nur offizielle Transfers umschalten',
@@ -44,9 +53,6 @@ const de = {
     // language, per explicit call) -- only the overlay's other text is.
     readOriginal: 'Artikel lesen',
     aiSummaryDisclaimer: 'KI-generierte Zusammenfassung, kann Fehler enthalten. Ersetzt nicht den Originalartikel.',
-    refreshing: 'Aktualisiert…',
-    releaseToRefresh: 'Loslassen zum Aktualisieren',
-    pullToRefresh: 'Zum Aktualisieren ziehen',
     justNow: 'gerade eben',
     minutesAgo: (n) => `vor ${n} Min`,
     hoursAgo: (n) => `vor ${n} Std`,
@@ -129,7 +135,16 @@ const de = {
 
 const en = {
   nav: { transfers: 'Transfers', fixtures: 'Fixtures', standings: 'Table', settings: 'Settings' },
-  common: { loading: 'Loading…', chooseClub: 'Choose club…', notSupported: 'not supported', vs: 'vs', cancel: 'Cancel' },
+  common: {
+    loading: 'Loading…',
+    chooseClub: 'Choose club…',
+    notSupported: 'not supported',
+    vs: 'vs',
+    cancel: 'Cancel',
+    refreshing: 'Refreshing…',
+    releaseToRefresh: 'Release to refresh',
+    pullToRefresh: 'Pull to refresh',
+  },
   transfers: {
     officialOnly: 'Official transfers only',
     officialOnlyToggle: 'Toggle official transfers only',
@@ -140,9 +155,6 @@ const en = {
     searchPlayerTitle: 'Search player on Transfermarkt',
     readOriginal: 'Read article',
     aiSummaryDisclaimer: 'AI-generated summary, may contain errors. Not a substitute for the original article.',
-    refreshing: 'Refreshing…',
-    releaseToRefresh: 'Release to refresh',
-    pullToRefresh: 'Pull to refresh',
     justNow: 'just now',
     minutesAgo: (n) => `${n} min ago`,
     hoursAgo: (n) => `${n} hr ago`,
@@ -225,7 +237,16 @@ const en = {
 
 const it = {
   nav: { transfers: 'Trasferimenti', fixtures: 'Partite', standings: 'Classifica', settings: 'Impostazioni' },
-  common: { loading: 'Caricamento…', chooseClub: 'Scegli squadra…', notSupported: 'non supportato', vs: 'vs', cancel: 'Annulla' },
+  common: {
+    loading: 'Caricamento…',
+    chooseClub: 'Scegli squadra…',
+    notSupported: 'non supportato',
+    vs: 'vs',
+    cancel: 'Annulla',
+    refreshing: 'Aggiornamento…',
+    releaseToRefresh: 'Rilascia per aggiornare',
+    pullToRefresh: 'Trascina per aggiornare',
+  },
   transfers: {
     officialOnly: 'Solo trasferimenti ufficiali',
     officialOnlyToggle: 'Attiva/disattiva solo trasferimenti ufficiali',
@@ -236,9 +257,6 @@ const it = {
     searchPlayerTitle: 'Cerca il giocatore su Transfermarkt',
     readOriginal: "Leggi l'articolo",
     aiSummaryDisclaimer: "Riepilogo generato dall'IA, può contenere errori. Non sostituisce l'articolo originale.",
-    refreshing: 'Aggiornamento…',
-    releaseToRefresh: 'Rilascia per aggiornare',
-    pullToRefresh: 'Trascina per aggiornare',
     justNow: 'proprio ora',
     minutesAgo: (n) => `${n} min fa`,
     hoursAgo: (n) => `${n} ${n === 1 ? 'ora' : 'ore'} fa`,
@@ -321,7 +339,16 @@ const it = {
 
 const fr = {
   nav: { transfers: 'Transferts', fixtures: 'Matchs', standings: 'Classement', settings: 'Réglages' },
-  common: { loading: 'Chargement…', chooseClub: 'Choisir un club…', notSupported: 'non pris en charge', vs: 'vs', cancel: 'Annuler' },
+  common: {
+    loading: 'Chargement…',
+    chooseClub: 'Choisir un club…',
+    notSupported: 'non pris en charge',
+    vs: 'vs',
+    cancel: 'Annuler',
+    refreshing: 'Actualisation…',
+    releaseToRefresh: 'Relâcher pour actualiser',
+    pullToRefresh: 'Tirer pour actualiser',
+  },
   transfers: {
     officialOnly: 'Transferts officiels uniquement',
     officialOnlyToggle: 'Activer/désactiver transferts officiels uniquement',
@@ -332,9 +359,6 @@ const fr = {
     searchPlayerTitle: 'Rechercher le joueur sur Transfermarkt',
     readOriginal: "Lire l'article",
     aiSummaryDisclaimer: "Résumé généré par IA, peut contenir des erreurs. Ne remplace pas l'article original.",
-    refreshing: 'Actualisation…',
-    releaseToRefresh: 'Relâcher pour actualiser',
-    pullToRefresh: 'Tirer pour actualiser',
     justNow: "à l'instant",
     minutesAgo: (n) => `il y a ${n} min`,
     hoursAgo: (n) => `il y a ${n} h`,
@@ -417,7 +441,16 @@ const fr = {
 
 const es = {
   nav: { transfers: 'Traspasos', fixtures: 'Partidos', standings: 'Clasificación', settings: 'Ajustes' },
-  common: { loading: 'Cargando…', chooseClub: 'Elegir club…', notSupported: 'no compatible', vs: 'vs', cancel: 'Cancelar' },
+  common: {
+    loading: 'Cargando…',
+    chooseClub: 'Elegir club…',
+    notSupported: 'no compatible',
+    vs: 'vs',
+    cancel: 'Cancelar',
+    refreshing: 'Actualizando…',
+    releaseToRefresh: 'Soltar para actualizar',
+    pullToRefresh: 'Desliza para actualizar',
+  },
   transfers: {
     officialOnly: 'Solo traspasos oficiales',
     officialOnlyToggle: 'Alternar solo traspasos oficiales',
@@ -428,9 +461,6 @@ const es = {
     searchPlayerTitle: 'Buscar jugador en Transfermarkt',
     readOriginal: 'Leer artículo',
     aiSummaryDisclaimer: 'Resumen generado por IA, puede contener errores. No sustituye al artículo original.',
-    refreshing: 'Actualizando…',
-    releaseToRefresh: 'Soltar para actualizar',
-    pullToRefresh: 'Desliza para actualizar',
     justNow: 'justo ahora',
     minutesAgo: (n) => `hace ${n} min`,
     hoursAgo: (n) => `hace ${n} h`,

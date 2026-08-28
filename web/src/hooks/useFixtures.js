@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { useLeagueId } from './useLeagueId.js';
 
@@ -21,6 +21,26 @@ function applyFixtureUpdate(matchdays, updated) {
   }));
 }
 
+// Same grouping used by both the initial load and refetch()/pull-to-refresh
+// below -- sorted by each group's earliest kickoff, not the raw matchday
+// number: confirmed live that football-data.org's own matchday field
+// doesn't always track calendar order (a fully rescheduled round can end up
+// dated entirely before the round "before" it), and sorting by the number
+// alone showed "2ª giornata" above "1ª giornata" with genuinely earlier
+// dates. games within each group are already ascending by kickoff_at from
+// the query's own .order() below, so games[0] is that group's earliest.
+function groupByMatchday(rows) {
+  const byMatchday = new Map();
+  for (const fixture of rows) {
+    const key = fixture.matchday ?? 0;
+    if (!byMatchday.has(key)) byMatchday.set(key, []);
+    byMatchday.get(key).push(fixture);
+  }
+  return [...byMatchday.entries()]
+    .map(([matchday, games]) => ({ matchday, games }))
+    .sort((a, b) => new Date(a.games[0].kickoff_at) - new Date(b.games[0].kickoff_at));
+}
+
 // Groups fixtures by matchday, sorted ascending. home_club_id/away_club_id
 // are resolved against the caller's clubs list (see useClubs), same
 // pattern as useTransfers, rather than an embedded Postgrest select.
@@ -36,50 +56,33 @@ export function useFixtures(leagueSlug) {
   const leagueId = useLeagueId(leagueSlug);
   const [matchdays, setMatchdays] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const buildQuery = useCallback(() => {
+    const cutoff = new Date(Date.now() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    return supabase
+      .from('fixtures')
+      .select('id, matchday, home_club_id, away_club_id, kickoff_at, status, home_score, away_score, referee')
+      .eq('league_id', leagueId)
+      .gte('kickoff_at', cutoff)
+      .order('kickoff_at', { ascending: true });
+  }, [leagueId]);
 
   useEffect(() => {
     if (leagueId == null) return;
     let cancelled = false;
     setLoading(true);
 
-    const cutoff = new Date(Date.now() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
-    supabase
-      .from('fixtures')
-      .select('id, matchday, home_club_id, away_club_id, kickoff_at, status, home_score, away_score, referee')
-      .eq('league_id', leagueId)
-      .gte('kickoff_at', cutoff)
-      .order('kickoff_at', { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error('Failed to load fixtures for league', leagueSlug, error);
-          setMatchdays([]);
-          setLoading(false);
-          return;
-        }
-
-        const byMatchday = new Map();
-        for (const fixture of data) {
-          const key = fixture.matchday ?? 0;
-          if (!byMatchday.has(key)) byMatchday.set(key, []);
-          byMatchday.get(key).push(fixture);
-        }
-        // Sorted by each group's earliest kickoff, not the raw matchday
-        // number -- confirmed live: football-data.org's own matchday field
-        // doesn't always track calendar order (a fully rescheduled round
-        // can end up dated entirely before the round "before" it), and
-        // sorting by the number alone showed "2ª giornata" above "1ª
-        // giornata" with genuinely earlier dates. games within each group
-        // are already ascending by kickoff_at from the query's own
-        // .order() above, so games[0] is that group's earliest.
-        const grouped = [...byMatchday.entries()]
-          .map(([matchday, games]) => ({ matchday, games }))
-          .sort((a, b) => new Date(a.games[0].kickoff_at) - new Date(b.games[0].kickoff_at));
-
-        setMatchdays(grouped);
-        setLoading(false);
-      });
+    buildQuery().then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to load fixtures for league', leagueSlug, error);
+        setMatchdays([]);
+      } else {
+        setMatchdays(groupByMatchday(data));
+      }
+      setLoading(false);
+    });
 
     // Live scores land here via syncLiveScores.js's ~75s poll loop (see
     // that file) writing status/home_score/away_score to this same row --
@@ -103,7 +106,22 @@ export function useFixtures(leagueSlug) {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [leagueId, leagueSlug]);
+  }, [leagueId, leagueSlug, buildQuery]);
 
-  return { matchdays, loading };
+  // Re-queries Supabase directly for pull-to-refresh -- same rationale as
+  // useTransfers.js's own refetch(): this never touches football-data.org
+  // or Highlightly, just re-reads whatever the last sync already stored.
+  const refetch = useCallback(async () => {
+    if (leagueId == null) return;
+    setRefreshing(true);
+    const { data, error } = await buildQuery();
+    if (error) {
+      console.error('Failed to refresh fixtures for league', leagueSlug, error);
+    } else {
+      setMatchdays(groupByMatchday(data));
+    }
+    setRefreshing(false);
+  }, [leagueId, leagueSlug, buildQuery]);
+
+  return { matchdays, loading, refreshing, refetch };
 }

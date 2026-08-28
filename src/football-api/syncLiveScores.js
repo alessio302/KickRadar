@@ -15,9 +15,14 @@ import { getMatches, sleep, STATUS_MAP } from './client.js';
 // syncFixtures.js's own loop) -- more requests per poll, but still
 // comfortably inside the free tier's 10 req/min cap.
 //
-// Free tier: 10 req/min. One poll = 5 requests (see pollOnce), spaced
-// 1500ms apart -- 75s between polls leaves huge margin even so.
-const POLL_INTERVAL_MS = 75_000;
+// Free tier: 10 req/min, shared across every football-data.org caller in
+// the repo (fixtures-sync, standings-sync, head-to-head-sync too, though
+// those run far less often). One poll = 5 requests (see pollOnce), taking
+// ~7.5s on their own; 45s between polls keeps the sustained rate to
+// roughly 5-6 req/min, leaving real headroom for one of those other jobs
+// happening to overlap a live window, while updating noticeably more often
+// than the previous 75s.
+const POLL_INTERVAL_MS = 45_000;
 
 // Bounded below the workflow's own 15-min job timeout so the process exits
 // cleanly on its own before GitHub Actions would kill it mid-request, and

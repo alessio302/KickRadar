@@ -1,24 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRightCircle, RefreshCw, User, Sparkles } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowRightCircle, User, Sparkles } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import QuickFilters from './QuickFilters.jsx';
 import TransferSummaryOverlay from './TransferSummaryOverlay.jsx';
+import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { relativeTime } from '../lib/relativeTime.js';
-
-// Distance the indicator has to be pulled past before releasing triggers a
-// refresh, and the cap on how far it visually travels while dragging.
-const PULL_THRESHOLD = 60;
-const PULL_MAX = 90;
-
-// Rubber-band curve (grows fast at first, increasingly resists further
-// pulling) instead of 1:1 finger tracking -- matches native overscroll
-// physics; confirmed live that a linear mapping read as "not elastic
-// enough, can barely pull it."
-function dampen(rawDelta) {
-  return Math.min(PULL_MAX, Math.sqrt(rawDelta) * 6);
-}
 
 export default function TransfersTab({
   theme,
@@ -44,70 +33,7 @@ export default function TransfersTab({
     return transfers.filter((transfer) => transfer.from_club_id === activeFilter.id || transfer.to_club_id === activeFilter.id);
   }, [transfers, activeFilter]);
 
-  // Pull-to-refresh: only starts tracking when the list is already
-  // scrolled to the top (a pull gesture mid-list would just be a normal
-  // scroll), and lets go cleanly the moment either condition stops holding
-  // mid-drag (scrolled away, or dragging back up).
-  //
-  // A real, non-passive touchmove listener (attached via useEffect), not
-  // React's synthetic onTouchMove/onPointerMove props -- confirmed live
-  // that those can't reliably preventDefault() the browser's own decision
-  // to hand an ambiguous vertical drag off to native scrolling mid-gesture,
-  // which showed up as the custom indicator flashing briefly and then the
-  // pull just stopping tracking. Calling preventDefault() ourselves, once
-  // we've decided this is a pull (not a scroll), keeps the whole gesture.
-  const scrollRef = useRef(null);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [pulling, setPulling] = useState(false);
-  const refetchRef = useRef(refetch);
-  refetchRef.current = refetch;
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    let startY = null;
-
-    const handleTouchStart = (e) => {
-      startY = el.scrollTop <= 0 ? e.touches[0].clientY : null;
-    };
-
-    const handleTouchMove = (e) => {
-      if (startY == null) return;
-      const rawDelta = e.touches[0].clientY - startY;
-      if (rawDelta <= 0 || el.scrollTop > 0) {
-        startY = null;
-        setPulling(false);
-        setPullDistance(0);
-        return;
-      }
-      e.preventDefault();
-      setPulling(true);
-      setPullDistance(dampen(rawDelta));
-    };
-
-    const handleTouchEnd = () => {
-      if (startY != null) {
-        setPullDistance((current) => {
-          if (current >= PULL_THRESHOLD) refetchRef.current();
-          return 0;
-        });
-        setPulling(false);
-      }
-      startY = null;
-    };
-
-    el.addEventListener('touchstart', handleTouchStart, { passive: true });
-    el.addEventListener('touchmove', handleTouchMove, { passive: false });
-    el.addEventListener('touchend', handleTouchEnd, { passive: true });
-    el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-    return () => {
-      el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchmove', handleTouchMove);
-      el.removeEventListener('touchend', handleTouchEnd);
-      el.removeEventListener('touchcancel', handleTouchEnd);
-    };
-  }, []);
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -177,29 +103,7 @@ export default function TransfersTab({
           padding: '12px 16px 14px',
         }}
       >
-      <style>{'@keyframes kickradar-spin { to { transform: rotate(360deg); } }'}</style>
-      <div
-        style={{
-          height: refreshing ? '40px' : `${pullDistance}px`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '6px',
-          overflow: 'hidden',
-          color: theme.textMuted,
-          fontSize: '12px',
-          transition: pulling ? 'none' : 'height 0.2s ease',
-        }}
-      >
-        <RefreshCw
-          size={14}
-          style={{
-            animation: refreshing ? 'kickradar-spin 0.7s linear infinite' : 'none',
-            transform: refreshing ? undefined : `rotate(${Math.min(pullDistance / PULL_THRESHOLD, 1) * 180}deg)`,
-          }}
-        />
-        {refreshing ? t.transfers.refreshing : pullDistance >= PULL_THRESHOLD ? t.transfers.releaseToRefresh : t.transfers.pullToRefresh}
-      </div>
+      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>

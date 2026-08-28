@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import FixtureRow from './FixtureRow.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
+import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 function formatDate(iso, locale) {
@@ -38,10 +40,11 @@ function pickCurrentMatchday(matchdays) {
 
 export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture }) {
   const { clubs } = useClubs(league);
-  const { matchdays, loading } = useFixtures(league);
+  const { matchdays, loading, refreshing, refetch } = useFixtures(league);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
   const locale = DATE_LOCALES[language];
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
@@ -109,7 +112,18 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 14px' }}>
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorY: 'none',
+          padding: '12px 16px 14px',
+        }}
+      >
+      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
       {!loading && visible.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
