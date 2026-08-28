@@ -1,0 +1,36 @@
+name: Live events
+
+# Fires every 15 min, same shape as live-scores.yml, but holds one WebSocket
+# connection open for the run instead of polling -- GOAL API's FREE plan
+# allows exactly 1 concurrent connection per key (confirmed live via
+# auth_success), so the concurrency group below is load-bearing, not just
+# belt-and-suspenders: two overlapping runs would fight over that single slot.
+on:
+  schedule:
+    # Offset to :04/:19/:34/:49 -- distinct from lineups-sync.yml's
+    # 14/29/44/59 and live-scores.yml's 9/24/39/54. See those files' own
+    # comments: several workflows sharing one cron pattern made GitHub
+    # Actions' scheduler throttle all of them hard.
+    - cron: '4,19,34,49 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: live-events
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/syncLiveEvents.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}

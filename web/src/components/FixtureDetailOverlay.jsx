@@ -414,7 +414,10 @@ function MatchEventTimelineRow({ theme, t, event, side }) {
 function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
   const { events, loading } = useMatchEvents(fixture.id);
 
-  if (fixture.status !== 'finished') {
+  // 'live' shown here too, not just 'finished' -- src/lineups/syncLiveEvents.js
+  // now streams goals/cards/subs in over Realtime while a match is still
+  // being played (see useMatchEvents.js), so there's real content to show.
+  if (fixture.status !== 'finished' && fixture.status !== 'live') {
     return (
       <div style={{ padding: '32px 16px', textAlign: 'center' }}>
         <CalendarClock size={22} style={{ color: theme.textMuted, marginBottom: '8px' }} />

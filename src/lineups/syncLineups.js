@@ -322,6 +322,14 @@ export async function syncLineups() {
 
         if (goals) {
           const rows = buildEventRows(f.id, homeClub.id, awayClub.id, { goals, cards, substitutions });
+          // Full replace, not merge: src/lineups/syncLiveEvents.js may have
+          // already written rows for this fixture while it was live, keyed
+          // by content (its WS payload has no stable per-event id, unlike
+          // these REST endpoints) -- clearing first guarantees the row set
+          // a finished fixture ends up with is exactly GOAL API's REST
+          // data, with no leftover live-only duplicates sitting alongside it.
+          const { error: deleteErr } = await supabase.from('match_events').delete().eq('fixture_id', f.id);
+          if (deleteErr) console.error(`Failed to clear existing events for fixture ${f.id}:`, deleteErr.message);
           if (rows.length > 0) {
             const { error: eventsErr } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
             if (eventsErr) console.error(`Failed to store events for fixture ${f.id}:`, eventsErr.message);
