@@ -503,23 +503,29 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   const hostClub = meetingIsHomeClubHost ? homeClub : awayClub;
   const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '12.5px', padding: '6px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12.5px', padding: '6px 0' }}>
       <span style={{ color: theme.textMuted, flexShrink: 0 }}>
         {new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
       </span>
-      {/* A single fixed-width block anchored to the row's right edge (like
-          Form's circle row and the League Position value), but with its
-          own internal host/score/guest columns so the colon still lines
-          up vertically across rows -- right-aligned as a unit AND
-          column-aligned inside it, not one or the other. */}
+      {/* Left-aligned right after the date with a fixed gap, not pushed to
+          the row's right edge -- confirmed live that right-alignment plus
+          a fixed per-name column width left long club names (e.g. "Stade
+          Rennais", short_name is whatever football-data.org happens to
+          return -- some are already short like "PSG", others aren't) with
+          nowhere to grow and always ellipsis-truncated, regardless of how
+          much space the row actually had. Widened 72px -> 96px on top of
+          that for real headroom; still fixed-width (not flex/intrinsic) so
+          the colon stays column-aligned across rows, and still has
+          ellipsis as a fallback for the genuine long-tail case (e.g.
+          "Borussia Mönchengladbach"). */}
       <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-        <span style={{ width: '72px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ width: '96px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {hostClub?.short_name || hostClub?.name}
         </span>
         <span style={{ width: '40px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>
           {meeting.home_score} : {meeting.away_score}
         </span>
-        <span style={{ width: '72px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ width: '96px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {guestClub?.short_name || guestClub?.name}
         </span>
       </div>
