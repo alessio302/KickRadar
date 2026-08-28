@@ -1,14 +1,13 @@
-name: Diagnose club short names (one-off)
+name: Fix club short names (one-off)
 
-# Lists every club's name/short_name across all 5 leagues so the
-# standings table's display names can be reviewed for nicknames/colloquial
-# forms that don't match real standings tables. See
-# src/football-api/diagnoseShortNames.js. Read-only, no DB writes.
+# Applies syncClubs.js's SHORT_NAME_OVERRIDES to clubs already in the DB
+# right now, so the fix shows up immediately instead of waiting for the
+# next clubs-sync run. See src/football-api/fixClubShortNames.js.
 on:
   workflow_dispatch: {}
 
 jobs:
-  diagnose:
+  fix:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,7 +17,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/football-api/diagnoseShortNames.js
+      - run: node src/football-api/fixClubShortNames.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
