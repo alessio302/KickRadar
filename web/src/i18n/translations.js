@@ -86,7 +86,7 @@ const de = {
     draw: 'U',
     lost: 'N',
     points: 'Pkt',
-    goalDiff: 'Tordiff.',
+    goalDiff: 'TD',
   },
   stats: {
     form: 'Form',
