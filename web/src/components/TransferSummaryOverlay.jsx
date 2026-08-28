@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Sparkles, ArrowRightCircle, ExternalLink } from 'lucide-react';
+import { Sparkles, ArrowRightCircle, ExternalLink } from 'lucide-react';
 import { relativeTime } from '../lib/relativeTime.js';
 
 // Same bottom-sheet chrome/drag-to-dismiss mechanics as
@@ -74,31 +74,10 @@ export default function TransferSummaryOverlay({ theme, t, language, transfer, o
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
             <div style={{ width: '36px', height: '4px', borderRadius: '999px', background: theme.border }} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: theme.textMuted }}>
-              <span>{transfer.source}</span>
-              <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: theme.textMuted }} />
-              <span>{relativeTime(transfer.published_at, t)}</span>
-            </div>
-            <button
-              onClick={onClose}
-              aria-label={t.common.cancel}
-              style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '50%',
-                border: `1px solid ${theme.border}`,
-                background: theme.surfaceRaised,
-                color: theme.textMuted,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <X size={14} strokeWidth={2.5} />
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11.5px', color: theme.textMuted }}>
+            <span>{transfer.source}</span>
+            <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: theme.textMuted }} />
+            <span>{relativeTime(transfer.published_at, t)}</span>
           </div>
         </div>
 
