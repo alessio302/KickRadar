@@ -61,7 +61,7 @@ jobs:
           # few minutes late) before treating the gap as actually stuck.
           if [ "$GAP_MIN" -gt 50 ]; then
             echo "Gap exceeds 50 min -- dispatching news-scraper.yml manually."
-            gh workflow run news-scraper.yml --ref "${{ github.ref_name }}"
+            gh workflow run news-scraper.yml --repo "$REPO" --ref "${{ github.ref_name }}"
           else
             echo "Gap is within the normal range -- nothing to do."
           fi
