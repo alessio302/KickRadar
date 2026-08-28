@@ -40,33 +40,37 @@ function dedupeKey(text) {
 // squad list, so the same lookup that recovers the club can recover the
 // full name too, essentially for free.
 //
-// Tries an exact normalized-name match first; if extraction only produced
-// a bare surname -- a headline like "Ricci al Como" is completely normal,
-// especially in Italian sports media -- falls back to a surname-suffix
-// match instead, but only when it's unambiguous (exactly one row either
-// way, same "don't guess" discipline as everywhere else in this file).
-// Confirmed live: "Ricci" had a real, exact "Samuele Ricci" row in
-// squad_memberships, but a plain equality check could never see it,
-// silently leaving from_club null (and the card showing just "Ricci") on a
-// story where both were perfectly recoverable.
+// Only trusts a FULL name (the extracted name contains a space). A bare
+// single word -- whether a mononym ("Vitinha") or a bare surname ("Ricci")
+// -- can be genuinely ambiguous: squad_memberships only covers 5 leagues'
+// current rosters, so "exactly one match in our table" only means "the
+// only one we happen to track," not "the only player with this name in the
+// world." Confirmed live: a story about Olympique de Marseille's Vitinha
+// moving to Rennes had its already-correct from_club silently overwritten
+// to PSG, because PSG's own Vitinha -- a different, unrelated real player
+// -- was the only "Vitinha" in our squad data. Growing our own squad
+// coverage doesn't fix this: more players tracked means MORE short-name
+// collisions, not fewer, and a transfer can always involve a club outside
+// our 5 leagues we'd never have squad data for anyway. Gemini already
+// resolves the player correctly from the article's own context in cases
+// like this; a bare-name match against an inherently partial internal list
+// must never be allowed to override that.
+//
+// This used to also recover a bare surname ("Ricci al Como") via a
+// suffix match against full names in squad_memberships -- removed for the
+// identical reason, just a different real-world example of the same risk
+// (a single word coincidentally unique in our own limited table).
 export async function lookupSquadMembership(supabase, playerName) {
   const normName = normalize(playerName);
+  if (!normName.includes(' ')) return null; // bare single word -- too ambiguous to trust, see above
+
   const { data: exactRows, error: exactErr } = await supabase
     .from('squad_memberships')
     .select('club_id, player_name')
     .eq('normalized_name', normName)
     .limit(2);
   if (exactErr) throw exactErr;
-  if (exactRows.length === 1) return { clubId: exactRows[0].club_id, fullName: exactRows[0].player_name };
-  if (exactRows.length > 1 || normName.includes(' ')) return null; // ambiguous, or already a full name with no surname fallback to try
-
-  const { data: suffixRows, error: suffixErr } = await supabase
-    .from('squad_memberships')
-    .select('club_id, player_name')
-    .ilike('normalized_name', `% ${normName}`)
-    .limit(2);
-  if (suffixErr) throw suffixErr;
-  return suffixRows.length === 1 ? { clubId: suffixRows[0].club_id, fullName: suffixRows[0].player_name } : null;
+  return exactRows.length === 1 ? { clubId: exactRows[0].club_id, fullName: exactRows[0].player_name } : null;
 }
 
 // resolvePlayerProfile() matches players by an EXACT normalized_name
