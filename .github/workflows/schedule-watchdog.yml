@@ -1,0 +1,81 @@
+name: Schedule watchdog
+
+# GitHub Actions' own scheduled-trigger delivery has been unreliable for
+# this repo -- confirmed live on 2026-08-28: news-scraper.yml, lineups-
+# sync.yml, live-scores.yml and fixtures-sync.yml all silently stopped
+# firing on their own schedule for 15+ hours despite being "active"
+# workflows with no code/secrets problem; a manual workflow_dispatch
+# worked fine every single time and pulled in real new data. GitHub
+# documents scheduled triggers as best-effort, and this is outside
+# anything fixable in our own code.
+#
+# This watchdog checks ALL of the time-critical workflows below (each
+# against its own staleness threshold) and re-triggers any that look
+# suspiciously stale. Originally scoped to news-scraper.yml only; widened
+# after the same outage hit lineups-sync/live-scores/fixtures-sync at the
+# same time, so one watchdog run now covers the whole set instead of
+# needing a separate one per workflow.
+#
+# This watchdog's own schedule is subject to the identical GitHub
+# reliability issue -- it isn't a way around the root cause, since nothing
+# we control is. That's why it's also wired up to be triggered externally:
+# an external cron service (outside GitHub entirely) hits this workflow's
+# workflow_dispatch via the GitHub API on a short interval, so this job
+# still runs even during a total GitHub Actions scheduler outage like
+# today's. Whenever it *does* run, even hours late, it immediately catches
+# up regardless of how long the gap was, rather than depending on a person
+# noticing and re-running things by hand.
+#
+# Offset to :50 -- doesn't collide with news-scraper's own :04/:34,
+# live-scores' :09/:24/:39/:54, or lineups-sync's :14/:29/:44/:59.
+on:
+  schedule:
+    - cron: '50 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check last scheduled runs and re-trigger any that are stale
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          REF="${{ github.ref_name }}"
+
+          check_and_trigger() {
+            local workflow="$1"
+            local threshold_min="$2"
+            local last_run
+            last_run=$(gh api "repos/$REPO/actions/workflows/$workflow/runs?event=schedule&status=success&per_page=1" --jq '.workflow_runs[0].created_at // empty')
+
+            if [ -z "$last_run" ]; then
+              echo "$workflow: no prior successful scheduled run found -- skipping."
+              return
+            fi
+
+            local last_epoch now_epoch gap_min
+            last_epoch=$(date -u -d "$last_run" +%s)
+            now_epoch=$(date -u +%s)
+            gap_min=$(( (now_epoch - last_epoch) / 60 ))
+            echo "$workflow: last successful scheduled run $last_run ($gap_min min ago, threshold ${threshold_min}m)"
+
+            if [ "$gap_min" -gt "$threshold_min" ]; then
+              echo "$workflow: gap exceeds threshold -- dispatching manually."
+              gh workflow run "$workflow" --repo "$REPO" --ref "$REF"
+            else
+              echo "$workflow: gap is within the normal range -- nothing to do."
+            fi
+          }
+
+          # Threshold = own cadence + slack for a run landing a bit late.
+          check_and_trigger news-scraper.yml 50     # cadence 30 min
+          check_and_trigger lineups-sync.yml 25     # cadence 15 min
+          check_and_trigger live-scores.yml 25      # cadence 15 min
+          check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
