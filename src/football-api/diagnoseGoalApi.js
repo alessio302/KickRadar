@@ -22,61 +22,45 @@ async function call(path) {
 }
 
 async function main() {
-  console.log('--- Leagues ---');
-  let leagues = [];
+  // GOAL API tracks ~1000 leagues worldwide, and generic names like
+  // "Premier League" collide across many countries (England, Kenya,
+  // Somalia, Taiwan, women's/junior variants, ...). Scoping the lookup by
+  // country avoids trusting a substring match against the wrong homonym.
+  const targets = [
+    { country: 'Germany', name: 'bundesliga' },
+    { country: 'England', name: 'premier league' },
+    { country: 'Italy', name: 'serie a' },
+    { country: 'France', name: 'ligue 1' },
+    { country: 'Spain', name: 'la liga' },
+  ];
+
+  console.log('--- Countries ---');
+  let countries = [];
   let offset = 0;
-  for (let page = 0; page < 10; page++) {
-    const resp = await call(`/leagues?limit=100&offset=${offset}`);
+  for (let page = 0; page < 5; page++) {
+    const resp = await call(`/countries?limit=100&offset=${offset}`);
     if (!resp) break;
-    leagues = leagues.concat(resp.data ?? []);
+    countries = countries.concat(resp.data ?? []);
     if (!resp.pagination?.hasMore) break;
     offset += 100;
   }
-  console.log(`Total leagues returned: ${leagues.length}`);
-  const wanted = ['bundesliga', 'serie a', 'premier league', 'ligue 1', 'la liga', 'laliga'];
-  const matches = leagues.filter((l) => wanted.some((w) => (l.name || '').toLowerCase().includes(w)));
-  for (const l of matches) console.log(`  ${l.id} (apiId=${l.apiId ?? 'n/a'}): ${l.name} -- country=${l.country ?? l.countryName ?? '?'}`);
+  console.log(`Total countries returned: ${countries.length}`);
 
-  const bundesliga = matches.find((l) => (l.name || '').toLowerCase().includes('bundesliga'));
-  if (!bundesliga) {
-    console.log('Could not find Bundesliga in the leagues list -- stopping here.');
-    return;
-  }
-
-  console.log('--- Bundesliga fixtures for 2026-08-28 ---');
-  const fixturesResp = await call(`/leagues/${bundesliga.id}/fixtures?date=2026-08-28`);
-  const fixtures = fixturesResp?.data ?? [];
-  console.log(`Fixtures returned: ${fixtures.length}`);
-  for (const f of fixtures) console.log(`  ${f.id}: ${f.homeTeam?.name ?? f.homeTeamName} vs ${f.awayTeam?.name ?? f.awayTeamName} -- status=${f.status}`);
-
-  const match = fixtures.find(
-    (f) => /bayern/i.test(f.homeTeam?.name ?? f.homeTeamName ?? '') && /stuttgart/i.test(f.awayTeam?.name ?? f.awayTeamName ?? '')
-  );
-  if (!match) {
-    console.log('Could not find Bayern-Stuttgart in the fixtures list -- trying /fixtures/date instead.');
-    const altResp = await call('/fixtures/date/2026-08-28');
-    const alt = (altResp?.data ?? []).filter(
-      (f) => /bayern/i.test(f.homeTeam?.name ?? f.homeTeamName ?? '') && /stuttgart/i.test(f.awayTeam?.name ?? f.awayTeamName ?? '')
+  for (const target of targets) {
+    const country = countries.find((c) => (c.name || '').toLowerCase() === target.country.toLowerCase());
+    if (!country) {
+      console.log(`${target.country}: not found in countries list.`);
+      continue;
+    }
+    const leaguesResp = await call(`/countries/${country.id}/leagues`);
+    const leagues = leaguesResp?.data ?? [];
+    const match = leagues.find((l) => (l.name || '').toLowerCase().includes(target.name));
+    console.log(
+      `${target.country} (countryId=${country.id}): ${leagues.length} leagues -- match: ${
+        match ? `${match.id} (apiId=${match.apiId ?? 'n/a'}) "${match.name}"` : 'NOT FOUND'
+      }`
     );
-    console.log('Matches found via /fixtures/date:', JSON.stringify(alt, null, 2));
-    return;
   }
-
-  console.log(`Found fixture id: ${match.id}`);
-  console.log('--- Fixture details ---');
-  console.log(JSON.stringify(await call(`/fixtures/${match.id}`), null, 2));
-
-  console.log('--- Events ---');
-  console.log(JSON.stringify(await call(`/fixtures/${match.id}/events`), null, 2));
-
-  console.log('--- Cards ---');
-  console.log(JSON.stringify(await call(`/fixtures/${match.id}/cards`), null, 2));
-
-  console.log('--- Substitutions ---');
-  console.log(JSON.stringify(await call(`/fixtures/${match.id}/substitutions`), null, 2));
-
-  console.log('--- Lineups (bonus check) ---');
-  console.log(JSON.stringify(await call(`/fixtures/${match.id}/lineups`), null, 2));
 }
 
 main().catch((err) => {
