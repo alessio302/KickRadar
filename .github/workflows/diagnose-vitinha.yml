@@ -1,0 +1,24 @@
+name: Diagnose Vitinha mismatch (one-off)
+
+# User's friend reports a "Vitinha -> Rennes" rumor showing up under a PSG
+# filter, but that story is about a different real player who shares PSG's
+# own Vitinha's common nickname -- see src/news/diagnoseVitinha.js.
+# Read-only, no DB writes.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseVitinha.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
