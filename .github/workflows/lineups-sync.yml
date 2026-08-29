@@ -38,11 +38,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/lineups/diagnoseLiveMatchState.js
+      - run: node src/lineups/syncLineups.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
-          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

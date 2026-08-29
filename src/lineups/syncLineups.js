@@ -12,8 +12,19 @@ import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 // bit past kickoff too, since the two sides don't always submit at exactly
 // the same time. Wide enough to catch that without polling fixtures that
 // are nowhere close yet.
+//
+// LOOKBACK_MIN confirmed live (Liverpool vs Nottingham Forest, 2026-08-29)
+// to matter well beyond "a bit past kickoff": a single missed or
+// rate-limited run right around kickoff dropped the fixture out of this
+// window entirely for the rest of the match (this file has no in-run
+// retry for a failed GOAL API call, unlike playerProfileResolver.js) --
+// its lineup then only backfilled once the match reached "finished" and
+// re-entered via finishedRecent below. 90 min instead of 20 keeps a
+// still-live, still-unconfirmed fixture in scope for another attempt on
+// every run through most of normal match length, rather than depending on
+// one run inside a narrow 20-minute band succeeding.
 const LOOKAHEAD_MIN = 45;
-const LOOKBACK_MIN = 20;
+const LOOKBACK_MIN = 90;
 
 // Separately, also revisit any *finished* fixture within the app's own
 // display window (matches web/src/hooks/useFixtures.js's PAST_WINDOW_DAYS)

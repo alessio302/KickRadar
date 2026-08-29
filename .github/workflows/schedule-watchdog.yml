@@ -16,6 +16,12 @@ name: Schedule watchdog
 # same time, so one watchdog run now covers the whole set instead of
 # needing a separate one per workflow.
 #
+# live-events.yml (added later, in the live-event-push stage) was never
+# added here -- confirmed live it went completely dark for well over an
+# hour spanning a real match's kickoff, with nothing catching it, since it
+# was relying solely on GitHub's own unreliable scheduler with no safety
+# net. Same threshold as lineups-sync.yml below: same 15-min native cadence.
+#
 # This watchdog's own schedule is subject to the identical GitHub
 # reliability issue -- it isn't a way around the root cause, since nothing
 # we control is. That's why it's also wired up to be triggered externally:
@@ -97,5 +103,6 @@ jobs:
           # aggressively.
           check_and_trigger news-scraper.yml 50     # cadence 30 min
           check_and_trigger lineups-sync.yml 25     # cadence 15 min
+          check_and_trigger live-events.yml 25      # cadence 15 min
           check_and_trigger live-scores.yml 14      # self-loops ~13 min while live; see comment above
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
