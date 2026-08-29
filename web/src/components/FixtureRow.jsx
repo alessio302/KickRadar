@@ -160,11 +160,11 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
           <ClubJersey club={clubsById.get(fixture.home_club_id)} size={20} theme={theme} />
-          <span style={{ fontSize: '13px' }}>{clubsById.get(fixture.home_club_id)?.name}</span>
+          <span style={{ fontSize: '13px' }}>{clubsById.get(fixture.home_club_id)?.short_name || clubsById.get(fixture.home_club_id)?.name}</span>
         </div>
         <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '11px', color: theme.textMuted }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, justifyContent: 'flex-end' }}>
-          <span style={{ fontSize: '13px' }}>{clubsById.get(fixture.away_club_id)?.name}</span>
+          <span style={{ fontSize: '13px' }}>{clubsById.get(fixture.away_club_id)?.short_name || clubsById.get(fixture.away_club_id)?.name}</span>
           <ClubJersey club={clubsById.get(fixture.away_club_id)} size={20} theme={theme} />
         </div>
       </div>
