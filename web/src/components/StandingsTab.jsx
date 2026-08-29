@@ -100,7 +100,7 @@ export default function StandingsTab({ theme, t, league, onSelectLeague, onSwipe
       <LeagueCarousel
         league={league}
         onSwitchLeague={onSwipeLeague}
-        renderPage={(slug) => <StandingsTable theme={theme} t={t} league={slug} />}
+        renderPage={(slug) => <StandingsTable key={slug} theme={theme} t={t} league={slug} />}
       />
     </div>
   );

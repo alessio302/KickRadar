@@ -10,6 +10,11 @@ import { useLeagueId } from './useLeagueId.js';
 // Fri-Mon round (confirmed live: LaLiga's 2026/27 Jornada 1 ran 15-27 Aug).
 const PAST_WINDOW_DAYS = 15;
 
+// Same module-level warm-start cache as useClubs.js/useStandings.js -- see
+// useClubs.js's own comment for why (the league swipe carousel in
+// useLeagueCarousel.js). Stores the already-grouped-by-matchday result.
+const cache = new Map();
+
 // Patches one fixture in place across the matchday-grouped structure --
 // used for the Realtime update below, so a live score/status change
 // doesn't need a full refetch (which would also reset scroll position and
@@ -54,8 +59,8 @@ function groupByMatchday(rows) {
 // FixturesTab.jsx for how "current" is actually determined now.
 export function useFixtures(leagueSlug) {
   const leagueId = useLeagueId(leagueSlug);
-  const [matchdays, setMatchdays] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [matchdays, setMatchdays] = useState(() => cache.get(leagueId) ?? []);
+  const [loading, setLoading] = useState(() => leagueId == null || !cache.has(leagueId));
   const [refreshing, setRefreshing] = useState(false);
 
   const buildQuery = useCallback(() => {
@@ -71,15 +76,23 @@ export function useFixtures(leagueSlug) {
   useEffect(() => {
     if (leagueId == null) return;
     let cancelled = false;
-    setLoading(true);
+    const cached = cache.get(leagueId);
+    if (cached) {
+      setMatchdays(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     buildQuery().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error('Failed to load fixtures for league', leagueSlug, error);
-        setMatchdays([]);
+        if (!cached) setMatchdays([]);
       } else {
-        setMatchdays(groupByMatchday(data));
+        const grouped = groupByMatchday(data);
+        cache.set(leagueId, grouped);
+        setMatchdays(grouped);
       }
       setLoading(false);
     });
@@ -97,7 +110,11 @@ export function useFixtures(leagueSlug) {
         { event: 'UPDATE', schema: 'public', table: 'fixtures', filter: `league_id=eq.${leagueId}` },
         (payload) => {
           if (cancelled) return;
-          setMatchdays((prev) => applyFixtureUpdate(prev, payload.new));
+          setMatchdays((prev) => {
+            const next = applyFixtureUpdate(prev, payload.new);
+            cache.set(leagueId, next);
+            return next;
+          });
         }
       )
       .subscribe();
@@ -118,7 +135,9 @@ export function useFixtures(leagueSlug) {
     if (error) {
       console.error('Failed to refresh fixtures for league', leagueSlug, error);
     } else {
-      setMatchdays(groupByMatchday(data));
+      const grouped = groupByMatchday(data);
+      cache.set(leagueId, grouped);
+      setMatchdays(grouped);
     }
     setRefreshing(false);
   }, [leagueId, leagueSlug, buildQuery]);

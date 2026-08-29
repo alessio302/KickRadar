@@ -230,6 +230,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
         onSwitchLeague={onSwipeLeague}
         renderPage={(slug) => (
           <FixturesList
+            key={slug}
             theme={theme}
             t={t}
             locale={locale}

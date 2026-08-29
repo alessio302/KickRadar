@@ -238,6 +238,7 @@ export default function TransfersTab({
         onSwitchLeague={onSwipeLeague}
         renderPage={(slug) => (
           <TransfersList
+            key={slug}
             theme={theme}
             t={t}
             language={language}

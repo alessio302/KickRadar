@@ -4,6 +4,14 @@ import { useLeagueId } from './useLeagueId.js';
 
 const PAGE_SIZE = 50;
 
+// Same module-level warm-start cache as useClubs.js/useStandings.js, keyed
+// by leagueId+officialOnly since that flag changes the query itself. See
+// useClubs.js's own comment for why this matters for the league swipe
+// carousel (useLeagueCarousel.js) -- without it, every league switch
+// re-fetched from scratch and showed a "Lädt..." flash even for a league
+// whose data had just finished loading moments earlier as the drag preview.
+const cache = new Map();
+
 // Returns plain rows (from_club_id/to_club_id as ints) rather than using
 // Supabase's embedded-relationship select -- transfers has two separate FKs
 // into clubs (from_club_id, to_club_id), which needs the exact auto-generated
@@ -33,8 +41,9 @@ const PAGE_SIZE = 50;
 // instead of just softening how the incomplete ones are displayed.
 export function useTransfers(leagueSlug, { officialOnly } = {}) {
   const leagueId = useLeagueId(leagueSlug);
-  const [transfers, setTransfers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = leagueId != null ? `${leagueId}:${officialOnly ? 1 : 0}` : null;
+  const [transfers, setTransfers] = useState(() => (cacheKey ? cache.get(cacheKey) ?? [] : []));
+  const [loading, setLoading] = useState(() => !cacheKey || !cache.has(cacheKey));
   const [refreshing, setRefreshing] = useState(false);
 
   const buildQuery = useCallback(() => {
@@ -57,16 +66,23 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
   }, [leagueId, officialOnly]);
 
   useEffect(() => {
-    if (leagueId == null) return;
+    if (leagueId == null || cacheKey == null) return;
     let cancelled = false;
-    setLoading(true);
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      setTransfers(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     buildQuery().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error('Failed to load transfers for league', leagueSlug, error);
-        setTransfers([]);
+        if (!cached) setTransfers([]);
       } else {
+        cache.set(cacheKey, data);
         setTransfers(data);
       }
       setLoading(false);
@@ -75,7 +91,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId, leagueSlug, buildQuery]);
+  }, [leagueId, cacheKey, leagueSlug, buildQuery]);
 
   // Re-queries Supabase directly for pull-to-refresh -- this never touches
   // the actual news sources, the LLM extraction, or any other rate-limited
@@ -89,10 +105,11 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     if (error) {
       console.error('Failed to refresh transfers for league', leagueSlug, error);
     } else {
+      if (cacheKey != null) cache.set(cacheKey, data);
       setTransfers(data);
     }
     setRefreshing(false);
-  }, [leagueId, leagueSlug, buildQuery]);
+  }, [leagueId, cacheKey, leagueSlug, buildQuery]);
 
   return { transfers, loading, refreshing, refetch };
 }

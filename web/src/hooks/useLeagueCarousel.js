@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { adjacentLeague } from '../lib/leagues.js';
 
 // Fraction of the container's width a drag has to cover before release
 // commits to the league switch instead of springing back -- roughly a
@@ -34,23 +35,37 @@ function startsInsideHorizontalScroller(target, boundary) {
 // clearly favors that axis (see DIRECTION_LOCK below), so ordinary
 // vertical list scrolling is never intercepted.
 //
+// `onCommit` fires the instant a release clears the threshold -- not
+// after the slide finishes animating -- so the rest of the app (the
+// active league pill, its scroll-into-view, any header data tied to the
+// league) updates immediately instead of visibly lagging behind a still-
+// animating swipe. `fromLeague`/`toLeague` stay frozen to whatever they
+// were at the start of the gesture for as long as a drag or its settle
+// animation is in progress, specifically so the two rendered panels don't
+// get pulled out from under that animation the moment `activeLeague`
+// changes underneath it; once the animation ends they fall back to
+// tracking `activeLeague` directly, which by then already equals what
+// `toLeague` was, so nothing visibly changes at that handoff.
+//
 // Callers render two absolutely-positioned panels inside the ref'd
-// container (see TransfersTab.jsx et al. for the exact markup): the
-// current page transformed by `offsetX`, and -- only while `direction` is
-// non-null -- a neighbor page pre-positioned just off-screen in that
-// direction and transformed by the same `offsetX`, so the two move in
-// perfect lockstep. `settling` is true only during the post-release
-// snap/spring-back animation, letting the caller add a CSS transition
-// then and only then (a transition applied during the live drag would
-// make it visibly lag the finger).
-export function useLeagueCarousel(onCommit) {
+// container (see LeagueCarousel.jsx for the exact markup): `fromLeague` at
+// `offsetX`, and -- only while `direction` is non-null -- `toLeague`
+// pre-positioned just off-screen in that direction and transformed by the
+// same `offsetX`, so the two move in perfect lockstep. `settling` is true
+// only during the post-release snap/spring-back animation, letting the
+// caller add a CSS transition then and only then (a transition applied
+// during the live drag would make it visibly lag the finger).
+export function useLeagueCarousel(activeLeague, onCommit) {
   const containerRef = useRef(null);
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
+  const activeLeagueRef = useRef(activeLeague);
+  activeLeagueRef.current = activeLeague;
 
   const [offsetX, setOffsetX] = useState(0);
   const [direction, setDirection] = useState(null); // 'next' | 'prev' | null
   const [settling, setSettling] = useState(false);
+  const [frozenFrom, setFrozenFrom] = useState(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -59,6 +74,7 @@ export function useLeagueCarousel(onCommit) {
     const DIRECTION_LOCK = 10;
     let startX = null;
     let startY = null;
+    let startLeague = null;
     let width = 0;
     // null = undecided, false = vertical/ignored this touch, true = horizontal drag live.
     let horizontal = null;
@@ -72,6 +88,7 @@ export function useLeagueCarousel(onCommit) {
       }
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
+      startLeague = activeLeagueRef.current;
       width = el.clientWidth;
       horizontal = null;
     };
@@ -86,6 +103,7 @@ export function useLeagueCarousel(onCommit) {
         horizontal = Math.abs(dx) > Math.abs(dy);
         if (!horizontal) return;
         setDirection(dx < 0 ? 'next' : 'prev');
+        setFrozenFrom(startLeague);
       }
       e.preventDefault();
       setOffsetX(dx);
@@ -97,13 +115,14 @@ export function useLeagueCarousel(onCommit) {
       settlingNow = true;
       setSettling(true);
       setOffsetX(committed ? (dir === 'next' ? -width : width) : 0);
+      if (committed) onCommitRef.current(dir);
 
       window.setTimeout(() => {
         settlingNow = false;
         setSettling(false);
         setOffsetX(0);
         setDirection(null);
-        if (committed) onCommitRef.current(dir);
+        setFrozenFrom(null);
       }, SETTLE_MS);
     };
 
@@ -133,7 +152,10 @@ export function useLeagueCarousel(onCommit) {
     };
   }, []);
 
-  return { containerRef, offsetX, direction, settling };
+  const fromLeague = frozenFrom ?? activeLeague;
+  const toLeague = direction ? adjacentLeague(fromLeague, direction === 'next' ? 1 : -1).slug : null;
+
+  return { containerRef, offsetX, direction, settling, fromLeague, toLeague };
 }
 
 export const LEAGUE_CAROUSEL_TRANSITION = `transform ${SETTLE_MS}ms ${SETTLE_EASING}`;
