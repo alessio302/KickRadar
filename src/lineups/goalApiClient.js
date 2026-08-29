@@ -24,10 +24,32 @@ export const GOAL_API_WS_URL = 'wss://api.goal-api.com/ws';
 // scheduled run 15+ minutes later. Retrying in this one shared call() means
 // every endpoint in this file rides out a transient rate-limit hit instead
 // of each caller needing its own copy of this logic.
+//
+// Confirmed live (2026-08-29, a full lineup-sync outage): the fixed 8s/16s
+// backoffs below were guessing blind. The 429 response's own headers
+// separate two independent budgets -- x-ratelimit-type: DAILY (1000/day,
+// plenty of headroom left) and a much tighter one (ratelimit-policy:
+// "1000;w=900", a 15-minute sliding window) that was fully saturated with
+// retry-after: 110 -- more than 6x the fixed backoff's total wait, so
+// every retry here was doomed before it started. retryDelayMs() below
+// reads the server's own Retry-After when present instead of guessing;
+// the fixed backoffs stay as a fallback for the rarer response that omits
+// it. Capped at 60s so one slow endpoint can't eat a whole job's timeout
+// budget -- a wait past that just fails this attempt and leaves it to the
+// next scheduled run, same as full exhaustion already degrades.
 const RETRY_BACKOFFS_MS = [8000, 16000];
+const MAX_RETRY_WAIT_MS = 60000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(res, attempt) {
+  const retryAfterSec = Number(res.headers.get('retry-after'));
+  if (Number.isFinite(retryAfterSec) && retryAfterSec > 0) {
+    return Math.min(retryAfterSec * 1000, MAX_RETRY_WAIT_MS);
+  }
+  return RETRY_BACKOFFS_MS[attempt];
 }
 
 async function call(path, params = {}) {
@@ -41,20 +63,20 @@ async function call(path, params = {}) {
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   }
 
-  for (const backoff of [0, ...RETRY_BACKOFFS_MS]) {
-    if (backoff > 0) {
-      console.warn(`GOAL API rate/gateway error on ${path}, retrying after ${backoff}ms`);
-      await sleep(backoff);
-    }
-
+  for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
     const body = await res.text();
     if (res.ok) return JSON.parse(body);
 
     const isRetryable = res.status === 429 || res.status === 502;
-    if (!isRetryable || backoff === RETRY_BACKOFFS_MS[RETRY_BACKOFFS_MS.length - 1]) {
+    const isLastAttempt = attempt === RETRY_BACKOFFS_MS.length;
+    if (!isRetryable || isLastAttempt) {
       throw new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
     }
+
+    const wait = retryDelayMs(res, attempt);
+    console.warn(`GOAL API rate/gateway error on ${path}, retrying after ${wait}ms`);
+    await sleep(wait);
   }
 }
 
