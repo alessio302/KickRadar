@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { CLUB_KIT_COLORS } from '../lib/clubKitColors.js';
 
 const SHIRT_PATH =
@@ -92,9 +92,32 @@ function KitFill({ pattern, primary, secondary }) {
   }
 }
 
+// football-data.org's own /teams response carries a real crest PNG per
+// club (see sql/031_club_crest.sql) -- confirmed live, a clean transparent
+// image, not a screenshot or watermarked logo. Preferred over the hand-
+// drawn kit below wherever it's synced; the kit stays as the fallback for
+// a club whose crest_url hasn't been backfilled yet, or whose image URL
+// fails to load (crest_url set but the actual request 404s/errors), so a
+// stale/dead link never leaves a blank square where a jersey used to be.
 export default function ClubJersey({ club, size = 24, theme }) {
   const clipId = useId();
+  const [imgFailed, setImgFailed] = useState(false);
   if (!club) return null;
+
+  if (club.crest_url && !imgFailed) {
+    return (
+      <img
+        src={club.crest_url}
+        alt={club.name}
+        title={club.name}
+        width={size}
+        height={size}
+        style={{ objectFit: 'contain', flex: '0 0 auto' }}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
   const kit = CLUB_KIT_COLORS[club.name];
   const primary = kit?.primary ?? theme.border;
   const secondary = kit?.secondary ?? theme.border;

@@ -51,6 +51,7 @@ export async function syncClubsForLeague(supabase, league) {
     external_team_id: team.id,
     venue: team.venue || null,
     short_name: SHORT_NAME_OVERRIDES[team.id] || team.shortName || null,
+    crest_url: team.crest || null,
   }));
 
   const { error } = await supabase

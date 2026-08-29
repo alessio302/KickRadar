@@ -12,7 +12,7 @@ export function useAllClubs() {
     let cancelled = false;
     supabase
       .from('clubs')
-      .select('id, name, short_code, leagues(slug, name)')
+      .select('id, name, short_code, crest_url, leagues(slug, name)')
       .order('name')
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -30,6 +30,7 @@ export function useAllClubs() {
             id: club.id,
             name: club.name,
             short_code: club.short_code,
+            crest_url: club.crest_url,
             league_slug: slug,
           });
         }
