@@ -1,10 +1,10 @@
-name: Diagnose Lucumi false-positive transfer
+name: Delete Lucumi false-positive transfer
 
 on:
   workflow_dispatch: {}
 
 jobs:
-  diagnose:
+  delete:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -14,7 +14,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/news/diagnoseLucumiTransfer.js
+      - run: node src/news/deleteLucumiTransfer.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
