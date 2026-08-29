@@ -128,6 +128,24 @@ function pickBestMatch(results, candidateClubNames) {
   return scored.length === 1 ? scored[0] : null;
 }
 
+// Shared shape-builder between resolveGoalApiProfile() (a fresh player,
+// found via name search) and refreshGoalApiProfileById() (an already-known
+// goal_api_id, re-fetched later by refreshPlayerProfiles.js) -- both end up
+// with the exact same raw GOAL API player object at this point, just
+// reached via a different first step.
+function buildProfileFields(profile) {
+  return {
+    goal_api_id: profile.id,
+    photo_url: profile.image || null,
+    birthdate: profile.birthdate || null,
+    position: POSITION_SINGULAR[profile.type] || profile.type || null,
+    squad_number: profile.number || null,
+    injured: profile.injured === 'Yes',
+    ...extractClubAndNationality(profile),
+    stats: extractStats(profile),
+  };
+}
+
 // Resolves a player against GOAL API's own player database instead of
 // transfermarkt.de's fragile quick-search scrape -- confirmed live it
 // returns a real photo, birthdate, current club (with badge), and a
@@ -144,18 +162,25 @@ export async function resolveGoalApiProfile(playerName, candidateClubNames) {
     const profile = await throttleGoalApi(() => getPlayer(match.id));
     if (!profile) return null;
 
-    return {
-      goal_api_id: profile.id,
-      photo_url: profile.image || null,
-      birthdate: profile.birthdate || null,
-      position: POSITION_SINGULAR[profile.type] || profile.type || null,
-      squad_number: profile.number || null,
-      injured: profile.injured === 'Yes',
-      ...extractClubAndNationality(profile),
-      stats: extractStats(profile),
-    };
+    return buildProfileFields(profile);
   } catch (err) {
     console.error(`GOAL API player resolution failed for "${playerName}":`, err.message);
+    return null;
+  }
+}
+
+// Re-fetches an already-resolved player by their known goal_api_id --
+// used by refreshPlayerProfiles.js to keep stats/club/injury status from
+// going stale forever after the one-time resolution above. Costs exactly
+// one GOAL API call (no search step needed, the id is already known),
+// unlike resolveGoalApiProfile()'s two.
+export async function refreshGoalApiProfileById(goalApiId) {
+  try {
+    const profile = await throttleGoalApi(() => getPlayer(goalApiId));
+    if (!profile) return null;
+    return buildProfileFields(profile);
+  } catch (err) {
+    console.error(`GOAL API profile refresh failed for goal_api_id "${goalApiId}":`, err.message);
     return null;
   }
 }

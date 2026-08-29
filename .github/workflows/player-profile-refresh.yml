@@ -1,0 +1,39 @@
+name: Player profile refresh
+
+on:
+  schedule:
+    # Every 6 hours, offset to :49 -- avoids colliding with news-scraper's
+    # :04/:34, lineups-sync's :14/:29/:44/:59, and other workflows' own
+    # minute marks (see news-scraper.yml's schedule comment for why that
+    # matters: GitHub Actions' scheduler throttles hard when multiple
+    # workflows share the exact same minute).
+    #
+    # Deliberately infrequent and small-batched (see refreshPlayerProfiles.js's
+    # own BATCH_SIZE comment) -- this shares the same GOAL API rate limit
+    # as syncLineups.js/syncLiveEvents.js/news-scraper.js's own player
+    # resolution, and that budget is already tight enough to have caused
+    # real outages. A full refresh cycle across every resolved player takes
+    # several days at this pace, which is fine for season stats that don't
+    # need to be real-time.
+    - cron: '49 1,7,13,19 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # 15 players x ~6.5s GOAL API spacing (1 call each, no search step) is
+    # well under a minute in the fast case; generous headroom for retries
+    # during a busy rate-limit window.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/refreshPlayerProfiles.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
