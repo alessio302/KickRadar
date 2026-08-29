@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowRightCircle, User, Sparkles } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
+import LeagueCarousel from './LeagueCarousel.jsx';
 import QuickFilters from './QuickFilters.jsx';
 import TransferSummaryOverlay from './TransferSummaryOverlay.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
@@ -8,112 +9,35 @@ import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
-import { useSwipeLeague } from '../hooks/useSwipeLeague.js';
 import { relativeTime } from '../lib/relativeTime.js';
 
-export default function TransfersTab({
-  theme,
-  t,
-  language,
-  league,
-  onSelectLeague,
-  onSwipeLeague,
-  favoriteClub,
-  quickFilters,
-  activeFilter,
-  onSelectFilter,
-  onAddQuickFilter,
-  onRemoveQuickFilter,
-  officialOnly,
-  onToggleOfficialOnly,
-}) {
-  const { clubs } = useClubs(league);
+// The transfer feed for one league -- rendered twice by LeagueCarousel
+// while a swipe is in progress (the active league and whichever neighbor
+// is being dragged into view). Only the active instance is interactive
+// (onOpenProfile/onOpenSummary are undefined on the preview one, and its
+// club filter is ignored -- see LeagueCarousel.jsx's own comment for why a
+// mid-drag preview represents "what you're about to land on" rather than
+// something meant to be tapped).
+function TransfersList({ theme, t, language, league, officialOnly, activeFilter, onOpenProfile, onOpenSummary }) {
   const { transfers, loading, refreshing, refetch } = useTransfers(league, { officialOnly });
-  const [summaryTransfer, setSummaryTransfer] = useState(null);
-  const [profilePlayer, setProfilePlayer] = useState(null);
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
     return transfers.filter((transfer) => transfer.from_club_id === activeFilter.id || transfer.to_club_id === activeFilter.id);
   }, [transfers, activeFilter]);
 
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
-  const swipeRef = useSwipeLeague(
-    () => onSwipeLeague(1),
-    () => onSwipeLeague(-1)
-  );
-
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
-        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
-
-        <QuickFilters
-          theme={theme}
-          t={t}
-          clubs={clubs}
-          favoriteClub={favoriteClub}
-          quickFilters={quickFilters}
-          activeFilterId={activeFilter?.id ?? null}
-          onSelectFilter={onSelectFilter}
-          onAddQuickFilter={onAddQuickFilter}
-          onRemoveQuickFilter={onRemoveQuickFilter}
-        />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 2px',
-            borderTop: `1px solid ${theme.border}`,
-            borderBottom: `1px solid ${theme.border}`,
-          }}
-        >
-          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.transfers.officialOnly}</span>
-          <button
-            onClick={onToggleOfficialOnly}
-            aria-label={t.transfers.officialOnlyToggle}
-            style={{
-              width: '40px',
-              height: '22px',
-              borderRadius: '999px',
-              border: 'none',
-              cursor: 'pointer',
-              background: officialOnly ? theme.accent : theme.border,
-              position: 'relative',
-            }}
-          >
-            <div
-              style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: theme.surface,
-                position: 'absolute',
-                top: '3px',
-                left: officialOnly ? '21px' : '3px',
-                transition: 'left 0.15s',
-              }}
-            />
-          </button>
-        </div>
-      </div>
-
-      <div
-        ref={(el) => {
-          scrollRef.current = el;
-          swipeRef.current = el;
-        }}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehaviorY: 'none',
-          padding: '12px 16px 14px',
-        }}
-      >
+    <div
+      ref={scrollRef}
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehaviorY: 'none',
+        padding: '12px 16px 14px',
+      }}
+    >
       <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
@@ -172,7 +96,7 @@ export default function TransfersTab({
               <div style={{ display: 'flex', gap: '10px' }}>
                 {transfer.players?.photo_url ? (
                   <button
-                    onClick={() => setProfilePlayer({ name: transfer.player_name, ...transfer.players })}
+                    onClick={() => onOpenProfile?.({ name: transfer.player_name, ...transfer.players })}
                     title={t.transfers.viewProfileTitle}
                     style={{
                       color: theme.textMuted,
@@ -204,7 +128,7 @@ export default function TransfersTab({
                 )}
                 {transfer[`ai_summary_${language}`] && (
                   <button
-                    onClick={() => setSummaryTransfer(transfer)}
+                    onClick={() => onOpenSummary?.(transfer)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -228,7 +152,103 @@ export default function TransfersTab({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+export default function TransfersTab({
+  theme,
+  t,
+  language,
+  league,
+  onSelectLeague,
+  onSwipeLeague,
+  favoriteClub,
+  quickFilters,
+  activeFilter,
+  onSelectFilter,
+  onAddQuickFilter,
+  onRemoveQuickFilter,
+  officialOnly,
+  onToggleOfficialOnly,
+}) {
+  const { clubs } = useClubs(league);
+  const [summaryTransfer, setSummaryTransfer] = useState(null);
+  const [profilePlayer, setProfilePlayer] = useState(null);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
+        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
+
+        <QuickFilters
+          theme={theme}
+          t={t}
+          clubs={clubs}
+          favoriteClub={favoriteClub}
+          quickFilters={quickFilters}
+          activeFilterId={activeFilter?.id ?? null}
+          onSelectFilter={onSelectFilter}
+          onAddQuickFilter={onAddQuickFilter}
+          onRemoveQuickFilter={onRemoveQuickFilter}
+        />
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 2px',
+            borderTop: `1px solid ${theme.border}`,
+            borderBottom: `1px solid ${theme.border}`,
+          }}
+        >
+          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.transfers.officialOnly}</span>
+          <button
+            onClick={onToggleOfficialOnly}
+            aria-label={t.transfers.officialOnlyToggle}
+            style={{
+              width: '40px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              cursor: 'pointer',
+              background: officialOnly ? theme.accent : theme.border,
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: theme.surface,
+                position: 'absolute',
+                top: '3px',
+                left: officialOnly ? '21px' : '3px',
+                transition: 'left 0.15s',
+              }}
+            />
+          </button>
+        </div>
       </div>
+
+      <LeagueCarousel
+        league={league}
+        onSwitchLeague={onSwipeLeague}
+        renderPage={(slug) => (
+          <TransfersList
+            theme={theme}
+            t={t}
+            language={language}
+            league={slug}
+            officialOnly={officialOnly}
+            activeFilter={slug === league ? activeFilter : null}
+            onOpenProfile={slug === league ? setProfilePlayer : undefined}
+            onOpenSummary={slug === league ? setSummaryTransfer : undefined}
+          />
+        )}
+      />
 
       {summaryTransfer && (
         <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />

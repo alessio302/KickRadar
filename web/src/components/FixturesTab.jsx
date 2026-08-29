@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
+import LeagueCarousel from './LeagueCarousel.jsx';
 import FixtureRow from './FixtureRow.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
-import { useSwipeLeague } from '../hooks/useSwipeLeague.js';
 import { useFavoriteFixtures } from '../hooks/useFavoriteFixtures.js';
 import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -41,30 +41,35 @@ function pickCurrentMatchday(matchdays) {
   return matchdays[matchdays.length - 1];
 }
 
-export default function FixturesTab({ theme, t, language, league, onSelectLeague, onSwipeLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
+// The fixture list for one league -- rendered twice by LeagueCarousel
+// while a swipe is in progress (the active league and whichever neighbor
+// is being dragged into view). Favoriting, opening a fixture's detail
+// overlay, and the push-notification deep link are only wired on the
+// active instance (see LeagueCarousel.jsx's own comment for why the
+// preview one stays non-interactive).
+function FixturesList({
+  theme,
+  t,
+  locale,
+  league,
+  currentMatchdayOnly,
+  favoriteIds,
+  onToggleFavorite,
+  openFixtureId,
+  onOpenRow,
+  onCloseRow,
+  onSelectFixture,
+  initialFixtureId,
+  onConsumedInitialFixture,
+}) {
+  // Own clubs fetch, scoped to this page's own league -- not the
+  // FixturesTab-level one below (that one only ever matches the actually
+  // active league, which would leave a neighbor preview's fixtures unable
+  // to resolve their own clubs' names/crests while it's mid-slide-in).
   const { clubs } = useClubs(league);
-  const { matchdays, loading, refreshing, refetch } = useFixtures(league);
-  const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
-  const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
-  const [selectedFixture, setSelectedFixture] = useState(null);
-  const [openFixtureId, setOpenFixtureId] = useState(null);
-  const locale = DATE_LOCALES[language];
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
-  const swipeRef = useSwipeLeague(
-    () => onSwipeLeague(1),
-    () => onSwipeLeague(-1)
-  );
-
-  const handleToggleFavorite = async (fixture) => {
-    try {
-      const result = await toggleFavorite(fixture.id);
-      onFavoriteToast(result === 'added' ? t.fixtures.favoritedToast : t.fixtures.unfavoritedToast);
-    } catch (err) {
-      onFavoriteToast(err.message === NOTIFICATIONS_DENIED ? t.errors.notificationsDenied : err.message);
-    }
-  };
-
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
+  const { matchdays, loading, refreshing, refetch } = useFixtures(league);
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
   const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
 
@@ -77,13 +82,103 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   // via onConsumedInitialFixture so a later matchdays refetch (e.g. after
   // the user closes the overlay) doesn't reopen it.
   useEffect(() => {
-    if (initialFixtureId == null) return;
+    if (initialFixtureId == null || !onSelectFixture) return;
     const found = matchdays.flatMap((m) => m.games).find((f) => f.id === initialFixtureId);
     if (found) {
-      setSelectedFixture(found);
+      onSelectFixture(found);
       onConsumedInitialFixture();
     }
-  }, [initialFixtureId, matchdays, onConsumedInitialFixture]);
+  }, [initialFixtureId, matchdays, onSelectFixture, onConsumedInitialFixture]);
+
+  return (
+    <div
+      ref={scrollRef}
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehaviorY: 'none',
+        padding: '12px 16px 14px',
+      }}
+    >
+      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
+      {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
+      {!loading && visible.length === 0 && (
+        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
+          {t.fixtures.empty}
+        </p>
+      )}
+
+      {visible.map(({ matchday, games }) => {
+        const byDate = games.reduce((acc, g) => {
+          const key = formatDate(g.kickoff_at, locale);
+          (acc[key] = acc[key] || []).push(g);
+          return acc;
+        }, {});
+
+        return (
+          <div key={matchday} style={{ marginBottom: '18px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 8px' }}>{t.fixtures.matchday(matchday)}</p>
+            {Object.entries(byDate).map(([date, dateGames]) => (
+              <div key={date} style={{ marginBottom: '10px' }}>
+                <p
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: theme.textMuted,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    margin: '0 0 6px',
+                  }}
+                >
+                  {date}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {dateGames.map((f) => (
+                    <FixtureRow
+                      key={f.id}
+                      theme={theme}
+                      t={t}
+                      locale={locale}
+                      formatTime={formatTime}
+                      clubsById={clubsById}
+                      fixture={f}
+                      isFavorite={favoriteIds?.has(f.id) ?? false}
+                      isOpen={openFixtureId === f.id}
+                      onOpenRow={() => onOpenRow?.(f.id)}
+                      onCloseRow={() => onCloseRow?.()}
+                      onSelectFixture={(fixture) => onSelectFixture?.(fixture)}
+                      onToggleFavorite={(fixture) => onToggleFavorite?.(fixture)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function FixturesTab({ theme, t, language, league, onSelectLeague, onSwipeLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
+  const { clubs } = useClubs(league);
+  const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
+  const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
+  const [selectedFixture, setSelectedFixture] = useState(null);
+  const [openFixtureId, setOpenFixtureId] = useState(null);
+  const locale = DATE_LOCALES[language];
+
+  const handleToggleFavorite = async (fixture) => {
+    try {
+      const result = await toggleFavorite(fixture.id);
+      onFavoriteToast(result === 'added' ? t.fixtures.favoritedToast : t.fixtures.unfavoritedToast);
+    } catch (err) {
+      onFavoriteToast(err.message === NOTIFICATIONS_DENIED ? t.errors.notificationsDenied : err.message);
+    }
+  };
+
+  const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -130,77 +225,27 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
         </div>
       </div>
 
-      <div
-        ref={(el) => {
-          scrollRef.current = el;
-          swipeRef.current = el;
-        }}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehaviorY: 'none',
-          padding: '12px 16px 14px',
-        }}
-      >
-      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
-      {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
-      {!loading && visible.length === 0 && (
-        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
-          {t.fixtures.empty}
-        </p>
-      )}
-
-      {visible.map(({ matchday, games }) => {
-        const byDate = games.reduce((acc, g) => {
-          const key = formatDate(g.kickoff_at, locale);
-          (acc[key] = acc[key] || []).push(g);
-          return acc;
-        }, {});
-
-        return (
-          <div key={matchday} style={{ marginBottom: '18px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 8px' }}>{t.fixtures.matchday(matchday)}</p>
-            {Object.entries(byDate).map(([date, dateGames]) => (
-              <div key={date} style={{ marginBottom: '10px' }}>
-                <p
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: theme.textMuted,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    margin: '0 0 6px',
-                  }}
-                >
-                  {date}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {dateGames.map((f) => (
-                    <FixtureRow
-                      key={f.id}
-                      theme={theme}
-                      t={t}
-                      locale={locale}
-                      formatTime={formatTime}
-                      clubsById={clubsById}
-                      fixture={f}
-                      isFavorite={favoriteIds.has(f.id)}
-                      isOpen={openFixtureId === f.id}
-                      onOpenRow={() => setOpenFixtureId(f.id)}
-                      onCloseRow={() => setOpenFixtureId(null)}
-                      onSelectFixture={setSelectedFixture}
-                      onToggleFavorite={handleToggleFavorite}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })}
-      </div>
+      <LeagueCarousel
+        league={league}
+        onSwitchLeague={onSwipeLeague}
+        renderPage={(slug) => (
+          <FixturesList
+            theme={theme}
+            t={t}
+            locale={locale}
+            league={slug}
+            currentMatchdayOnly={currentMatchdayOnly}
+            favoriteIds={slug === league ? favoriteIds : undefined}
+            onToggleFavorite={slug === league ? handleToggleFavorite : undefined}
+            openFixtureId={slug === league ? openFixtureId : null}
+            onOpenRow={slug === league ? setOpenFixtureId : undefined}
+            onCloseRow={slug === league ? () => setOpenFixtureId(null) : undefined}
+            onSelectFixture={slug === league ? setSelectedFixture : undefined}
+            initialFixtureId={slug === league ? initialFixtureId : null}
+            onConsumedInitialFixture={slug === league ? onConsumedInitialFixture : undefined}
+          />
+        )}
+      />
 
       {selectedFixture && (
         <FixtureDetailOverlay

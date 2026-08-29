@@ -85,7 +85,7 @@ export default function App() {
   };
 
   // direction 1 = swipe left (next league), -1 = swipe right (previous) --
-  // see useSwipeLeague.js. Goes through the same selectLeague as tapping a
+  // see useLeagueCarousel.js. Goes through the same selectLeague as tapping a
   // pill so activeFilter gets cleared identically either way.
   const swipeLeague = (direction) => {
     selectLeague(adjacentLeague(league, direction).slug);
