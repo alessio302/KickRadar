@@ -62,7 +62,7 @@ export function useFixtures(leagueSlug) {
     const cutoff = new Date(Date.now() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
     return supabase
       .from('fixtures')
-      .select('id, matchday, home_club_id, away_club_id, kickoff_at, status, home_score, away_score, referee')
+      .select('id, matchday, home_club_id, away_club_id, kickoff_at, status, home_score, away_score, referee, live_minute')
       .eq('league_id', leagueId)
       .gte('kickoff_at', cutoff)
       .order('kickoff_at', { ascending: true });

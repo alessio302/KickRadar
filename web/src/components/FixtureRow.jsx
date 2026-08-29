@@ -155,7 +155,7 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
         }}
       >
         <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '48px', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '3px' }}>
-          {formatTime(fixture.kickoff_at, locale)}
+          {fixture.status === 'live' && fixture.live_minute ? `${fixture.live_minute}'` : formatTime(fixture.kickoff_at, locale)}
           {isFavorite && <Star size={14} fill={FAVORITE_STAR_COLOR} color={FAVORITE_STAR_COLOR} style={{ flexShrink: 0 }} />}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>

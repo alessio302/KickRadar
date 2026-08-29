@@ -183,6 +183,25 @@ function buildLiveEventRows(fixtureId, homeClubId, awayClubId, data) {
   return rows;
 }
 
+// Confirmed live: GOAL API's match_update carries no dedicated elapsed-
+// minute field, but match_status doubles as one while a match is
+// in-play -- a bare string like "23" or "45+2" (its match_time field stays
+// fixed at kickoff time throughout, and the REST fixtures-by-date endpoint
+// has no minute at all, only a text matchStatus like "LIVE"/"FINISHED").
+// This mirrors GoalServe's well-known schema, which match_update's other
+// field names (match_hometeam_name, goalscorer, ...) already match closely
+// -- match_status holds the live minute as a plain number there too,
+// switching to fixed text ("Half Time", "Finished", ...) outside play.
+// Only recognized as a minute when it parses cleanly; any other value
+// (including those fixed text ones) is left alone rather than guessed at,
+// same conservative-match principle clubMatch.js's resolveClub() already
+// applies -- a wrong minute shown as live would be worse than the fixture
+// row falling back to its kickoff time.
+function parseLiveMinute(matchStatus) {
+  if (typeof matchStatus !== 'string') return null;
+  return /^\d{1,3}(\+\d{1,2})?$/.test(matchStatus) ? matchStatus : null;
+}
+
 function countLiveEvents(data) {
   const subs = data.substitutions ?? {};
   return (data.goalscorer?.length ?? 0) + (data.cards?.length ?? 0) + (subs.home?.length ?? 0) + (subs.away?.length ?? 0);
@@ -210,6 +229,7 @@ export async function syncLiveEvents() {
   let updatesHandled = 0;
   let rowsWritten = 0;
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
+  const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
 
   await new Promise((resolve) => {
     const ws = new WebSocket(`${GOAL_API_WS_URL}?wsToken=${token}`);
@@ -279,6 +299,13 @@ export async function syncLiveEvents() {
       const goalApiId = String(data?.id ?? '');
       const info = byGoalApiId.get(goalApiId);
       if (!info) return; // a match we're not tracking, or id shape we don't recognize
+
+      const liveMinute = parseLiveMinute(data.match_status);
+      if (liveMinute && lastMinutes.get(goalApiId) !== liveMinute) {
+        lastMinutes.set(goalApiId, liveMinute);
+        const { error: minuteErr } = await supabase.from('fixtures').update({ live_minute: liveMinute }).eq('id', info.fixtureId);
+        if (minuteErr) console.error(`Failed to update live minute for fixture ${info.fixtureId}:`, minuteErr.message);
+      }
 
       const count = countLiveEvents(data);
       if (lastCounts.get(goalApiId) === count) return; // no new goal/card/sub since last push
