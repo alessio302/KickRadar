@@ -679,7 +679,13 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
           background: theme.bg,
           width: '100%',
           maxWidth: '420px',
-          maxHeight: '82vh',
+          // Fixed, not maxHeight -- with only a cap, the flex column below
+          // shrank to fit whatever the active tab's content needed (a short
+          // stats list vs. a long lineup), so the whole sheet visibly
+          // resized every time the user switched tabs. A fixed height plus
+          // the content area's own overflowY:auto (below) keeps the sheet's
+          // footprint constant and lets each tab scroll internally instead.
+          height: '82vh',
           borderTopLeftRadius: '16px',
           borderTopRightRadius: '16px',
           display: 'flex',
