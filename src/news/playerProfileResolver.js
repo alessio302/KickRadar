@@ -4,6 +4,42 @@ import { searchPlayers, getPlayer } from '../lineups/goalApiClient.js';
 
 const TRANSFERMARKT_BASE = 'https://www.transfermarkt.de';
 
+// Confirmed live: GOAL API's response headers only describe its 1000/day
+// bucket (X-RateLimit-Type: DAILY), but a real call sequence still got
+// rejected well under that daily number -- a tight, undocumented short-term
+// limit, surfaced inconsistently as either a 429 RATE_LIMIT_EXCEEDED (from
+// the app itself) or a bare 502 with Retry-After: 60 (from a gateway layer
+// in front of it). Binary-searching real gaps found 4s still failing and
+// 6s succeeding twice in a row; spacing every call at 6.5s (a bit of
+// margin) plus one retry after a longer backoff handles the odd transient
+// 502 without giving up on a player entirely.
+const MIN_GOAL_API_INTERVAL_MS = 6500;
+const RETRY_BACKOFF_MS = 12000;
+let lastGoalApiCallAt = 0;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function throttleGoalApi() {
+  const wait = lastGoalApiCallAt + MIN_GOAL_API_INTERVAL_MS - Date.now();
+  if (wait > 0) await sleep(wait);
+  lastGoalApiCallAt = Date.now();
+}
+
+async function callGoalApiThrottled(fn) {
+  await throttleGoalApi();
+  try {
+    return await fn();
+  } catch (err) {
+    if (!/\b(429|502)\b/.test(err.message)) throw err;
+    console.warn('GOAL API rate/gateway error, retrying once after backoff:', err.message);
+    await sleep(RETRY_BACKOFF_MS);
+    lastGoalApiCallAt = Date.now();
+    return await fn();
+  }
+}
+
 // GOAL API's own singular/plural mismatch with this app's existing
 // position keys (web/src/i18n/translations.js's t.lineup.positions,
 // inherited from Highlightly's enum) -- same normalization
@@ -58,11 +94,11 @@ function pickBestMatch(results, candidateClubNames) {
 // link, same as before this existed.
 async function resolveGoalApiProfile(playerName, candidateClubNames) {
   try {
-    const results = await searchPlayers(playerName);
+    const results = await callGoalApiThrottled(() => searchPlayers(playerName));
     const match = pickBestMatch(results, candidateClubNames);
     if (!match) return null;
 
-    const profile = await getPlayer(match.id);
+    const profile = await callGoalApiThrottled(() => getPlayer(match.id));
     if (!profile) return null;
 
     return {

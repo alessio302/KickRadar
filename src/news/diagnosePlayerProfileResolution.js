@@ -1,45 +1,84 @@
-// Read-only: GOAL API's response headers (X-RateLimit-Limit: 1000, type:
-// DAILY) only describe the daily bucket -- a real call sequence still hit
-// 429 RATE_LIMIT_EXCEEDED after just ~3s of spacing, well under that daily
-// number, so there's a second, tighter (per-second/per-minute) limit the
-// headers don't surface. Finds the real safe interval empirically by
-// firing the same request at increasing delays and seeing which gap the
-// 429 stops appearing at, instead of guessing.
+// Read-only, no DB writes: dry-runs the real, now-throttled GOAL-API-based
+// player resolution logic (search -> disambiguate by club -> full
+// profile), reusing resolveGoalApiProfile()'s actual exported internals
+// isn't possible (it's private to playerProfileResolver.js), so this
+// re-implements the same call shape -- but with the SAME throttle/retry
+// constants that module now uses, to confirm they actually hold up
+// end-to-end after the 429/502 findings from the previous two runs.
+import { searchPlayers, getPlayer } from '../lineups/goalApiClient.js';
+
+const MIN_GOAL_API_INTERVAL_MS = 6500;
+const RETRY_BACKOFF_MS = 12000;
+let lastCallAt = 0;
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function probe(label) {
-  const apiKey = process.env.GOAL_API_KEY;
-  const start = Date.now();
-  const res = await fetch('https://api.goal-api.com/v1/players?search=Messi', {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  const elapsed = Date.now() - start;
-  console.log(
-    `[${label}] status=${res.status} elapsed=${elapsed}ms retry-after=${res.headers.get('retry-after')} ` +
-      `x-ratelimit-remaining=${res.headers.get('x-ratelimit-remaining')} x-ratelimit-type=${res.headers.get('x-ratelimit-type')}`
-  );
-  return res.status;
+async function throttled(fn) {
+  const wait = lastCallAt + MIN_GOAL_API_INTERVAL_MS - Date.now();
+  if (wait > 0) await sleep(wait);
+  lastCallAt = Date.now();
+  try {
+    return await fn();
+  } catch (err) {
+    if (!/\b(429|502)\b/.test(err.message)) throw err;
+    console.warn('rate/gateway error, retrying once:', err.message);
+    await sleep(RETRY_BACKOFF_MS);
+    lastCallAt = Date.now();
+    return await fn();
+  }
 }
 
-const DELAYS_MS = [0, 1000, 2000, 4000, 6000, 8000, 10000, 15000];
+function normalize(text) {
+  return text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function pickBestMatch(results, candidateClubNames) {
+  if (results.length === 0) return null;
+  if (results.length === 1) return results[0];
+  const candidates = candidateClubNames.filter(Boolean).map(normalize);
+  const scored = results.filter((r) => {
+    const teamName = normalize(r.team?.name || '');
+    return teamName && candidates.some((c) => teamName.includes(c) || c.includes(teamName));
+  });
+  return scored.length === 1 ? scored[0] : null;
+}
+
+const CASES = [
+  { name: 'Erling Haaland', clubs: ['Manchester City'] },
+  { name: 'Rodrygo', clubs: ['Real Madrid'] },
+  { name: 'Silva', clubs: ['Chelsea'] },
+];
 
 async function main() {
-  for (const delay of DELAYS_MS) {
-    await sleep(delay);
-    const status = await probe(`gap=${delay}ms`);
-    if (status === 200 && delay > 0) {
-      // Confirm it's not a fluke -- fire one more at the same gap.
-      await sleep(delay);
-      const confirmStatus = await probe(`gap=${delay}ms (confirm)`);
-      if (confirmStatus === 200) {
-        console.log(`\nFirst reliably-safe gap found: ${delay}ms`);
-        return;
-      }
+  for (const { name, clubs } of CASES) {
+    console.log(`\n=== "${name}" (candidate clubs: ${clubs.join(', ')}) ===`);
+    const results = await throttled(() => searchPlayers(name));
+    console.log(`${results.length} search result(s):`, results.map((r) => `${r.name} (${r.team?.name ?? 'no team'})`));
+
+    const match = pickBestMatch(results, clubs);
+    if (!match) {
+      console.log('No confident match -- would fall back to transfermarkt.de.');
+      continue;
     }
+    console.log('Picked:', match.name, '/', match.team?.name);
+
+    const profile = await throttled(() => getPlayer(match.id));
+    console.log('Full profile fields:', {
+      image: profile.image,
+      birthdate: profile.birthdate,
+      type: profile.type,
+      team: profile.team,
+      goals: profile.goals,
+      assists: profile.assists,
+      rating: profile.rating,
+    });
   }
-  console.log('\nNo gap up to 15s was reliably safe -- limit may be lower still, or based on something other than time (e.g. a small burst bucket).');
 }
 
 main().catch((err) => {
