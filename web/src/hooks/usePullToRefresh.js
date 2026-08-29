@@ -5,6 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 export const PULL_THRESHOLD = 60;
 const PULL_MAX = 90;
 
+// Same axis-lock distance as useLeagueCarousel.js's own DIRECTION_LOCK --
+// keeping both at the same value means whichever axis actually dominates a
+// diagonal drag wins outright, instead of one gesture reacting to a couple
+// of early, still-ambiguous pixels before the other has had a chance to
+// even look at the same movement.
+const AXIS_LOCK = 10;
+
 // Rubber-band curve (grows fast at first, increasingly resists further
 // pulling) instead of 1:1 finger tracking -- matches native overscroll
 // physics; confirmed live that a linear mapping read as "not elastic
@@ -27,6 +34,17 @@ function dampen(rawDelta) {
 // showed up as the custom indicator flashing briefly and then the pull
 // just stopping tracking. Calling preventDefault() ourselves, once we've
 // decided this is a pull (not a scroll), keeps the whole gesture.
+//
+// This element also has useLeagueCarousel's own touch listeners on an
+// ancestor of it (the same touchmove bubbles to both) -- a genuinely
+// diagonal drag used to trigger both at once (confirmed live via
+// screenshot: the pull indicator and a half-slid-in neighbor league
+// showing together), since this hook used to react to any downward
+// movement at all regardless of how much horizontal movement came with
+// it. Waiting for AXIS_LOCK pixels of movement before deciding whether
+// the drag is dominantly vertical mirrors the same lock useLeagueCarousel
+// applies for "dominantly horizontal" -- a diagonal drag now commits to
+// whichever axis actually wins, never both.
 export function usePullToRefresh(onRefresh) {
   const scrollRef = useRef(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -38,16 +56,34 @@ export function usePullToRefresh(onRefresh) {
     const el = scrollRef.current;
     if (!el) return;
 
+    let startX = null;
     let startY = null;
+    // null = undecided, false = horizontal/ignored this touch, true = vertical pull live.
+    let vertical = null;
 
     const handleTouchStart = (e) => {
-      startY = el.scrollTop <= 0 ? e.touches[0].clientY : null;
+      if (el.scrollTop <= 0) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        vertical = null;
+      } else {
+        startX = null;
+        startY = null;
+      }
     };
 
     const handleTouchMove = (e) => {
-      if (startY == null) return;
-      const rawDelta = e.touches[0].clientY - startY;
-      if (rawDelta <= 0 || el.scrollTop > 0) {
+      if (startY == null || vertical === false) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+
+      if (vertical == null) {
+        if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) return;
+        vertical = Math.abs(dy) > Math.abs(dx);
+        if (!vertical) return;
+      }
+
+      if (dy <= 0 || el.scrollTop > 0) {
         startY = null;
         setPulling(false);
         setPullDistance(0);
@@ -55,18 +91,20 @@ export function usePullToRefresh(onRefresh) {
       }
       e.preventDefault();
       setPulling(true);
-      setPullDistance(dampen(rawDelta));
+      setPullDistance(dampen(dy));
     };
 
     const handleTouchEnd = () => {
-      if (startY != null) {
+      if (startY != null && vertical) {
         setPullDistance((current) => {
           if (current >= PULL_THRESHOLD) onRefreshRef.current();
           return 0;
         });
         setPulling(false);
       }
+      startX = null;
       startY = null;
+      vertical = null;
     };
 
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
