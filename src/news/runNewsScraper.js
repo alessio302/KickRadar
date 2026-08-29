@@ -331,7 +331,7 @@ async function scrapeLeague(supabase, league) {
     let playerId = null;
     if (resolvedPlayerName) {
       try {
-        const player = await resolvePlayerProfile(supabase, resolvedPlayerName);
+        const player = await resolvePlayerProfile(supabase, resolvedPlayerName, [resolvedFromClub, resolvedToClub]);
         playerId = player.id;
       } catch (err) {
         console.warn(`[${league.slug}] player profile resolution failed for "${resolvedPlayerName}":`, err.message);

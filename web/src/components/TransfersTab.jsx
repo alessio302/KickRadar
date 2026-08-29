@@ -3,6 +3,7 @@ import { ArrowRightCircle, User, Sparkles } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import QuickFilters from './QuickFilters.jsx';
 import TransferSummaryOverlay from './TransferSummaryOverlay.jsx';
+import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
@@ -27,6 +28,7 @@ export default function TransfersTab({
   const { clubs } = useClubs(league);
   const { transfers, loading, refreshing, refetch } = useTransfers(league, { officialOnly });
   const [summaryTransfer, setSummaryTransfer] = useState(null);
+  const [profilePlayer, setProfilePlayer] = useState(null);
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
@@ -159,16 +161,37 @@ export default function TransfersTab({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', color: theme.textMuted }}>{transfer.source}</span>
               <div style={{ display: 'flex', gap: '10px' }}>
-                {transfer.players?.transfermarkt_url && (
-                  <a
-                    href={transfer.players.transfermarkt_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={t.transfers.searchPlayerTitle}
-                    style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
+                {transfer.players?.photo_url ? (
+                  <button
+                    onClick={() => setProfilePlayer({ name: transfer.player_name, ...transfer.players })}
+                    title={t.transfers.viewProfileTitle}
+                    style={{
+                      color: theme.textMuted,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      fontSize: '11px',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
                   >
-                    <User size={13} /> {t.transfers.searchPlayer}
-                  </a>
+                    <User size={13} /> {t.transfers.viewProfile}
+                  </button>
+                ) : (
+                  transfer.players?.transfermarkt_url && (
+                    <a
+                      href={transfer.players.transfermarkt_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={t.transfers.searchPlayerTitle}
+                      style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
+                    >
+                      <User size={13} /> {t.transfers.searchPlayer}
+                    </a>
+                  )
                 )}
                 {transfer[`ai_summary_${language}`] && (
                   <button
@@ -200,6 +223,9 @@ export default function TransfersTab({
 
       {summaryTransfer && (
         <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />
+      )}
+      {profilePlayer && (
+        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} onClose={() => setProfilePlayer(null)} />
       )}
     </div>
   );

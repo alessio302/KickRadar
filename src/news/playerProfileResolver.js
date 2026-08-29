@@ -1,7 +1,84 @@
 import * as cheerio from 'cheerio';
 import { normalize } from '../util/normalize.js';
+import { searchPlayers, getPlayer } from '../lineups/goalApiClient.js';
 
 const TRANSFERMARKT_BASE = 'https://www.transfermarkt.de';
+
+// GOAL API's own singular/plural mismatch with this app's existing
+// position keys (web/src/i18n/translations.js's t.lineup.positions,
+// inherited from Highlightly's enum) -- same normalization
+// syncLineups.js's groupByPositionRows() already applies to lineup data,
+// duplicated here rather than shared since it's 4 lines either way.
+const POSITION_SINGULAR = {
+  Goalkeepers: 'Goalkeeper',
+  Defenders: 'Defender',
+  Midfielders: 'Midfielder',
+  Forwards: 'Forward',
+};
+
+// Curated subset of GOAL API's player-profile stat fields -- confirmed
+// live many others (shotsTotal, tackles, blocks, ...) come back null
+// depending on coverage; these are the ones reliably populated.
+const STAT_FIELDS = ['matchPlayed', 'goals', 'assists', 'yellowCards', 'redCards', 'rating', 'minutes'];
+
+function extractStats(profile) {
+  const stats = {};
+  for (const key of STAT_FIELDS) {
+    if (profile[key] != null) stats[key] = profile[key];
+  }
+  return stats;
+}
+
+// GOAL API's player search is global (~1000 leagues, same collision risk
+// as league name search -- see config/leagues.js) -- a bare name search
+// for something like "Silva" can return several unrelated real players.
+// Only trusts a result when it's the sole hit, or when exactly one hit's
+// current club matches one of the clubs this transfer story already
+// resolved (from_club/to_club) -- multiple ambiguous matches are left
+// unresolved rather than guessed at, same principle
+// runNewsScraper.js's lookupSquadMembership() already applies.
+function pickBestMatch(results, candidateClubNames) {
+  if (results.length === 0) return null;
+  if (results.length === 1) return results[0];
+
+  const candidates = candidateClubNames.filter(Boolean).map(normalize);
+  const scored = results.filter((r) => {
+    const teamName = normalize(r.team?.name || '');
+    return teamName && candidates.some((c) => teamName.includes(c) || c.includes(teamName));
+  });
+  return scored.length === 1 ? scored[0] : null;
+}
+
+// Resolves a player against GOAL API's own player database instead of
+// transfermarkt.de's fragile quick-search scrape -- confirmed live it
+// returns a real photo, birthdate, current club (with badge), and a
+// season stats snapshot, all from the same provider/quota already used
+// for lineups and live events. Returns null (never throws for a genuine
+// "no confident match") so the caller can fall back to the transfermarkt
+// link, same as before this existed.
+async function resolveGoalApiProfile(playerName, candidateClubNames) {
+  try {
+    const results = await searchPlayers(playerName);
+    const match = pickBestMatch(results, candidateClubNames);
+    if (!match) return null;
+
+    const profile = await getPlayer(match.id);
+    if (!profile) return null;
+
+    return {
+      goal_api_id: profile.id,
+      photo_url: profile.image || null,
+      birthdate: profile.birthdate || null,
+      position: POSITION_SINGULAR[profile.type] || profile.type || null,
+      current_club_name: profile.team?.name || null,
+      current_club_badge: profile.team?.badge || null,
+      stats: extractStats(profile),
+    };
+  } catch (err) {
+    console.error(`GOAL API player resolution failed for "${playerName}":`, err.message);
+    return null;
+  }
+}
 
 function quickSearchUrl(playerName) {
   return `${TRANSFERMARKT_BASE}/schnellsuche/ergebnis/schnellsuche?query=${encodeURIComponent(playerName)}`;
@@ -33,31 +110,43 @@ async function lookupTransfermarktUrl(playerName) {
   }
 }
 
-// Resolves and caches a player's transfermarkt.de profile URL. `getPlayerId`
-// callers should pass a Supabase client; resolution happens once per player
-// name (normalized), subsequent calls hit the cache.
-export async function resolvePlayerProfile(supabase, playerName) {
+// Resolves and caches a player's profile -- GOAL API's own player database
+// first (real photo/birthdate/club/stats, see resolveGoalApiProfile()),
+// falling back to transfermarkt.de's quick-search scrape only when GOAL API
+// has no confident match. Resolution happens once per player name
+// (normalized), like before; subsequent calls hit the cache as-is, so a
+// player's photo/stats are a snapshot from whenever they were first
+// resolved, not refreshed later -- same accepted tradeoff this cache
+// already had for transfermarkt_url.
+//
+// candidateClubNames lets the caller pass the transfer's own already-
+// resolved from_club/to_club, used only to disambiguate a common name
+// against GOAL API's global player search (see pickBestMatch()) -- never
+// required, but resolution silently stays less certain without it.
+export async function resolvePlayerProfile(supabase, playerName, candidateClubNames = []) {
   const normalized = normalize(playerName);
 
   const { data: existing, error: lookupErr } = await supabase
     .from('players')
-    .select('id, transfermarkt_url')
+    .select('id, transfermarkt_url, goal_api_id, photo_url')
     .eq('normalized_name', normalized)
     .maybeSingle();
   if (lookupErr) throw lookupErr;
   if (existing) return existing;
 
-  const { url } = await lookupTransfermarktUrl(playerName);
+  const goalApiProfile = await resolveGoalApiProfile(playerName, candidateClubNames);
+  const transfermarktUrl = goalApiProfile ? null : (await lookupTransfermarktUrl(playerName)).url;
 
   const { data: inserted, error: insertErr } = await supabase
     .from('players')
     .insert({
       name: playerName,
       normalized_name: normalized,
-      transfermarkt_url: url,
+      transfermarkt_url: transfermarktUrl,
       resolved_at: new Date().toISOString(),
+      ...(goalApiProfile ?? {}),
     })
-    .select('id, transfermarkt_url')
+    .select('id, transfermarkt_url, goal_api_id, photo_url')
     .single();
   if (insertErr) throw insertErr;
 

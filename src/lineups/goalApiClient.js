@@ -70,6 +70,28 @@ export async function getFixtureSubstitutions(fixtureId) {
   return data.data ?? [];
 }
 
+// Global name search across every player GOAL API tracks (~1000 leagues
+// worldwide, same collision risk as league name search -- see
+// config/leagues.js's own comment on that) -- confirmed live it returns a
+// real result set (id, name, image, age, birthdate, team{id,name,badge})
+// per match, not just a bare id. src/news/playerProfileResolver.js
+// disambiguates multiple hits against the club a transfer story already
+// resolved, rather than guessing.
+export async function searchPlayers(name) {
+  const data = await call('/players', { search: name });
+  return data.data ?? [];
+}
+
+// Full profile for one player -- confirmed live this adds a real photo
+// URL, birthdate, current team (with badge), and a season stats snapshot
+// (goals/assists/cards/rating/minutes -- many other stat fields come back
+// null depending on coverage) on top of what the search result above
+// already has.
+export async function getPlayer(goalApiId) {
+  const data = await call(`/players/${goalApiId}`);
+  return data.data ?? null;
+}
+
 // Exchanges the API key for a short-lived (60s), single-use WebSocket
 // connection token -- required for browser-style clients per GOAL API's
 // own docs; a server-side Node client could send the API key directly on
