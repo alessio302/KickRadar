@@ -26,6 +26,11 @@ const FIXTURE_WINDOW_DAYS = Number(process.env.FIXTURE_WINDOW_DAYS || 21);
 // what's available for a club-scoped stats query).
 const FIXTURE_PAST_WINDOW_DAYS = Number(process.env.FIXTURE_PAST_WINDOW_DAYS || 60);
 
+// Never let a fresh fetch move a fixture backwards through this ranking --
+// see syncFixturesForLeague's own comment below on why a stale response can
+// otherwise regress an already-live/finished fixture back to 'scheduled'.
+const STATUS_RANK = { scheduled: 0, postponed: 0, cancelled: 0, live: 1, finished: 2 };
+
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -49,24 +54,45 @@ export async function syncFixturesForLeague(supabase, league) {
   const to = toDateString(new Date(Date.now() + FIXTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
 
   const matches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: from, dateTo: to });
+  const relevant = matches.filter((m) => clubIdByExternalId.has(m.homeTeam.id) && clubIdByExternalId.has(m.awayTeam.id));
+  if (relevant.length === 0) return 0;
 
-  const rows = matches
-    .filter((m) => clubIdByExternalId.has(m.homeTeam.id) && clubIdByExternalId.has(m.awayTeam.id))
-    .map((m) => ({
+  // Confirmed live (Lille-PSG, 2026-08-28): this call's own date range spans
+  // FIXTURE_PAST_WINDOW_DAYS+FIXTURE_WINDOW_DAYS (~80 days), and football-
+  // data.org can serve a cached response for that broad query that lags
+  // behind a match's real state -- a re-sync at 00:00 UTC overwrote a
+  // fixture syncLiveScores.js had already correctly marked 'finished' (with
+  // its final 2-2 score) hours earlier right back to 'scheduled' with a
+  // null score, because this particular query was still serving a stale
+  // snapshot from before kickoff. Fetching each match's current stored
+  // status first and refusing to move it backwards through STATUS_RANK
+  // means a stale response can no longer undo what syncLiveScores.js (or
+  // syncLiveEvents.js) already established.
+  const { data: existingRows, error: existingErr } = await supabase
+    .from('fixtures')
+    .select('external_fixture_id, status, home_score, away_score')
+    .in('external_fixture_id', relevant.map((m) => m.id));
+  if (existingErr) throw existingErr;
+  const existingByExternalId = new Map(existingRows.map((r) => [r.external_fixture_id, r]));
+
+  const rows = relevant.map((m) => {
+    const existing = existingByExternalId.get(m.id);
+    const fetchedStatus = STATUS_MAP[m.status] || 'scheduled';
+    const regressing = existing && STATUS_RANK[existing.status] > STATUS_RANK[fetchedStatus];
+    return {
       league_id: dbLeague.id,
       matchday: m.matchday,
       home_club_id: clubIdByExternalId.get(m.homeTeam.id),
       away_club_id: clubIdByExternalId.get(m.awayTeam.id),
       kickoff_at: m.utcDate,
-      status: STATUS_MAP[m.status] || 'scheduled',
-      home_score: m.score?.fullTime?.home ?? null,
-      away_score: m.score?.fullTime?.away ?? null,
+      status: regressing ? existing.status : fetchedStatus,
+      home_score: regressing ? existing.home_score : (m.score?.fullTime?.home ?? null),
+      away_score: regressing ? existing.away_score : (m.score?.fullTime?.away ?? null),
       external_fixture_id: m.id,
       referee: m.referees?.find((r) => r.type === 'REFEREE')?.name ?? m.referees?.[0]?.name ?? null,
       updated_at: new Date().toISOString(),
-    }));
-
-  if (rows.length === 0) return 0;
+    };
+  });
 
   const { error } = await supabase
     .from('fixtures')
