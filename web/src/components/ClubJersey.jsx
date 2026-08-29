@@ -1,106 +1,14 @@
-import { useId, useState } from 'react';
-import { CLUB_KIT_COLORS } from '../lib/clubKitColors.js';
+import { useState } from 'react';
 
-const SHIRT_PATH =
-  'M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z';
-
-// Renders the actual real-kit pattern inside the shirt clip, not just a
-// flat fill -- confirmed via feedback that a uniform primary/secondary
-// split looked "billig und nicht korrekt" regardless of the club, since
-// e.g. Real Madrid (plain white) and Inter (black+blue vertical stripes)
-// both have "2 colors" but look nothing alike on the actual shirt. See
-// clubKitColors.js for the per-club pattern classification and its
-// research notes.
-function KitFill({ pattern, primary, secondary }) {
-  switch (pattern) {
-    case 'stripes': {
-      // Odd count so the body starts and ends on the primary color, like
-      // the real Juventus/Inter/Athletic Club shirts -- a plain 2-stripe
-      // half-split was exactly the "billig" look being replaced.
-      const STRIPES = 5;
-      const w = 24 / STRIPES;
-      return (
-        <>
-          {Array.from({ length: STRIPES }, (_, i) => (
-            <rect key={i} x={i * w} y="0" width={w} height="24" fill={i % 2 === 0 ? primary : secondary} />
-          ))}
-        </>
-      );
-    }
-    case 'hoops': {
-      const HOOPS = 5;
-      const h = 24 / HOOPS;
-      return (
-        <>
-          {Array.from({ length: HOOPS }, (_, i) => (
-            <rect key={i} x="0" y={i * h} width="24" height={h} fill={i % 2 === 0 ? primary : secondary} />
-          ))}
-        </>
-      );
-    }
-    case 'sash':
-      // Diagonal band from the lower-left to the upper-right, like the
-      // real Monaco/Rayo Vallecano shirts (a sash draped over one
-      // shoulder), not a straight 50/50 split.
-      return (
-        <>
-          <rect x="0" y="0" width="24" height="24" fill={primary} />
-          <line x1="-4" y1="29" x2="29" y2="-4" stroke={secondary} strokeWidth="9" />
-        </>
-      );
-    case 'band':
-      // Single vertical stripe down the center, like PSG's real shirt.
-      return (
-        <>
-          <rect x="0" y="0" width="24" height="24" fill={primary} />
-          <rect x="9.5" y="0" width="5" height="24" fill={secondary} />
-        </>
-      );
-    case 'chestband':
-      // Horizontal secondary band across the chest, like VfB Stuttgart's
-      // red "Brustring" on white -- a century-old identity element, not a
-      // stripe or sash shape.
-      return (
-        <>
-          <rect x="0" y="0" width="24" height="24" fill={primary} />
-          <rect x="0" y="9" width="24" height="5" fill={secondary} />
-        </>
-      );
-    case 'cross':
-      // A black cross on white, like Parma's "Maglia Crociata" -- the
-      // club's defining shirt identity since 1913, not a stripe or sash.
-      return (
-        <>
-          <rect x="0" y="0" width="24" height="24" fill={primary} />
-          <rect x="9.5" y="0" width="5" height="24" fill={secondary} />
-          <rect x="0" y="9.5" width="24" height="5" fill={secondary} />
-        </>
-      );
-    case 'quarters':
-      // Diagonally-alternating quadrants, like Cagliari's real shirt.
-      return (
-        <>
-          <rect x="0" y="0" width="12" height="12" fill={primary} />
-          <rect x="12" y="0" width="12" height="12" fill={secondary} />
-          <rect x="0" y="12" width="12" height="12" fill={secondary} />
-          <rect x="12" y="12" width="12" height="12" fill={primary} />
-        </>
-      );
-    case 'solid':
-    default:
-      return <rect x="0" y="0" width="24" height="24" fill={primary} />;
-  }
-}
-
-// football-data.org's own /teams response carries a real crest PNG per
-// club (see sql/031_club_crest.sql) -- confirmed live, a clean transparent
-// image, not a screenshot or watermarked logo. Preferred over the hand-
-// drawn kit below wherever it's synced; the kit stays as the fallback for
-// a club whose crest_url hasn't been backfilled yet, or whose image URL
-// fails to load (crest_url set but the actual request 404s/errors), so a
-// stale/dead link never leaves a blank square where a jersey used to be.
+// Renders the real club crest football-data.org's /teams response carries
+// per club (see sql/031_club_crest.sql) -- confirmed live, a clean
+// transparent PNG, not a screenshot or watermarked logo. No per-club
+// hand-drawn fallback here on purpose: mixing real crest photos with a
+// colorful illustrated jersey for whichever clubs hadn't synced one yet
+// read as inconsistent side by side, not as a reasonable placeholder.
+// Every club gets the same plain neutral badge until (or unless) its real
+// crest is available, never a one-off substitute.
 export default function ClubJersey({ club, size = 24, theme }) {
-  const clipId = useId();
   const [imgFailed, setImgFailed] = useState(false);
   if (!club) return null;
 
@@ -118,23 +26,19 @@ export default function ClubJersey({ club, size = 24, theme }) {
     );
   }
 
-  const kit = CLUB_KIT_COLORS[club.name];
-  const primary = kit?.primary ?? theme.border;
-  const secondary = kit?.secondary ?? theme.border;
-  const pattern = kit?.pattern ?? 'solid';
-
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label={club.name} style={{ flex: '0 0 auto' }}>
-      <title>{club.name}</title>
-      <defs>
-        <clipPath id={clipId}>
-          <path d={SHIRT_PATH} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clipId})`}>
-        <KitFill pattern={pattern} primary={primary} secondary={secondary} />
-      </g>
-      <path d={SHIRT_PATH} fill="none" stroke={theme.border} strokeWidth="1" strokeLinejoin="round" />
-    </svg>
+    <div
+      title={club.name}
+      aria-label={club.name}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '999px',
+        background: theme.surfaceRaised,
+        border: `1px solid ${theme.border}`,
+        boxSizing: 'border-box',
+        flex: '0 0 auto',
+      }}
+    />
   );
 }

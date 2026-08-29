@@ -21,7 +21,7 @@
 //   together), but "BAR" is just as recognized for Barcelona and avoids
 //   the two clubs sharing a code at all.
 //
-// Keyed by the exact `clubs.name` string, same as clubKitColors.js.
+// Keyed by the exact `clubs.name` string.
 export const CLUB_SHORT_CODE_OVERRIDES = {
   '1. FC Union Berlin': 'FCU',
   'RC Strasbourg Alsace': 'RCS',
