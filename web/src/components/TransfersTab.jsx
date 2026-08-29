@@ -8,6 +8,7 @@ import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import { useSwipeLeague } from '../hooks/useSwipeLeague.js';
 import { relativeTime } from '../lib/relativeTime.js';
 
 export default function TransfersTab({
@@ -16,6 +17,7 @@ export default function TransfersTab({
   language,
   league,
   onSelectLeague,
+  onSwipeLeague,
   favoriteClub,
   quickFilters,
   activeFilter,
@@ -36,6 +38,10 @@ export default function TransfersTab({
   }, [transfers, activeFilter]);
 
   const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
+  const swipeRef = useSwipeLeague(
+    () => onSwipeLeague(1),
+    () => onSwipeLeague(-1)
+  );
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -95,7 +101,10 @@ export default function TransfersTab({
       </div>
 
       <div
-        ref={scrollRef}
+        ref={(el) => {
+          scrollRef.current = el;
+          swipeRef.current = el;
+        }}
         style={{
           flex: 1,
           minHeight: 0,

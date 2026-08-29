@@ -13,3 +13,14 @@ export const LEAGUES = [
 export function leagueBySlug(slug) {
   return LEAGUES.find((l) => l.slug === slug);
 }
+
+// Cyclic neighbor lookup for swipe-to-switch (see useSwipeLeague.js) --
+// direction 1 = next (wraps LaLiga -> Serie A), -1 = previous (wraps
+// Serie A -> LaLiga). Falls back to the first league if the current slug
+// isn't found at all (shouldn't happen, but a wrap is a safer default than
+// throwing mid-gesture).
+export function adjacentLeague(slug, direction) {
+  const idx = LEAGUES.findIndex((l) => l.slug === slug);
+  const base = idx === -1 ? 0 : idx;
+  return LEAGUES[(base + direction + LEAGUES.length) % LEAGUES.length];
+}

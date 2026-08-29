@@ -7,6 +7,7 @@ import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
+import { adjacentLeague } from './lib/leagues.js';
 
 function useDarkMode(mode) {
   const [systemDark, setSystemDark] = useState(
@@ -81,6 +82,13 @@ export default function App() {
   const selectLeague = (slug) => {
     setLeague(slug);
     setActiveFilter(null);
+  };
+
+  // direction 1 = swipe left (next league), -1 = swipe right (previous) --
+  // see useSwipeLeague.js. Goes through the same selectLeague as tapping a
+  // pill so activeFilter gets cleared identically either way.
+  const swipeLeague = (direction) => {
+    selectLeague(adjacentLeague(league, direction).slug);
   };
 
   // Selecting a favorite/quick-filter chip whose club is in a different
@@ -222,6 +230,7 @@ export default function App() {
             language={language}
             league={league}
             onSelectLeague={selectLeague}
+            onSwipeLeague={swipeLeague}
             favoriteClub={favoriteClub}
             quickFilters={quickFilters}
             activeFilter={activeFilter}
@@ -239,12 +248,15 @@ export default function App() {
             language={language}
             league={league}
             onSelectLeague={selectLeague}
+            onSwipeLeague={swipeLeague}
             initialFixtureId={initialFixtureId}
             onConsumedInitialFixture={() => setInitialFixtureId(null)}
             onFavoriteToast={setToast}
           />
         )}
-        {tab === 'tabelle' && <StandingsTab theme={theme} t={t} league={league} onSelectLeague={selectLeague} />}
+        {tab === 'tabelle' && (
+          <StandingsTab theme={theme} t={t} league={league} onSelectLeague={selectLeague} onSwipeLeague={swipeLeague} />
+        )}
         {tab === 'einstellungen' && (
           <SettingsTab
             theme={theme}

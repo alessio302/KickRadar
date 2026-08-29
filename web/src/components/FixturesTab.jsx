@@ -6,6 +6,7 @@ import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import { useSwipeLeague } from '../hooks/useSwipeLeague.js';
 import { useFavoriteFixtures } from '../hooks/useFavoriteFixtures.js';
 import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -40,7 +41,7 @@ function pickCurrentMatchday(matchdays) {
   return matchdays[matchdays.length - 1];
 }
 
-export default function FixturesTab({ theme, t, language, league, onSelectLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
+export default function FixturesTab({ theme, t, language, league, onSelectLeague, onSwipeLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
   const { clubs } = useClubs(league);
   const { matchdays, loading, refreshing, refetch } = useFixtures(league);
   const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
@@ -49,6 +50,10 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   const [openFixtureId, setOpenFixtureId] = useState(null);
   const locale = DATE_LOCALES[language];
   const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
+  const swipeRef = useSwipeLeague(
+    () => onSwipeLeague(1),
+    () => onSwipeLeague(-1)
+  );
 
   const handleToggleFavorite = async (fixture) => {
     try {
@@ -126,7 +131,10 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
       </div>
 
       <div
-        ref={scrollRef}
+        ref={(el) => {
+          scrollRef.current = el;
+          swipeRef.current = el;
+        }}
         style={{
           flex: 1,
           minHeight: 0,

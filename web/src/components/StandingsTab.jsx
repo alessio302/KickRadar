@@ -3,6 +3,7 @@ import LeagueSwitcher from './LeagueSwitcher.jsx';
 import ClubJersey from './ClubJersey.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useStandings } from '../hooks/useStandings.js';
+import { useSwipeLeague } from '../hooks/useSwipeLeague.js';
 
 // Fixed pixel widths (not flex) for every numeric column -- keeps every
 // row's numbers lined up in a column regardless of how many digits a
@@ -28,10 +29,14 @@ function NumCell({ children, bold, theme }) {
   );
 }
 
-export default function StandingsTab({ theme, t, league, onSelectLeague }) {
+export default function StandingsTab({ theme, t, league, onSelectLeague, onSwipeLeague }) {
   const { clubs } = useClubs(league);
   const { table, loading } = useStandings(league);
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
+  const swipeRef = useSwipeLeague(
+    () => onSwipeLeague(1),
+    () => onSwipeLeague(-1)
+  );
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -39,7 +44,10 @@ export default function StandingsTab({ theme, t, league, onSelectLeague }) {
         <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
+      <div
+        ref={swipeRef}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}
+      >
         {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
         {!loading && table.length === 0 && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.standings.empty}</p>
