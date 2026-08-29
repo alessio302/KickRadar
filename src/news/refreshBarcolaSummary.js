@@ -9,12 +9,14 @@ import { llmExtractTransferInfo } from './llmExtract.js';
 
 async function main() {
   const supabase = getSupabaseClient();
-  const { data: row, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('transfers')
-    .select('id, player_name, source_url, summary')
-    .ilike('player_name', '%barcola%')
-    .single();
+    .select('id, player_name, source_url, summary, to_club')
+    .ilike('player_name', '%barcola%');
   if (error) throw error;
+  console.log('matches:', JSON.stringify(rows, null, 2));
+  const row = rows.find((r) => r.to_club === 'Liverpool FC') ?? rows[0];
+  if (!row) throw new Error('No Barcola transfer row found.');
 
   const articleText = await fetchArticleText(row.source_url);
   console.log('re-fetched article length:', articleText?.length ?? 0);
