@@ -13,21 +13,18 @@ const DISMISS_THRESHOLD_PX = 100;
 // accepted tradeoff the old transfermarkt_url cache already had. Only
 // shows the fields that are actually present; GOAL API's own coverage
 // leaves many stat fields null depending on the player/competition.
-const STAT_ROWS = [
-  'matchPlayed',
-  'goals',
-  'assists',
-  'yellowCards',
-  'redCards',
-  'rating',
-  'minutes',
-  'shotsTotal',
-  'passes',
-  'keyPasses',
-  'tackles',
-  'interceptions',
-  'duelsWon',
-  'dribbleSucc',
+//
+// Grouped into tabs by football content (summary/attack/defense/
+// discipline), same underline-tab pattern FixtureDetailOverlay.jsx
+// already uses for Aufstellungen/Spielinfo/Statistiken -- a flat list of
+// 14 numbers read as a wall once passing and defensive stats joined the
+// original 7, the same way that overlay's own event list needed lineups
+// split out once it grew.
+const STAT_GROUPS = [
+  { key: 'overview', labelKey: 'tabOverview', fields: ['matchPlayed', 'minutes', 'rating'] },
+  { key: 'attack', labelKey: 'tabAttack', fields: ['goals', 'assists', 'shotsTotal', 'passes', 'keyPasses', 'dribbleSucc'] },
+  { key: 'defense', labelKey: 'tabDefense', fields: ['tackles', 'interceptions', 'duelsWon'] },
+  { key: 'discipline', labelKey: 'tabDiscipline', fields: ['yellowCards', 'redCards'] },
 ];
 
 function calculateAge(birthdate) {
@@ -74,7 +71,17 @@ export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
   const age = calculateAge(player.birthdate);
   const positionLabel = player.position ? t.lineup.positions[player.position] || player.position : null;
   const stats = player.stats || {};
-  const statRows = STAT_ROWS.filter((key) => stats[key] != null);
+
+  const groups = STAT_GROUPS.map((group) => ({ ...group, rows: group.fields.filter((key) => stats[key] != null) })).filter(
+    (group) => group.rows.length > 0
+  );
+  const hasStats = groups.length > 0;
+  // A lone populated group (a sparse profile, e.g. only overview numbers on
+  // file) shows its grid directly -- a one-tab bar would just be a label
+  // with nothing to switch to.
+  const showTabs = groups.length > 1;
+  const [statTab, setStatTab] = useState(groups[0]?.key);
+  const activeGroup = groups.find((g) => g.key === statTab) ?? groups[0];
 
   return (
     <div
@@ -161,16 +168,38 @@ export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px', borderTop: `1px solid ${theme.border}` }}>
-          {statRows.length > 0 && (
+          {hasStats && (
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: theme.textMuted, margin: '0 0 10px' }}>
               {t.playerProfile.season(currentSeasonLabel())}
             </p>
           )}
-          {statRows.length === 0 ? (
+          {showTabs && (
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', borderBottom: `1px solid ${theme.border}` }}>
+              {groups.map((group) => (
+                <button
+                  key={group.key}
+                  onClick={() => setStatTab(group.key)}
+                  style={{
+                    padding: '2px 2px 8px',
+                    fontSize: '13px',
+                    fontWeight: activeGroup.key === group.key ? 700 : 600,
+                    border: 'none',
+                    borderBottom: activeGroup.key === group.key ? `2px solid ${theme.accent}` : '2px solid transparent',
+                    background: 'transparent',
+                    color: activeGroup.key === group.key ? theme.text : theme.textMuted,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t.playerProfile[group.labelKey]}
+                </button>
+              ))}
+            </div>
+          )}
+          {!hasStats ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.playerProfile.noStats}</p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {statRows.map((key) => (
+              {activeGroup.rows.map((key) => (
                 <div key={key} style={{ background: theme.surfaceRaised, border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '10px 12px' }}>
                   <p style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 2px' }}>{stats[key]}</p>
                   <p style={{ fontSize: '11px', color: theme.textMuted, margin: 0 }}>{t.playerProfile[key]}</p>
