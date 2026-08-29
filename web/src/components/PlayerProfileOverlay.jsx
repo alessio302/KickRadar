@@ -102,7 +102,13 @@ export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
           background: theme.bg,
           width: '100%',
           maxWidth: '420px',
-          maxHeight: '82vh',
+          // Fixed, not maxHeight -- confirmed live (FixtureDetailOverlay.jsx
+          // had the exact same complaint first) that a content-driven height
+          // visibly resizes the sheet on every tab switch, since Übersicht's
+          // 3 stats and Angriff's 6 don't fill the same space. Fixed height
+          // keeps every tab landing in the same place regardless of how many
+          // rows it has.
+          height: '82vh',
           borderTopLeftRadius: '16px',
           borderTopRightRadius: '16px',
           display: 'flex',
