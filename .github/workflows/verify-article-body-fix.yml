@@ -1,10 +1,10 @@
-name: Diagnose footmercato article body fetch
+name: Verify article-body fallback fix
 
 on:
   workflow_dispatch: {}
 
 jobs:
-  diagnose:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -14,4 +14,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/news/diagnoseFootmercatoBody.js
+      - run: node src/news/verifyArticleBodyFix.js

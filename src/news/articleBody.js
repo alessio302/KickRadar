@@ -12,6 +12,14 @@ import * as cheerio from 'cheerio';
 const MAX_CHARS = 3000;
 const MIN_PARAGRAPH_LENGTH = 40;
 
+function extractParagraphs($, scope) {
+  return scope
+    .find('p')
+    .map((_, el) => $(el).text().replace(/\s+/g, ' ').trim())
+    .get()
+    .filter((text) => text.length >= MIN_PARAGRAPH_LENGTH);
+}
+
 export async function fetchArticleText(url) {
   try {
     const res = await fetch(url, {
@@ -24,12 +32,18 @@ export async function fetchArticleText(url) {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    const scope = $('article').length > 0 ? $('article') : $('body');
-    const paragraphs = scope
-      .find('p')
-      .map((_, el) => $(el).text().replace(/\s+/g, ' ').trim())
-      .get()
-      .filter((text) => text.length >= MIN_PARAGRAPH_LENGTH);
+    // Confirmed live (footmercato.net): a page can have <article> tags that
+    // aren't the story at all -- there, 21 of them turned out to be
+    // "recommended article" teaser cards elsewhere on the page, each with
+    // no <p> content, while the real story text sat in a plain <div>
+    // outside all of them. Scoping to <article> then found zero paragraphs
+    // and returned null, so the LLM only ever saw the bare headline for
+    // this source -- correct extraction, just nothing to summarize.
+    // Falling back to <body> when the <article> scope comes up empty
+    // catches this without giving up the (still useful, e.g. tuttomercatoweb)
+    // preference for a real single-article wrapper when one exists.
+    let paragraphs = extractParagraphs($, $('article'));
+    if (paragraphs.length === 0) paragraphs = extractParagraphs($, $('body'));
 
     const text = paragraphs.join(' ').slice(0, MAX_CHARS);
     return text.length > 0 ? text : null;
