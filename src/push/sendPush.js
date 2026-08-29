@@ -128,3 +128,24 @@ export async function sendPushToLineupSubscribers(payloadsByLanguage) {
   if (error) throw error;
   return sendToSubscriptionsByLanguage(supabase, subs, payloadsByLanguage);
 }
+
+// Match events (goals/cards/subs) are the one push category that isn't a
+// blanket opt-in/opt-out toggle: there's no "notify_match_events" column,
+// only whichever specific fixtures a subscription favorited (see
+// favorite_fixtures, sql/026_favorite_fixtures.sql). Targeted by fixture,
+// not a boolean column, since two different subscriptions can favorite two
+// entirely different sets of matches at once. Runs with the service_role
+// key (this whole module does), so it can embed push_subscriptions through
+// the FK directly -- no RPC needed here, those exist only for the
+// anon-key frontend path.
+export async function sendPushToFixtureFavoriters(fixtureId, payloadsByLanguage) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { data: rows, error } = await supabase
+    .from('favorite_fixtures')
+    .select('push_subscriptions(id, endpoint, p256dh, auth, language)')
+    .eq('fixture_id', fixtureId);
+  if (error) throw error;
+  const subs = rows.map((r) => r.push_subscriptions).filter(Boolean);
+  return sendToSubscriptionsByLanguage(supabase, subs, payloadsByLanguage);
+}

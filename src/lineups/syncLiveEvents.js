@@ -16,6 +16,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
 import { getLeagueFixtures, getWsToken, GOAL_API_WS_URL } from './goalApiClient.js';
 import { resolveClub } from '../news/clubMatch.js';
+import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -110,7 +111,7 @@ async function resolveGoalApiIds(supabase, candidates) {
         return homeMatch && awayMatch;
       });
       if (!match) continue;
-      resolved.set(f.id, { goalApiId: String(match.id), homeClubId: homeClub.id, awayClubId: awayClub.id });
+      resolved.set(f.id, { goalApiId: String(match.id), homeClubId: homeClub.id, awayClubId: awayClub.id, leagueSlug: league.slug });
     }
   }
   return resolved;
@@ -197,11 +198,11 @@ export async function syncLiveEvents() {
   const resolved = await resolveGoalApiIds(supabase, candidates);
   if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0 };
 
-  // goalApiId -> { fixtureId, homeClubId, awayClubId }
+  // goalApiId -> { fixtureId, homeClubId, awayClubId, leagueSlug }
   const byGoalApiId = new Map();
   for (const [fixtureId, info] of resolved) {
     if (byGoalApiId.size >= MAX_SUBSCRIPTIONS) break;
-    byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId });
+    byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
   }
 
   const { token } = await getWsToken();
@@ -261,7 +262,7 @@ export async function syncLiveEvents() {
             const freshResolved = await resolveGoalApiIds(supabase, freshCandidates);
             for (const [fixtureId, info] of freshResolved) {
               if (byGoalApiId.has(info.goalApiId) || byGoalApiId.size >= MAX_SUBSCRIPTIONS) continue;
-              byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId });
+              byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
               subscribeTo(info.goalApiId);
             }
           } catch (err) {
@@ -287,8 +288,17 @@ export async function syncLiveEvents() {
       if (rows.length === 0) return;
 
       const { error } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
-      if (error) console.error(`Failed to store live events for fixture ${info.fixtureId}:`, error.message);
-      else rowsWritten += rows.length;
+      if (error) {
+        console.error(`Failed to store live events for fixture ${info.fixtureId}:`, error.message);
+        return;
+      }
+      rowsWritten += rows.length;
+
+      try {
+        await notifyFavoritedFixtureEvents(supabase, info.fixtureId, info.leagueSlug, rows);
+      } catch (err) {
+        console.error(`Failed to notify favorited-fixture events for fixture ${info.fixtureId}:`, err.message);
+      }
     });
 
     ws.addEventListener('close', () => finish());

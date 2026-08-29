@@ -34,36 +34,70 @@
 // fichajes"). Now reuses each language's own bare noun from
 // translations.js's transfers.rumor field, matching `official` being
 // bare too.
+// matchEvent: bare, standard football-broadcast terms per language (goal/
+// card/substitution announcements), not idiomatic phrasing that needs the
+// same real-usage verification lineupTitle/rumor above needed -- these are
+// the plain vocabulary words themselves.
 export const PUSH_STRINGS = {
   de: {
     official: 'Offiziell',
     rumor: 'Gerücht',
     summaryTitle: (n) => `${n} neue Transfer-Meldungen`,
     lineupTitle: 'Offizielle Aufstellungen',
+    matchEvent: {
+      goal: { icon: '⚽', title: 'Tor!' },
+      yellowCard: { icon: '🟨', title: 'Gelbe Karte' },
+      redCard: { icon: '🟥', title: 'Rote Karte' },
+      substitution: { icon: '🔄', title: 'Wechsel' },
+    },
   },
   en: {
     official: 'Official',
     rumor: 'Rumor',
     summaryTitle: (n) => `${n} new transfer updates`,
     lineupTitle: 'Official lineups',
+    matchEvent: {
+      goal: { icon: '⚽', title: 'Goal!' },
+      yellowCard: { icon: '🟨', title: 'Yellow Card' },
+      redCard: { icon: '🟥', title: 'Red Card' },
+      substitution: { icon: '🔄', title: 'Substitution' },
+    },
   },
   it: {
     official: 'Ufficiale',
     rumor: 'Voce di mercato',
     summaryTitle: (n) => `${n} nuovi aggiornamenti di mercato`,
     lineupTitle: 'Formazioni ufficiali',
+    matchEvent: {
+      goal: { icon: '⚽', title: 'Gol!' },
+      yellowCard: { icon: '🟨', title: 'Cartellino giallo' },
+      redCard: { icon: '🟥', title: 'Cartellino rosso' },
+      substitution: { icon: '🔄', title: 'Cambio' },
+    },
   },
   fr: {
     official: 'Officiel',
     rumor: 'Rumeur',
     summaryTitle: (n) => `${n} nouvelles infos transferts`,
     lineupTitle: 'Compositions officielles',
+    matchEvent: {
+      goal: { icon: '⚽', title: 'But !' },
+      yellowCard: { icon: '🟨', title: 'Carton jaune' },
+      redCard: { icon: '🟥', title: 'Carton rouge' },
+      substitution: { icon: '🔄', title: 'Changement' },
+    },
   },
   es: {
     official: 'Oficial',
     rumor: 'Rumor',
     summaryTitle: (n) => `${n} nuevas noticias de fichajes`,
     lineupTitle: 'Alineaciones oficiales',
+    matchEvent: {
+      goal: { icon: '⚽', title: '¡Gol!' },
+      yellowCard: { icon: '🟨', title: 'Tarjeta amarilla' },
+      redCard: { icon: '🟥', title: 'Tarjeta roja' },
+      substitution: { icon: '🔄', title: 'Cambio' },
+    },
   },
 };
 
