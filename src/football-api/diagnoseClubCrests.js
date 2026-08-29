@@ -10,7 +10,10 @@ import { getTeams } from './client.js';
 async function main() {
   const teams = await getTeams({ competitionId: 2019 }); // Serie A
   console.log(`${teams.length} teams returned`);
-  console.log('First 3 raw team objects:', JSON.stringify(teams.slice(0, 3), null, 2));
+  console.log('Top-level keys on a team object:', Object.keys(teams[0]));
+  for (const team of teams.slice(0, 5)) {
+    console.log(`${team.name}: crest=${team.crest}`);
+  }
 }
 
 main().catch((err) => {
