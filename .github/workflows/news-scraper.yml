@@ -34,7 +34,7 @@ jobs:
     # backlog of new items -- e.g. after a `truncate table transfers` --
     # can take several minutes to clear. Steady-state hourly runs (only
     # genuinely new items get processed) finish in well under a minute.
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,7 +42,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/news/runNewsScraper.js
+      - run: node src/news/backfillGoalApiProfiles.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
