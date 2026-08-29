@@ -17,8 +17,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/football-api/syncClubs.js
+      - run: node src/news/diagnoseBackfillProgress.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
