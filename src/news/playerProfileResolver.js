@@ -14,40 +14,30 @@ const TRANSFERMARKT_BASE = 'https://www.transfermarkt.de';
 // already poll this same GOAL_API_KEY on their own 15-min schedules, so a
 // short-term limit can already be partly spent by the time this runs,
 // independent of anything this file does. Spacing every call here at 6.5s
-// reduces self-inflicted collisions; the retries with growing backoff
-// (10s, then 20s) ride out the rest. Genuine exhaustion still degrades
-// gracefully -- resolveGoalApiProfile() below returns null on total
-// failure, same as any other "no confident match", so the caller falls
-// back to the transfermarkt.de link rather than losing the transfer story.
+// reduces self-inflicted collisions.
+//
+// Retrying on 429/502 itself now lives in goalApiClient.js's shared call()
+// (added once that became a live-events problem too, not just this file's).
+// This used to also retry with its own growing backoff on top of that --
+// confirmed live that stacked the two layers: goalApiClient's own 3
+// attempts (up to ~24s of internal backoff) got wrapped in another 3
+// attempts here, multiplying out to minutes per player during a genuinely
+// busy window and stalling a whole news-scraper run over just a couple of
+// new players. Spacing calls is still this file's own job (goalApiClient
+// has no idea multiple call sites share one budget); retrying a failure is
+// not, now that there's one shared place doing it.
 const MIN_GOAL_API_INTERVAL_MS = 6500;
-const RETRY_BACKOFFS_MS = [10000, 20000];
 let lastGoalApiCallAt = 0;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function throttleGoalApi() {
+async function throttleGoalApi(fn) {
   const wait = lastGoalApiCallAt + MIN_GOAL_API_INTERVAL_MS - Date.now();
   if (wait > 0) await sleep(wait);
   lastGoalApiCallAt = Date.now();
-}
-
-async function callGoalApiThrottled(fn) {
-  await throttleGoalApi();
-  for (const backoff of [0, ...RETRY_BACKOFFS_MS]) {
-    if (backoff > 0) {
-      console.warn(`GOAL API rate/gateway error, retrying after ${backoff}ms backoff`);
-      await sleep(backoff);
-      lastGoalApiCallAt = Date.now();
-    }
-    try {
-      return await fn();
-    } catch (err) {
-      if (!/\b(429|502)\b/.test(err.message)) throw err;
-      if (backoff === RETRY_BACKOFFS_MS[RETRY_BACKOFFS_MS.length - 1]) throw err;
-    }
-  }
+  return fn();
 }
 
 // GOAL API's own singular/plural mismatch with this app's existing
@@ -104,11 +94,11 @@ function pickBestMatch(results, candidateClubNames) {
 // link, same as before this existed.
 async function resolveGoalApiProfile(playerName, candidateClubNames) {
   try {
-    const results = await callGoalApiThrottled(() => searchPlayers(playerName));
+    const results = await throttleGoalApi(() => searchPlayers(playerName));
     const match = pickBestMatch(results, candidateClubNames);
     if (!match) return null;
 
-    const profile = await callGoalApiThrottled(() => getPlayer(match.id));
+    const profile = await throttleGoalApi(() => getPlayer(match.id));
     if (!profile) return null;
 
     return {
