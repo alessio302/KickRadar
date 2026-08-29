@@ -12,6 +12,24 @@
 const BASE_URL = process.env.GOAL_API_BASE_URL || 'https://api.goal-api.com/v1';
 export const GOAL_API_WS_URL = 'wss://api.goal-api.com/ws';
 
+// Confirmed live (src/news/playerProfileResolver.js's own investigation,
+// then again here): GOAL API's short-term rate limit is an account-wide
+// budget shared by every script polling this key (syncLineups.js,
+// syncLiveEvents.js, playerProfileResolver.js all draw from the same
+// GOAL_API_KEY), not something any one caller can pace on its own. Before
+// this, a single 429/502 here threw straight up to the caller -- confirmed
+// live for syncLiveEvents.js, a bare 429 on the very first fixtures lookup
+// of a run meant `subscribed: 0` for that entire run, silently missing a
+// real live match's events with no other chance to catch it until the next
+// scheduled run 15+ minutes later. Retrying in this one shared call() means
+// every endpoint in this file rides out a transient rate-limit hit instead
+// of each caller needing its own copy of this logic.
+const RETRY_BACKOFFS_MS = [8000, 16000];
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function call(path, params = {}) {
   const apiKey = process.env.GOAL_API_KEY;
   if (!apiKey) {
@@ -23,12 +41,21 @@ async function call(path, params = {}) {
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   }
 
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
-  const body = await res.text();
-  if (!res.ok) {
-    throw new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
+  for (const backoff of [0, ...RETRY_BACKOFFS_MS]) {
+    if (backoff > 0) {
+      console.warn(`GOAL API rate/gateway error on ${path}, retrying after ${backoff}ms`);
+      await sleep(backoff);
+    }
+
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+    const body = await res.text();
+    if (res.ok) return JSON.parse(body);
+
+    const isRetryable = res.status === 429 || res.status === 502;
+    if (!isRetryable || backoff === RETRY_BACKOFFS_MS[RETRY_BACKOFFS_MS.length - 1]) {
+      throw new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
+    }
   }
-  return JSON.parse(body);
 }
 
 // One call per (league, date) -- fixtures for every match that league
