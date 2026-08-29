@@ -110,6 +110,7 @@ export default function App() {
   // color via underline/border + bold, not fill.
   const theme = isDark
     ? {
+        isDark: true,
         bg: '#0B0D10',
         surface: '#15181D',
         surfaceRaised: '#1C2027',
@@ -121,6 +122,7 @@ export default function App() {
         danger: '#FF6B5E',
       }
     : {
+        isDark: false,
         bg: '#F5F5F2',
         surface: '#FFFFFF',
         surfaceRaised: '#FFFFFF',
