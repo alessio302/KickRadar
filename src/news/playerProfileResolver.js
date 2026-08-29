@@ -5,16 +5,22 @@ import { searchPlayers, getPlayer } from '../lineups/goalApiClient.js';
 const TRANSFERMARKT_BASE = 'https://www.transfermarkt.de';
 
 // Confirmed live: GOAL API's response headers only describe its 1000/day
-// bucket (X-RateLimit-Type: DAILY), but a real call sequence still got
-// rejected well under that daily number -- a tight, undocumented short-term
-// limit, surfaced inconsistently as either a 429 RATE_LIMIT_EXCEEDED (from
-// the app itself) or a bare 502 with Retry-After: 60 (from a gateway layer
-// in front of it). Binary-searching real gaps found 4s still failing and
-// 6s succeeding twice in a row; spacing every call at 6.5s (a bit of
-// margin) plus one retry after a longer backoff handles the odd transient
-// 502 without giving up on a player entirely.
+// bucket (X-RateLimit-Type: DAILY), but real calls got rejected well under
+// that daily number -- inconsistently as a 429 RATE_LIMIT_EXCEEDED (from
+// the app itself) or a bare 502 with Retry-After: 60 (a gateway layer in
+// front of it). Confirmed live this isn't purely a function of this
+// module's own call spacing either: a fresh process's very first call (no
+// prior spacing to blame) still 429'd -- syncLineups.js/syncLiveEvents.js
+// already poll this same GOAL_API_KEY on their own 15-min schedules, so a
+// short-term limit can already be partly spent by the time this runs,
+// independent of anything this file does. Spacing every call here at 6.5s
+// reduces self-inflicted collisions; the retries with growing backoff
+// (10s, then 20s) ride out the rest. Genuine exhaustion still degrades
+// gracefully -- resolveGoalApiProfile() below returns null on total
+// failure, same as any other "no confident match", so the caller falls
+// back to the transfermarkt.de link rather than losing the transfer story.
 const MIN_GOAL_API_INTERVAL_MS = 6500;
-const RETRY_BACKOFF_MS = 12000;
+const RETRY_BACKOFFS_MS = [10000, 20000];
 let lastGoalApiCallAt = 0;
 
 function sleep(ms) {
@@ -29,14 +35,18 @@ async function throttleGoalApi() {
 
 async function callGoalApiThrottled(fn) {
   await throttleGoalApi();
-  try {
-    return await fn();
-  } catch (err) {
-    if (!/\b(429|502)\b/.test(err.message)) throw err;
-    console.warn('GOAL API rate/gateway error, retrying once after backoff:', err.message);
-    await sleep(RETRY_BACKOFF_MS);
-    lastGoalApiCallAt = Date.now();
-    return await fn();
+  for (const backoff of [0, ...RETRY_BACKOFFS_MS]) {
+    if (backoff > 0) {
+      console.warn(`GOAL API rate/gateway error, retrying after ${backoff}ms backoff`);
+      await sleep(backoff);
+      lastGoalApiCallAt = Date.now();
+    }
+    try {
+      return await fn();
+    } catch (err) {
+      if (!/\b(429|502)\b/.test(err.message)) throw err;
+      if (backoff === RETRY_BACKOFFS_MS[RETRY_BACKOFFS_MS.length - 1]) throw err;
+    }
   }
 }
 
