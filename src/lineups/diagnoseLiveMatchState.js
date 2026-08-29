@@ -65,15 +65,19 @@ async function main() {
   try {
     const goalFixtures = await getLeagueFixtures(league.goalApiLeagueId, today);
     console.log('GOAL API fixtures today count:', goalFixtures.length);
-    const goalMatch = goalFixtures.find(
-      (m) => /liverpool/i.test(m.homeTeam?.name || '') || /liverpool/i.test(m.awayTeam?.name || '')
+    console.log(
+      'GOAL API matchDate/status distribution:',
+      JSON.stringify(goalFixtures.map((m) => ({ matchDate: m.matchDate, matchStatus: m.matchStatus, matchLive: m.matchLive, home: m.homeTeam?.name, away: m.awayTeam?.name })))
     );
-    console.log('GOAL API raw match:', JSON.stringify(goalMatch, null, 2));
-    if (goalMatch) {
-      const homeResolved = resolveClub(goalMatch.homeTeam?.name, clubs);
-      const awayResolved = resolveClub(goalMatch.awayTeam?.name, clubs);
-      console.log('resolveClub(home):', homeResolved?.id, homeResolved?.name);
-      console.log('resolveClub(away):', awayResolved?.id, awayResolved?.name);
+    const forestMatches = goalFixtures.filter(
+      (m) => /forest/i.test(m.homeTeam?.name || '') || /forest/i.test(m.awayTeam?.name || '') ||
+             /liverpool/i.test(m.homeTeam?.name || '') || /liverpool/i.test(m.awayTeam?.name || '')
+    );
+    console.log('GOAL API matches mentioning liverpool/forest:', JSON.stringify(forestMatches, null, 2));
+    for (const m of forestMatches) {
+      const homeResolved = resolveClub(m.homeTeam?.name, clubs);
+      const awayResolved = resolveClub(m.awayTeam?.name, clubs);
+      console.log(`resolveClub for ${m.homeTeam?.name} vs ${m.awayTeam?.name}:`, homeResolved?.id, homeResolved?.name, '|', awayResolved?.id, awayResolved?.name);
     }
   } catch (err) {
     console.error('GOAL API getLeagueFixtures failed:', err.message);
