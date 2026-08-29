@@ -52,8 +52,20 @@ function playerLabel(p, t) {
 // silently once content needs more room than the ratio provides --
 // confirmed live: a 5-rank formation (4-2-3-1's GK/DF/DM/AM/FW split)
 // lost its entire forward line, cropped out with no visual warning.
-// minHeight scaled to the actual rank count guarantees every rank fits
-// while staying close to the real proportions for the common 4-rank case.
+//
+// PITCH_SAFE_ROWS fixes the floor instead of scaling minHeight to this
+// lineup's own rank count -- confirmed live, two lineups shown right after
+// each other (a 4-rank and a 5-rank one) rendered at visibly different
+// pitch heights, which read as a layout bug even though nothing was
+// actually cropped. 5 covers every shape actually seen: syncLineups.js's
+// groupByPositionRows() caps *new* lineups at 4 ranks (GK/DF/MF/FW), and
+// older lineups stored before that migration can have one extra
+// split-out tactical line. Math.max keeps the original safety net for
+// anything unexpectedly taller instead of silently cropping it.
+const PITCH_SAFE_ROWS = 5;
+// Up from 44 -- more vertical breathing room between ranks, per feedback.
+const PITCH_ROW_HEIGHT = 58;
+
 function PitchFormation({ formation, rows }) {
   return (
     <div
@@ -73,7 +85,7 @@ function PitchFormation({ formation, rows }) {
         borderTopRightRadius: '14px',
         background: 'linear-gradient(180deg, #1e6b3a, #164d2a)',
         padding: '30px 6px 10px',
-        minHeight: `${Math.max(4, rows.length) * 44 + 40}px`,
+        minHeight: `${Math.max(PITCH_SAFE_ROWS, rows.length) * PITCH_ROW_HEIGHT + 40}px`,
         display: 'flex',
         flexDirection: 'column',
       }}
