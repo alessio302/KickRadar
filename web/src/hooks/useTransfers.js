@@ -41,7 +41,7 @@ export function useTransfers(leagueSlug, { officialOnly } = {}) {
     let query = supabase
       .from('transfers')
       .select(
-        'id, player_name, from_club, to_club, from_club_id, to_club_id, is_official, source, source_url, summary, ai_summary_de, ai_summary_en, ai_summary_it, ai_summary_fr, ai_summary_es, published_at, players(transfermarkt_url, photo_url, birthdate, position, current_club_name, current_club_badge, stats)'
+        'id, player_name, from_club, to_club, from_club_id, to_club_id, is_official, source, source_url, summary, ai_summary_de, ai_summary_en, ai_summary_it, ai_summary_fr, ai_summary_es, published_at, players(transfermarkt_url, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, stats)'
       )
       .eq('league_id', leagueId)
       .not('player_name', 'is', null)

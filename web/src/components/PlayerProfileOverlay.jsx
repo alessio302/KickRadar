@@ -13,7 +13,22 @@ const DISMISS_THRESHOLD_PX = 100;
 // accepted tradeoff the old transfermarkt_url cache already had. Only
 // shows the fields that are actually present; GOAL API's own coverage
 // leaves many stat fields null depending on the player/competition.
-const STAT_ROWS = ['matchPlayed', 'goals', 'assists', 'yellowCards', 'redCards', 'rating', 'minutes'];
+const STAT_ROWS = [
+  'matchPlayed',
+  'goals',
+  'assists',
+  'yellowCards',
+  'redCards',
+  'rating',
+  'minutes',
+  'shotsTotal',
+  'passes',
+  'keyPasses',
+  'tackles',
+  'interceptions',
+  'duelsWon',
+  'dribbleSucc',
+];
 
 function calculateAge(birthdate) {
   if (!birthdate) return null;
@@ -21,6 +36,17 @@ function calculateAge(birthdate) {
   if (Number.isNaN(dob.getTime())) return null;
   const ageMs = Date.now() - dob.getTime();
   return Math.floor(ageMs / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+// GOAL API's player profile carries no season identifier at all (confirmed
+// live) -- this is just the standard Aug-May European football season
+// convention applied to today's date, not something the stats snapshot
+// below actually states. Shown as a label on the stats section, not a
+// claim about exactly which matches are counted.
+function currentSeasonLabel() {
+  const now = new Date();
+  const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${startYear}/${String(startYear + 1).slice(-2)}`;
 }
 
 export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
@@ -100,11 +126,19 @@ export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: theme.surfaceRaised, flexShrink: 0 }} />
             )}
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 4px', lineHeight: 1.25 }}>{player.name}</p>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+                <p style={{ fontSize: '17px', fontWeight: 800, margin: 0, lineHeight: 1.25 }}>{player.name}</p>
+                {player.squad_number && <span style={{ fontSize: '13px', fontWeight: 700, color: theme.textMuted }}>#{player.squad_number}</span>}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: theme.textMuted, flexWrap: 'wrap' }}>
                 {positionLabel && <span>{positionLabel}</span>}
                 {positionLabel && age != null && <span>·</span>}
                 {age != null && <span>{t.playerProfile.age(age)}</span>}
+                {player.injured && (
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: theme.danger, border: `1px solid ${theme.danger}`, borderRadius: '999px', padding: '1px 7px' }}>
+                    {t.playerProfile.injured}
+                  </span>
+                )}
               </div>
               {player.current_club_name && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
@@ -114,11 +148,24 @@ export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
                   <span style={{ fontSize: '12.5px', color: theme.textMuted }}>{player.current_club_name}</span>
                 </div>
               )}
+              {player.nationality_name && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  {player.nationality_badge && (
+                    <img src={player.nationality_badge} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }} />
+                  )}
+                  <span style={{ fontSize: '12.5px', color: theme.textMuted }}>{player.nationality_name}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px', borderTop: `1px solid ${theme.border}` }}>
+          {statRows.length > 0 && (
+            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: theme.textMuted, margin: '0 0 10px' }}>
+              {t.playerProfile.season(currentSeasonLabel())}
+            </p>
+          )}
           {statRows.length === 0 ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.playerProfile.noStats}</p>
           ) : (

@@ -53,9 +53,30 @@ const POSITION_SINGULAR = {
 };
 
 // Curated subset of GOAL API's player-profile stat fields -- confirmed
-// live many others (shotsTotal, tackles, blocks, ...) come back null
-// depending on coverage; these are the ones reliably populated.
-const STAT_FIELDS = ['matchPlayed', 'goals', 'assists', 'yellowCards', 'redCards', 'rating', 'minutes'];
+// live several others (passesAccuracy, duelsTotal, dribbleAttempts, ...)
+// exist but are attempt/denominator counts this app doesn't try to turn
+// into a percentage; these are the plain counts worth showing as-is.
+// No season identifier exists anywhere in this response (confirmed live) --
+// these are just whatever GOAL API currently has on file for the player,
+// almost certainly the current season given how low matchPlayed reads
+// early in one, but that's an inference from the number, not something
+// the API states.
+const STAT_FIELDS = [
+  'matchPlayed',
+  'goals',
+  'assists',
+  'yellowCards',
+  'redCards',
+  'rating',
+  'minutes',
+  'shotsTotal',
+  'passes',
+  'keyPasses',
+  'tackles',
+  'interceptions',
+  'duelsWon',
+  'dribbleSucc',
+];
 
 function extractStats(profile) {
   const stats = {};
@@ -63,6 +84,28 @@ function extractStats(profile) {
     if (profile[key] != null) stats[key] = profile[key];
   }
   return stats;
+}
+
+// GOAL API's player profile has no separate "nationality" concept of its
+// own beyond a top-level `country` field that's frequently null (confirmed
+// live) -- but when a player currently has no club on file, `team` itself
+// falls back to their senior national team instead of being empty
+// (confirmed live for a free-agent transfer target: team.name and
+// team.country were both "Argentina"). That fallback is the one case
+// where team.country IS the player's real nationality, not just the
+// country a real club happens to be based in -- detected here by
+// name === country, since a genuine club's own country almost never
+// equals its own name.
+function extractClubAndNationality(profile) {
+  const team = profile.team;
+  const isNationalTeamFallback = !!team && team.name === team.country;
+
+  return {
+    current_club_name: team && !isNationalTeamFallback ? team.name || null : null,
+    current_club_badge: team && !isNationalTeamFallback ? team.badge || null : null,
+    nationality_name: profile.country || (isNationalTeamFallback ? team.country : null) || null,
+    nationality_badge: isNationalTeamFallback ? team.badge || null : null,
+  };
 }
 
 // GOAL API's player search is global (~1000 leagues, same collision risk
@@ -106,8 +149,9 @@ async function resolveGoalApiProfile(playerName, candidateClubNames) {
       photo_url: profile.image || null,
       birthdate: profile.birthdate || null,
       position: POSITION_SINGULAR[profile.type] || profile.type || null,
-      current_club_name: profile.team?.name || null,
-      current_club_badge: profile.team?.badge || null,
+      squad_number: profile.number || null,
+      injured: profile.injured === 'Yes',
+      ...extractClubAndNationality(profile),
       stats: extractStats(profile),
     };
   } catch (err) {
