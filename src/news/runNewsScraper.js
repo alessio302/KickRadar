@@ -171,6 +171,7 @@ async function scrapeLeague(supabase, league) {
   const knownIds = new Set(seenRows.map((r) => r.external_id));
 
   const items = await source.fetchLatest();
+  console.error(`[DIAG] ${league.slug} (${league.newsSource}): fetchLatest returned ${items.length} items`);
   let inserted = 0;
   let skipped = 0;
   let merged = 0;
@@ -236,6 +237,9 @@ async function scrapeLeague(supabase, league) {
     const fromInThisLeague = fromClubMatch?.league_id === dbLeague.id;
     const toInThisLeague = toClubMatch?.league_id === dbLeague.id;
     if (!fromInThisLeague && !toInThisLeague) {
+      console.error(
+        `[DIAG] ${league.slug} wrong-league skip: "${item.title}" -> playerName=${playerName} fromClub=${fromClub} (match=${fromClubMatch?.name}, league_id=${fromClubMatch?.league_id}) toClub=${toClub} (match=${toClubMatch?.name}, league_id=${toClubMatch?.league_id}) thisLeagueId=${dbLeague.id}`
+      );
       skipped += 1;
       continue;
     }
