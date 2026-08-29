@@ -386,7 +386,7 @@ function MatchEventContent({ theme, t, event, align }) {
   // longer also spelled out as a second line under the name.
   const label = labelKey ? t.matchInfo[labelKey] : event.type;
   const cardColor = CARD_COLOR[event.type];
-  const iconEl = cardColor ? <CardIcon color={cardColor} /> : <span style={{ fontSize: '15px', lineHeight: 1 }}>{EVENT_ICON[event.type] || '•'}</span>;
+  const iconEl = cardColor ? <CardIcon color={cardColor} /> : <span style={{ fontSize: '12px', lineHeight: 1 }}>{EVENT_ICON[event.type] || '•'}</span>;
 
   return (
     <div style={{ textAlign: align }}>
