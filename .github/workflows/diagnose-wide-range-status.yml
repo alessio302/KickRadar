@@ -1,10 +1,10 @@
-name: Verify Lille-PSG fixture row
+name: Diagnose wide-range vs narrow status mismatch
 
 on:
   workflow_dispatch: {}
 
 jobs:
-  verify:
+  diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -14,7 +14,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/football-api/verifyLillePsg.js
+      - run: node src/football-api/diagnoseWideRangeStatus.js
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
