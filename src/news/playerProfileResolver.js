@@ -135,7 +135,7 @@ function pickBestMatch(results, candidateClubNames) {
 // for lineups and live events. Returns null (never throws for a genuine
 // "no confident match") so the caller can fall back to the transfermarkt
 // link, same as before this existed.
-async function resolveGoalApiProfile(playerName, candidateClubNames) {
+export async function resolveGoalApiProfile(playerName, candidateClubNames) {
   try {
     const results = await throttleGoalApi(() => searchPlayers(playerName));
     const match = pickBestMatch(results, candidateClubNames);
@@ -212,9 +212,36 @@ export async function resolvePlayerProfile(supabase, playerName, candidateClubNa
     .eq('normalized_name', normalized)
     .maybeSingle();
   if (lookupErr) throw lookupErr;
-  if (existing) return existing;
+  // A cached row with no goal_api_id means the FIRST resolution attempt
+  // never got a confident GOAL API match -- confirmed live this includes
+  // plenty of cases where GOAL API was just transiently unavailable (a
+  // 429/502 exhausted goalApiClient.js's own retries, or this file's
+  // GOAL API interval collided with a busy window) for an otherwise
+  // perfectly resolvable real player, not just genuine no-match cases.
+  // Without this, that one bad-timing attempt permanently locks the
+  // player onto the transfermarkt.de fallback forever, since every future
+  // mention of the same name just returns this same cached row on line
+  // 209 above without ever asking GOAL API again. Retrying here means a
+  // player heals the next time any transfer story mentions them again,
+  // at the cost of one extra GOAL API call for names that turn out to
+  // still have no real match (rare enough not to matter next to the
+  // stories permanently stuck otherwise).
+  if (existing && existing.goal_api_id) return existing;
 
   const goalApiProfile = await resolveGoalApiProfile(playerName, candidateClubNames);
+
+  if (existing) {
+    if (!goalApiProfile) return existing;
+    const { data: updated, error: updateErr } = await supabase
+      .from('players')
+      .update(goalApiProfile)
+      .eq('id', existing.id)
+      .select('id, transfermarkt_url, goal_api_id, photo_url')
+      .single();
+    if (updateErr) throw updateErr;
+    return updated;
+  }
+
   const transfermarktUrl = goalApiProfile ? null : (await lookupTransfermarktUrl(playerName)).url;
 
   const { data: inserted, error: insertErr } = await supabase
