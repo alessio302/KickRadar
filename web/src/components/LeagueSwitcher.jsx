@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { LEAGUES } from '../lib/leagues.js';
 
 // Horizontal-scrolling pill row, not a shrink-to-fit flex row: five leagues
@@ -11,6 +12,18 @@ import { LEAGUES } from '../lib/leagues.js';
 // (see TransfersTab.jsx/FixturesTab.jsx) so the row scrolls edge-to-edge
 // like a native tab bar, not just within the inset content column.
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
+  const activePillRef = useRef(null);
+
+  // Switching league by swiping the content (see useLeagueCarousel.js) can
+  // land on a league whose pill is scrolled out of view in this row --
+  // confirmed live: swiping to Ligue 1/LaLiga left their pills off-screen
+  // with nothing showing which league was now active. Tapping a pill
+  // already keeps it in view (it's already visible, that's how it got
+  // tapped), so this only ever needs to actually scroll after a swipe.
+  useEffect(() => {
+    activePillRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [league]);
+
   return (
     <div
       className="league-scroll-row"
@@ -27,6 +40,7 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
       {LEAGUES.map((l) => (
         <button
           key={l.slug}
+          ref={league === l.slug ? activePillRef : undefined}
           onClick={() => onSelectLeague(l.slug)}
           style={{
             flex: '0 0 auto',
