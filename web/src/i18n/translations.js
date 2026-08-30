@@ -81,7 +81,7 @@ const de = {
   },
   playerProfile: {
     age: (n) => `${n} Jahre`,
-    season: (s) => `Saison ${s}`,
+    statsAsOf: (d) => `Stand: ${d}`,
     tabOverview: 'Übersicht',
     tabAttack: 'Angriff',
     tabDefense: 'Abwehr',
@@ -213,7 +213,7 @@ const en = {
   },
   playerProfile: {
     age: (n) => `${n} years old`,
-    season: (s) => `${s} season`,
+    statsAsOf: (d) => `As of ${d}`,
     tabOverview: 'Overview',
     tabAttack: 'Attack',
     tabDefense: 'Defense',
@@ -345,7 +345,7 @@ const it = {
   },
   playerProfile: {
     age: (n) => `${n} anni`,
-    season: (s) => `Stagione ${s}`,
+    statsAsOf: (d) => `Aggiornato al ${d}`,
     tabOverview: 'Panoramica',
     tabAttack: 'Attacco',
     tabDefense: 'Difesa',
@@ -477,7 +477,7 @@ const fr = {
   },
   playerProfile: {
     age: (n) => `${n} ans`,
-    season: (s) => `Saison ${s}`,
+    statsAsOf: (d) => `Au ${d}`,
     tabOverview: 'Aperçu',
     tabAttack: 'Attaque',
     tabDefense: 'Défense',
@@ -609,7 +609,7 @@ const es = {
   },
   playerProfile: {
     age: (n) => `${n} años`,
-    season: (s) => `Temporada ${s}`,
+    statsAsOf: (d) => `Actualizado: ${d}`,
     tabOverview: 'Resumen',
     tabAttack: 'Ataque',
     tabDefense: 'Defensa',

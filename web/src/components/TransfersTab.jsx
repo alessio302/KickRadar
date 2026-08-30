@@ -10,6 +10,7 @@ import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { relativeTime } from '../lib/relativeTime.js';
+import { DATE_LOCALES } from '../i18n/languages.js';
 
 // The transfer feed for one league -- rendered twice by LeagueCarousel
 // while a swipe is in progress (the active league and whichever neighbor
@@ -173,6 +174,7 @@ export default function TransfersTab({
   onToggleOfficialOnly,
 }) {
   const { clubs } = useClubs(league);
+  const locale = DATE_LOCALES[language];
   const [summaryTransfer, setSummaryTransfer] = useState(null);
   const [profilePlayer, setProfilePlayer] = useState(null);
 
@@ -255,7 +257,7 @@ export default function TransfersTab({
         <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />
       )}
       {profilePlayer && (
-        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} onClose={() => setProfilePlayer(null)} />
+        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} onClose={() => setProfilePlayer(null)} />
       )}
     </div>
   );

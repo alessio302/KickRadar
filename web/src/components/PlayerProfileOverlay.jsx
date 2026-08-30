@@ -36,17 +36,22 @@ function calculateAge(birthdate) {
 }
 
 // GOAL API's player profile carries no season identifier at all (confirmed
-// live) -- this is just the standard Aug-May European football season
-// convention applied to today's date, not something the stats snapshot
-// below actually states. Shown as a label on the stats section, not a
-// claim about exactly which matches are counted.
-function currentSeasonLabel() {
-  const now = new Date();
-  const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${startYear}/${String(startYear + 1).slice(-2)}`;
+// live, including checking its statistics[] field -- empty for every
+// player sampled) -- these stat fields are just whatever GOAL API most
+// recently had on file, which for an inactive player (long-term injury,
+// no minutes since) can silently be many months stale with nothing in the
+// response to reveal that. A guessed "Saison 2026/27" label used to be
+// shown here regardless -- confirmed live wrong for a player who hadn't
+// played since before the season even started. Showing the actual
+// stats_refreshed_at (falling back to resolved_at for a player never
+// picked up by refreshPlayerProfiles.js's periodic sweep yet, see
+// playerProfileResolver.js) is the honest version: readers can judge
+// staleness themselves instead of trusting an unverifiable season claim.
+function formatStatsDate(iso, locale) {
+  return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
+export default function PlayerProfileOverlay({ theme, t, player, locale, onClose }) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef(null);
@@ -176,7 +181,7 @@ export default function PlayerProfileOverlay({ theme, t, player, onClose }) {
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px', borderTop: `1px solid ${theme.border}` }}>
           {hasStats && (
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: theme.textMuted, margin: '0 0 10px' }}>
-              {t.playerProfile.season(currentSeasonLabel())}
+              {t.playerProfile.statsAsOf(formatStatsDate(player.stats_refreshed_at ?? player.resolved_at, locale))}
             </p>
           )}
           {showTabs && (
