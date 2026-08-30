@@ -4,44 +4,44 @@ const UA =
 const URL_TO_CHECK =
   'https://www.transfermarkt.de/geruchtekuche/detail/forum/154/gk_group/nationalCompetitions/gk_wettbewerb_id/L1';
 
-function snippetAround(text, pattern, radius = 400) {
-  const idx = text.search(pattern);
-  if (idx === -1) return null;
-  return text.slice(Math.max(0, idx - radius), idx + radius);
+async function tryFetch(label, headers) {
+  console.log(`\n=== Attempt: ${label} ===`);
+  const res = await fetch(URL_TO_CHECK, { headers });
+  console.log('Status:', res.status, res.statusText);
+  console.log('Response headers:');
+  for (const [k, v] of res.headers.entries()) {
+    console.log(` ${k}: ${v}`);
+  }
+  const html = await res.text();
+  console.log('Body length:', html.length);
+  if (html.length > 0) {
+    console.log('First 500 chars:', html.slice(0, 500));
+  }
 }
 
 async function main() {
-  const res = await fetch(URL_TO_CHECK, {
-    headers: {
-      'User-Agent': UA,
-      'Accept-Language': 'de-DE,de;q=0.9',
-    },
+  await tryFetch('plain UA only', { 'User-Agent': UA });
+
+  await tryFetch('full browser-like headers', {
+    'User-Agent': UA,
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    Referer: 'https://www.google.com/',
   });
-  console.log('Fetch status:', res.status);
-  const html = await res.text();
-  console.log('HTML length:', html.length);
 
-  // Bot-block/challenge detection
-  for (const pattern of [/cloudflare/i, /captcha/i, /access denied/i, /just a moment/i, /cf-browser-verification/i]) {
-    if (pattern.test(html)) console.log('POSSIBLE BLOCK PAGE, matched:', pattern);
-  }
-
-  for (const pattern of [
-    /application\/ld\+json/i,
-    /__NEXT_DATA__/,
-    /LiveBlogPosting/i,
-    /class="items"/i,
-    /gk_forum_id/i,
-    /class="rumour/i,
-    /table class/i,
-  ]) {
-    const snip = snippetAround(html, pattern);
-    console.log(`\nPattern ${pattern}:`, snip ? 'FOUND' : 'not found');
-  }
-
-  const bodyIdx = html.indexOf('<body');
-  console.log('\n=== First 2500 chars from body ===\n');
-  console.log(html.slice(bodyIdx, bodyIdx + 2500));
+  // Also try the plain transfermarkt homepage, to see if the block is
+  // site-wide or specific to the Gerüchteküche path.
+  const homeRes = await fetch('https://www.transfermarkt.de/', { headers: { 'User-Agent': UA } });
+  console.log('\n=== Homepage ===');
+  console.log('Status:', homeRes.status);
+  const homeHtml = await homeRes.text();
+  console.log('Body length:', homeHtml.length);
 }
 
 main().catch((err) => {
