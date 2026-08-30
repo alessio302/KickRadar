@@ -192,13 +192,22 @@ function buildLiveEventRows(fixtureId, homeClubId, awayClubId, data) {
 // field names (match_hometeam_name, goalscorer, ...) already match closely
 // -- match_status holds the live minute as a plain number there too,
 // switching to fixed text ("Half Time", "Finished", ...) outside play.
-// Only recognized as a minute when it parses cleanly; any other value
-// (including those fixed text ones) is left alone rather than guessed at,
-// same conservative-match principle clubMatch.js's resolveClub() already
-// applies -- a wrong minute shown as live would be worse than the fixture
-// row falling back to its kickoff time.
+//
+// "Half Time"/"HT" maps to the 'HT' sentinel rather than being left alone
+// like every other fixed-text status -- confirmed live: leaving it alone
+// (the original behavior here) meant fixtures.live_minute just kept
+// whatever numeric value it last held before half-time, which the app then
+// displayed as an actual live minute ("29'") long after kickoff, no
+// different in appearance from a genuinely stuck sync. "Half Time" is the
+// one fixed-text status worth surfacing explicitly, since it's a normal,
+// expected phase of every match rather than a transient/edge state --
+// other fixed-text values ("Finished", "Not Started", ...) stay ignored
+// here, same conservative-match principle clubMatch.js's resolveClub()
+// already applies: a wrong minute shown as live would be worse than the
+// fixture row falling back to its kickoff time.
 function parseLiveMinute(matchStatus) {
   if (typeof matchStatus !== 'string') return null;
+  if (/^(half.?time|ht)$/i.test(matchStatus.trim())) return 'HT';
   return /^\d{1,3}(\+\d{1,2})?$/.test(matchStatus) ? matchStatus : null;
 }
 
