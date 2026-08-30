@@ -55,6 +55,7 @@ function collectBlogPostings(parsed) {
   if (parsed?.['@type'] === 'BlogPosting') return [parsed];
   return [];
 }
+
 export async function fetchLiveBlogEntries(blogUrl) {
   const res = await fetch(blogUrl, { headers: { 'User-Agent': UA } });
   if (!res.ok) {
