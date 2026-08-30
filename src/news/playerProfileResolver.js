@@ -133,6 +133,13 @@ function pickBestMatch(results, candidateClubNames) {
 // goal_api_id, re-fetched later by refreshPlayerProfiles.js) -- both end up
 // with the exact same raw GOAL API player object at this point, just
 // reached via a different first step.
+// goal_api_updated_at is GOAL API's own `updatedAt` on the raw profile --
+// confirmed live this only moves when GOAL API actually recomputes the
+// player's data (a long-term-injured player with no minutes since can sit
+// on the same value for months), unlike our own stats_refreshed_at (030),
+// which bumps to now() on every successful poll regardless of whether
+// anything changed. Storing this separately is what lets the UI show a
+// real freshness date instead of "when we last happened to ask".
 function buildProfileFields(profile) {
   return {
     goal_api_id: profile.id,
@@ -141,6 +148,7 @@ function buildProfileFields(profile) {
     position: POSITION_SINGULAR[profile.type] || profile.type || null,
     squad_number: profile.number || null,
     injured: profile.injured === 'Yes',
+    goal_api_updated_at: profile.updatedAt || null,
     ...extractClubAndNationality(profile),
     stats: extractStats(profile),
   };

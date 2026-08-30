@@ -42,11 +42,19 @@ function calculateAge(birthdate) {
 // no minutes since) can silently be many months stale with nothing in the
 // response to reveal that. A guessed "Saison 2026/27" label used to be
 // shown here regardless -- confirmed live wrong for a player who hadn't
-// played since before the season even started. Showing the actual
-// stats_refreshed_at (falling back to resolved_at for a player never
-// picked up by refreshPlayerProfiles.js's periodic sweep yet, see
-// playerProfileResolver.js) is the honest version: readers can judge
-// staleness themselves instead of trusting an unverifiable season claim.
+// played since before the season even started.
+//
+// player.goal_api_updated_at (GOAL API's own `updatedAt`) is the real
+// freshness signal, NOT player.stats_refreshed_at -- confirmed live those
+// two disagree: stats_refreshed_at is stamped to now() by
+// refreshPlayerProfiles.js on every successful poll regardless of whether
+// GOAL API actually recomputed anything, so a first attempt at this fix
+// showed "Stand: <today>" for a player whose underlying numbers hadn't
+// moved since two months earlier. No fallback to stats_refreshed_at here
+// on purpose -- showing our own poll time as a freshness date is exactly
+// the bug just described, so a player without goal_api_updated_at (not
+// yet backfilled, or GOAL API omitted it) shows no date at all rather
+// than a misleading one.
 function formatStatsDate(iso, locale) {
   return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -179,9 +187,9 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px', borderTop: `1px solid ${theme.border}` }}>
-          {hasStats && (
+          {hasStats && player.goal_api_updated_at && (
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: theme.textMuted, margin: '0 0 10px' }}>
-              {t.playerProfile.statsAsOf(formatStatsDate(player.stats_refreshed_at ?? player.resolved_at, locale))}
+              {t.playerProfile.statsAsOf(formatStatsDate(player.goal_api_updated_at, locale))}
             </p>
           )}
           {showTabs && (

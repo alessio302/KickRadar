@@ -1,0 +1,11 @@
+-- Tracks GOAL API's OWN `updatedAt` for a player's profile -- distinct
+-- from stats_refreshed_at (030), which only records when WE last polled
+-- the endpoint, not whether the underlying data actually changed.
+-- Confirmed live: refreshPlayerProfiles.js bumps stats_refreshed_at to
+-- now() on every successful poll regardless, so a player GOAL API hasn't
+-- recomputed in months (e.g. long-term injured, no minutes since) still
+-- shows a same-day "Stand" in the app -- the UI was displaying "when we
+-- last asked" as if it were "how current this is", the opposite of what a
+-- freshness label is supposed to tell a reader. goal_api_updated_at is the
+-- field that actually answers that question.
+alter table players add column if not exists goal_api_updated_at timestamptz;
