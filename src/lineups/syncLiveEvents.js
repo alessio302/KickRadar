@@ -47,6 +47,24 @@ const RECENT_KICKOFF_WINDOW_MS = 15 * 60 * 1000;
 // subscribe_response messages rejected.
 const MAX_SUBSCRIPTIONS = 25;
 
+// Brief pause before re-establishing a dropped connection -- confirmed
+// live: GOAL API can close the socket within seconds of a successful
+// auth+subscribe with zero match_update messages ever delivered and no
+// error event, for no reason visible from this end. Reconnecting instantly
+// in a tight loop would just hammer GOAL API's ws/token REST endpoint (a
+// real call, not free) if whatever caused the drop is still true a moment
+// later; a few seconds' backoff costs nothing against a 13-minute budget.
+const RECONNECT_DELAY_MS = 5_000;
+
+// Safety valve, not an expected ceiling -- a connection dropping and
+// reconnecting a handful of times during a 13-minute run is normal GOAL
+// API flakiness (see above); dozens of drops in a row would mean something
+// more fundamental is broken (bad token minting, an outage on GOAL API's
+// side), and at that point burning the rest of the run's budget on
+// certain-to-fail reconnect attempts helps nobody -- better to exit and
+// let the next scheduled run (or the watchdog) try fresh.
+const MAX_RECONNECTS = 30;
+
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -216,37 +234,33 @@ function countLiveEvents(data) {
   return (data.goalscorer?.length ?? 0) + (data.cards?.length ?? 0) + (subs.home?.length ?? 0) + (subs.away?.length ?? 0);
 }
 
-export async function syncLiveEvents() {
-  const supabase = getSupabaseClient();
-  const deadline = Date.now() + JOB_BUDGET_MS;
-
-  const candidates = await findCandidateFixtures(supabase);
-  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0 };
-
-  const resolved = await resolveGoalApiIds(supabase, candidates);
-  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0 };
-
-  // goalApiId -> { fixtureId, homeClubId, awayClubId, leagueSlug }
-  const byGoalApiId = new Map();
-  for (const [fixtureId, info] of resolved) {
-    if (byGoalApiId.size >= MAX_SUBSCRIPTIONS) break;
-    byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
-  }
-
+// Holds one WebSocket connection open until either the run's overall
+// deadline arrives (expected -- resolves reachedDeadline: true) or the
+// connection closes for any other reason (GOAL API bouncing it, a network
+// blip, an auth failure -- resolves reachedDeadline: false so the caller
+// reconnects instead of treating the whole run as done). byGoalApiId,
+// lastCounts and lastMinutes are the same Maps across every reconnect
+// attempt within one run (mutated in place, never recreated here), so a
+// fresh connection picks up exactly where a dropped one left off --
+// already-known matches, minutes and event counts don't need rediscovering,
+// and a reconnect's own auth_success re-subscribes to all of them in one
+// go, same as the very first connection did.
+async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, counts }) {
   const { token } = await getWsToken();
 
-  let updatesHandled = 0;
-  let rowsWritten = 0;
-  const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
-  const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
-
-  await new Promise((resolve) => {
-    const ws = new WebSocket(`${GOAL_API_WS_URL}?wsToken=${token}`);
+  return new Promise((resolve, reject) => {
+    let ws;
+    try {
+      ws = new WebSocket(`${GOAL_API_WS_URL}?wsToken=${token}`);
+    } catch (err) {
+      reject(err);
+      return;
+    }
     let settled = false;
     let rescanTimer = null;
     let deadlineTimer = null;
 
-    const finish = () => {
+    const finish = (reachedDeadline) => {
       if (settled) return;
       settled = true;
       clearInterval(rescanTimer);
@@ -256,10 +270,10 @@ export async function syncLiveEvents() {
       } catch {
         // ignore
       }
-      resolve();
+      resolve(reachedDeadline);
     };
 
-    deadlineTimer = setTimeout(finish, Math.max(deadline - Date.now(), 0));
+    deadlineTimer = setTimeout(() => finish(true), Math.max(deadline - Date.now(), 0));
 
     const subscribeTo = (goalApiId) => {
       ws.send(JSON.stringify({ type: 'subscribe', resource: 'match', matchId: goalApiId }));
@@ -302,7 +316,7 @@ export async function syncLiveEvents() {
       }
 
       if (msg.type !== 'match_update') return;
-      updatesHandled += 1;
+      counts.updatesHandled += 1;
 
       const data = msg.data;
       const goalApiId = String(data?.id ?? '');
@@ -328,7 +342,7 @@ export async function syncLiveEvents() {
         console.error(`Failed to store live events for fixture ${info.fixtureId}:`, error.message);
         return;
       }
-      rowsWritten += rows.length;
+      counts.rowsWritten += rows.length;
 
       try {
         await notifyFavoritedFixtureEvents(supabase, info.fixtureId, info.leagueSlug, rows);
@@ -337,11 +351,59 @@ export async function syncLiveEvents() {
       }
     });
 
-    ws.addEventListener('close', () => finish());
+    ws.addEventListener('close', () => finish(false));
     ws.addEventListener('error', (event) => console.error('Live events WS error:', event.message ?? event));
   });
+}
 
-  return { subscribed: byGoalApiId.size, updatesHandled, rowsWritten };
+export async function syncLiveEvents() {
+  const supabase = getSupabaseClient();
+  const deadline = Date.now() + JOB_BUDGET_MS;
+
+  const candidates = await findCandidateFixtures(supabase);
+  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, reconnects: 0 };
+
+  const resolved = await resolveGoalApiIds(supabase, candidates);
+  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, reconnects: 0 };
+
+  // goalApiId -> { fixtureId, homeClubId, awayClubId, leagueSlug }
+  const byGoalApiId = new Map();
+  for (const [fixtureId, info] of resolved) {
+    if (byGoalApiId.size >= MAX_SUBSCRIPTIONS) break;
+    byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
+  }
+
+  const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
+  const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
+  const counts = { updatesHandled: 0, rowsWritten: 0 };
+  let reconnects = 0;
+
+  // Keeps reconnecting on an early/unexpected close until the deadline
+  // itself is what ends the run -- see connectAndTrack()'s own comment for
+  // why this exists. MAX_RECONNECTS is a safety valve against a
+  // fundamentally broken connection (bad token, GOAL API outage) burning
+  // the whole run on doomed retries, not an expected ceiling for normal
+  // flakiness.
+  while (Date.now() < deadline) {
+    let reachedDeadline;
+    try {
+      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, counts });
+    } catch (err) {
+      console.error('Live events connection attempt failed:', err.message);
+      reachedDeadline = false;
+    }
+    if (reachedDeadline) break;
+
+    reconnects += 1;
+    if (reconnects >= MAX_RECONNECTS) {
+      console.error(`Live events: hit MAX_RECONNECTS (${MAX_RECONNECTS}), giving up for this run.`);
+      break;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(RECONNECT_DELAY_MS);
+  }
+
+  return { subscribed: byGoalApiId.size, updatesHandled: counts.updatesHandled, rowsWritten: counts.rowsWritten, reconnects };
 }
 
 const isMain = process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href;
