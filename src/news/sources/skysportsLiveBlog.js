@@ -27,18 +27,34 @@ function decodeEntities(text) {
 
 // Sky's own live blog pages (Transfer Centre LIVE, and each club's own
 // transfer blog -- see skysports.js's LIVE_BLOG_PATTERN) embed every
-// individual timestamped update as a schema.org BlogPosting object in a
-// JSON-LD <script> block, right there in the plain server-rendered HTML --
+// individual timestamped update as a schema.org BlogPosting object, right
+// there in a JSON-LD <script> block in the plain server-rendered HTML --
 // confirmed live, no separate API call or JS execution needed. This is
 // exactly the content a blog's own sitemap entry can never represent as a
 // single story (see skysports.js): a one-paragraph update like "AC Milan
 // reach agreement to sign Forest's Hutchinson on initial loan" only ever
 // existed as one of these, never as its own article.
 //
+// The page's JSON-LD isn't a flat array of BlogPostings -- confirmed live
+// (a first attempt assuming a flat array silently found zero entries
+// every time): the real root is a single LiveBlogPosting object, with the
+// individual updates nested under its own `liveBlogUpdate` array. Each of
+// those still happens to repeat its own "@context"/"@type": "BlogPosting"
+// (a valid, if slightly redundant, JSON-LD pattern), which is what made
+// them look like flat top-level siblings at a glance.
+//
 // Iterates every <script type="application/ld+json"> block (there are
-// others on the page too, e.g. Organization/WebSite schema) and keeps
-// only entries actually typed BlogPosting, rather than assuming there's
-// exactly one script tag or one array shape.
+// others on the page too, e.g. Organization/WebSite schema) so this
+// doesn't depend on which position in the page the LiveBlogPosting block
+// happens to be at.
+function collectBlogPostings(parsed) {
+  if (Array.isArray(parsed)) return parsed.filter((p) => p?.['@type'] === 'BlogPosting');
+  if (parsed?.['@type'] === 'LiveBlogPosting' && Array.isArray(parsed.liveBlogUpdate)) {
+    return parsed.liveBlogUpdate.filter((p) => p?.['@type'] === 'BlogPosting');
+  }
+  if (parsed?.['@type'] === 'BlogPosting') return [parsed];
+  return [];
+}
 export async function fetchLiveBlogEntries(blogUrl) {
   const res = await fetch(blogUrl, { headers: { 'User-Agent': UA } });
   if (!res.ok) {
@@ -57,9 +73,9 @@ export async function fetchLiveBlogEntries(blogUrl) {
     } catch {
       return; // not the JSON we expect -- skip this block
     }
-    const posts = Array.isArray(parsed) ? parsed : [parsed];
+    const posts = collectBlogPostings(parsed);
     for (const post of posts) {
-      if (post?.['@type'] !== 'BlogPosting' || !post.headline || !post.url) continue;
+      if (!post.headline || !post.url) continue;
 
       // datePublished has no timezone offset (e.g. "2026-08-29T21:29:07")
       // -- Sky Sports is UK-based, so this is almost certainly UK local
