@@ -201,7 +201,14 @@ async function scrapeLeague(supabase, league) {
     // the LLM anyway. A failed fetch (network error, block, empty page)
     // just falls back to the headline/RSS summary as before -- extraction
     // is never blocked on this succeeding.
-    const articleText = await fetchArticleText(item.link);
+    //
+    // skipBodyFetch (set by skysportsLiveBlog.js) opts out entirely: those
+    // items' `link` is a shared live-blog page, not a page of their own
+    // (their own #anchor is never sent to the server) -- fetching it here
+    // would just re-extract every <p> on the whole blog page mixed
+    // together, clobbering the item's already-correct, already-scoped
+    // single-entry summary with a garbled multi-entry blob.
+    const articleText = item.skipBodyFetch ? null : await fetchArticleText(item.link);
     const extractionItem = articleText ? { ...item, summary: articleText } : item;
 
     const { playerName, fromClub, toClub, isOfficial, aiSummary } = await extractInfo(extractionItem, allClubs, league.newsSource);
