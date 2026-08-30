@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { collectBlogPostings, decodeEntities } from './liveBlogJsonLd.js';
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
@@ -12,19 +13,6 @@ const UA =
 // wasted work.
 const MAX_AGE_DAYS = 3;
 
-// The JSON-LD content is HTML-entity-encoded ("Forest&#x27;s",
-// "deal.&nbsp;Talks...") even though it's JSON, not HTML -- JSON.parse
-// only undoes JSON's own escaping, so this still needs a real HTML entity
-// decode afterwards. Reuses cheerio (an existing dependency, see
-// articleBody.js) rather than a hand-rolled replacement list, since its
-// HTML parser already decodes any entity correctly, not just the couple
-// seen so far -- and collapses the run of whitespace &nbsp; decodes to,
-// same normalization articleBody.js already applies to real article text.
-function decodeEntities(text) {
-  if (!text) return '';
-  return cheerio.load(`<div>${text}</div>`)('div').text().replace(/\s+/g, ' ').trim();
-}
-
 // Sky's own live blog pages (Transfer Centre LIVE, and each club's own
 // transfer blog -- see skysports.js's LIVE_BLOG_PATTERN) embed every
 // individual timestamped update as a schema.org BlogPosting object, right
@@ -33,29 +21,9 @@ function decodeEntities(text) {
 // exactly the content a blog's own sitemap entry can never represent as a
 // single story (see skysports.js): a one-paragraph update like "AC Milan
 // reach agreement to sign Forest's Hutchinson on initial loan" only ever
-// existed as one of these, never as its own article.
-//
-// The page's JSON-LD isn't a flat array of BlogPostings -- confirmed live
-// (a first attempt assuming a flat array silently found zero entries
-// every time): the real root is a single LiveBlogPosting object, with the
-// individual updates nested under its own `liveBlogUpdate` array. Each of
-// those still happens to repeat its own "@context"/"@type": "BlogPosting"
-// (a valid, if slightly redundant, JSON-LD pattern), which is what made
-// them look like flat top-level siblings at a glance.
-//
-// Iterates every <script type="application/ld+json"> block (there are
-// others on the page too, e.g. Organization/WebSite schema) so this
-// doesn't depend on which position in the page the LiveBlogPosting block
-// happens to be at.
-function collectBlogPostings(parsed) {
-  if (Array.isArray(parsed)) return parsed.filter((p) => p?.['@type'] === 'BlogPosting');
-  if (parsed?.['@type'] === 'LiveBlogPosting' && Array.isArray(parsed.liveBlogUpdate)) {
-    return parsed.liveBlogUpdate.filter((p) => p?.['@type'] === 'BlogPosting');
-  }
-  if (parsed?.['@type'] === 'BlogPosting') return [parsed];
-  return [];
-}
-
+// existed as one of these, never as its own article. See
+// liveBlogJsonLd.js for the actual JSON-LD parsing (shared with
+// fichajes.js, which turned out to use the same underlying pattern).
 export async function fetchLiveBlogEntries(blogUrl) {
   const res = await fetch(blogUrl, { headers: { 'User-Agent': UA } });
   if (!res.ok) {

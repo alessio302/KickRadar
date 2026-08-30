@@ -11,6 +11,13 @@
 // countries (Kenya, Somalia, Taiwan, women's/junior variants, ...); a
 // global name search risks silently wiring up the wrong homonym, so this
 // was resolved once per country rather than trusted from a substring match.
+//
+// newsSources is an array (even where every league but LaLiga only has
+// one entry) rather than a single string -- runNewsScraper.js scrapes
+// each one independently and tags every row with ITS OWN source key, not
+// the league's, so a second source for one league (LaLiga: marca +
+// fichajes, confirmed live as a genuinely different publisher, not just
+// a mirror of marca's own content) never gets mislabeled as the first.
 export const LEAGUES = [
   {
     slug: 'serie-a',
@@ -18,7 +25,7 @@ export const LEAGUES = [
     country: 'Italy',
     externalCompetitionId: 2019,
     goalApiLeagueId: 'cmr77dvpd006yrx06zig7907g',
-    newsSource: 'tuttomercatoweb',
+    newsSources: ['tuttomercatoweb'],
   },
   {
     slug: 'bundesliga',
@@ -26,7 +33,7 @@ export const LEAGUES = [
     country: 'Germany',
     externalCompetitionId: 2002,
     goalApiLeagueId: 'cmr77dvgm0002rx06rt2uqxii',
-    newsSource: 'kicker',
+    newsSources: ['kicker'],
   },
   {
     slug: 'premier-league',
@@ -34,7 +41,7 @@ export const LEAGUES = [
     country: 'England',
     externalCompetitionId: 2021,
     goalApiLeagueId: 'cmr77dvkr005nrx06lp7rvp49',
-    newsSource: 'skysports',
+    newsSources: ['skysports'],
   },
   {
     slug: 'ligue-1',
@@ -42,7 +49,7 @@ export const LEAGUES = [
     country: 'France',
     externalCompetitionId: 2015,
     goalApiLeagueId: 'cmr77dvqg007crx06q1kaceyo',
-    newsSource: 'footmercato',
+    newsSources: ['footmercato'],
   },
   {
     slug: 'la-liga',
@@ -50,7 +57,7 @@ export const LEAGUES = [
     country: 'Spain',
     externalCompetitionId: 2014,
     goalApiLeagueId: 'cmr77dvnt006nrx063v3w622e',
-    newsSource: 'marca',
+    newsSources: ['marca', 'fichajes'],
   },
 ];
 
@@ -59,5 +66,5 @@ export function leagueBySlug(slug) {
 }
 
 export function leagueByNewsSource(sourceKey) {
-  return LEAGUES.find((l) => l.newsSource === sourceKey);
+  return LEAGUES.find((l) => l.newsSources.includes(sourceKey));
 }

@@ -17,8 +17,9 @@ import kicker from './sources/kicker.js';
 import skysports from './sources/skysports.js';
 import footmercato from './sources/footmercato.js';
 import marca from './sources/marca.js';
+import fichajes from './sources/fichajes.js';
 
-const SOURCES = { tuttomercatoweb, kicker, skysports, footmercato, marca };
+const SOURCES = { tuttomercatoweb, kicker, skysports, footmercato, marca, fichajes };
 
 function externalIdFor(item) {
   return createHash('sha256').update(item.guid || item.link).digest('hex');
@@ -129,10 +130,14 @@ function aiSummaryColumns(aiSummary) {
   };
 }
 
+// One league's own worth of scraping, split across however many
+// newsSources it has (LaLiga: marca + fichajes, confirmed live as two
+// genuinely different publishers -- see leagues.js's own comment). Each
+// source is scraped independently -- its own seen_news_items scope, its
+// own `source` value written to every row it produces -- sharing only the
+// per-league lookups (dbLeague, allClubs) that don't depend on which
+// source found a given story.
 async function scrapeLeague(supabase, league) {
-  const source = SOURCES[league.newsSource];
-  if (!source) throw new Error(`No source module for "${league.newsSource}"`);
-
   const { data: dbLeague, error: leagueErr } = await supabase
     .from('leagues')
     .select('id')
@@ -153,6 +158,26 @@ async function scrapeLeague(supabase, league) {
   const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, short_name, aliases, league_id');
   if (clubsErr) throw clubsErr;
 
+  let inserted = 0;
+  let skipped = 0;
+  let merged = 0;
+  const notifiable = [];
+
+  for (const sourceKey of league.newsSources) {
+    const result = await scrapeSource(supabase, league, dbLeague, allClubs, sourceKey);
+    inserted += result.inserted;
+    skipped += result.skipped;
+    merged += result.merged;
+    notifiable.push(...result.notifiable);
+  }
+
+  return { inserted, skipped, merged, notifiable };
+}
+
+async function scrapeSource(supabase, league, dbLeague, allClubs, sourceKey) {
+  const source = SOURCES[sourceKey];
+  if (!source) throw new Error(`No source module for "${sourceKey}"`);
+
   // Only ever process genuinely new items -- avoids re-running the LLM call
   // (and the relevance/player-resolution work) on the same ~150 items every
   // hourly run just because they're still in the source's latest-20/N list.
@@ -166,7 +191,7 @@ async function scrapeLeague(supabase, league) {
   const { data: seenRows, error: seenErr } = await supabase
     .from('seen_news_items')
     .select('external_id')
-    .eq('source', league.newsSource);
+    .eq('source', sourceKey);
   if (seenErr) throw seenErr;
   const knownIds = new Set(seenRows.map((r) => r.external_id));
 
@@ -183,7 +208,7 @@ async function scrapeLeague(supabase, league) {
     }
 
     const text = `${item.title} ${item.summary || ''}`;
-    if (!isTransferRelevant(league.newsSource, text)) {
+    if (!isTransferRelevant(sourceKey, text)) {
       skipped += 1;
       continue;
     }
@@ -211,14 +236,14 @@ async function scrapeLeague(supabase, league) {
     const articleText = item.skipBodyFetch ? null : await fetchArticleText(item.link);
     const extractionItem = articleText ? { ...item, summary: articleText } : item;
 
-    const { playerName, fromClub, toClub, isOfficial, aiSummary } = await extractInfo(extractionItem, allClubs, league.newsSource);
+    const { playerName, fromClub, toClub, isOfficial, aiSummary } = await extractInfo(extractionItem, allClubs, sourceKey);
 
     // Mark as seen right after paying the LLM cost, regardless of what
     // happens below -- an item rejected for an unrelated league (or a
     // failed transfers upsert) must never be re-extracted on the next run.
     const { error: markSeenErr } = await supabase
       .from('seen_news_items')
-      .upsert({ source: league.newsSource, external_id: externalId }, { onConflict: 'source,external_id' });
+      .upsert({ source: sourceKey, external_id: externalId }, { onConflict: 'source,external_id' });
     if (markSeenErr) console.error(`[${league.slug}] failed to record seen item:`, markSeenErr.message);
 
     // Resolve to our curated club table when possible -- normalizes naming
@@ -426,7 +451,7 @@ async function scrapeLeague(supabase, league) {
           published_at: newerPublishedAt,
           summary: item.summary || item.title,
           ...aiSummaryColumns(aiSummary),
-          source: league.newsSource,
+          source: sourceKey,
           source_url: item.link,
           // Once confirmed official, a later, less-certain rumor-flavored
           // article about the same move shouldn't walk that back.
@@ -453,7 +478,7 @@ async function scrapeLeague(supabase, league) {
           from_club_id: resolvedFromMatch?.id ?? null,
           to_club_id: resolvedToMatch?.id ?? null,
           is_official: isOfficial,
-          source: league.newsSource,
+          source: sourceKey,
           source_url: item.link,
           summary: item.summary || item.title,
           ...aiSummaryColumns(aiSummary),
