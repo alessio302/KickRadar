@@ -1,3 +1,5 @@
+import { normalize } from '../util/normalize.js';
+
 // Thin adapter around GOAL API's REST + WebSocket surface. Replaces
 // Highlightly for lineup confirmation and match events (goals/cards/
 // substitutions) -- confirmed live (see this project's diagnostic history)
@@ -126,8 +128,19 @@ export async function getFixtureSubstitutions(fixtureId) {
 // per match, not just a bare id. src/news/playerProfileResolver.js
 // disambiguates multiple hits against the club a transfer story already
 // resolved, rather than guessing.
+//
+// Diacritics stripped before sending -- confirmed live via news-scraper
+// run logs: GOAL API's own `search` param rejects any accented character
+// outright with 400 "Search contains invalid characters" ("Julián Álvarez",
+// "Joaquín Oso", ...), not something fixable by encoding on this end (the
+// query string was already correctly percent-encoded). Extremely common in
+// Spanish/French/Italian player names, so left unstripped this silently
+// killed GOAL API resolution (photo/birthdate/stats) for a large share of
+// LaLiga/Ligue 1 players, falling back to the transfermarkt.de scrape every
+// time. GOAL API's own player records keep the real accented name (only
+// the search query needed plain ASCII), so this doesn't lose match quality.
 export async function searchPlayers(name) {
-  const data = await call('/players', { search: name });
+  const data = await call('/players', { search: normalize(name) });
   return data.data ?? [];
 }
 
