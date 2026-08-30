@@ -1,0 +1,19 @@
+name: Diagnose Grealish GOAL API stats period
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/diagnoseGrealishStats.js
+        env:
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
