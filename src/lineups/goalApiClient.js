@@ -91,6 +91,24 @@ export async function getLeagueFixtures(leagueId, date) {
   return data.data ?? [];
 }
 
+// Match-specific highlight videos (GOAL API's own "Videos" resource) --
+// used by refreshFixtureVideo.js to attach a highlights clip once a
+// fixture finishes. matchId is GOAL API's own fixture id, same one
+// resolveGoalApiIds()/getLeagueFixtures() already resolve elsewhere in
+// this codebase -- not our internal numeric fixtures.id.
+export async function getMatchVideos(matchId) {
+  const data = await call(`/videos/match/${matchId}`);
+  return data.data ?? [];
+}
+
+// League-wide recent videos -- used only by the one-off coverage
+// diagnostic (checking whether GOAL API actually has highlight videos for
+// all 5 tracked leagues, not just some), not by the real per-fixture sync.
+export async function getLeagueVideos(leagueId) {
+  const data = await call(`/videos/league/${leagueId}`);
+  return data.data ?? [];
+}
+
 // { data: { home: { startingLineups, substitutes, coach, missingPlayers },
 // away: { ...same shape... }, homeFormation, awayFormation, hasLineups } } --
 // confirmed live. Each lineup entry is a flat row (lineupPlayer,
