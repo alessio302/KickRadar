@@ -55,9 +55,6 @@ function FixturesList({
   currentMatchdayOnly,
   favoriteIds,
   onToggleFavorite,
-  openFixtureId,
-  onOpenRow,
-  onCloseRow,
   onSelectFixture,
   initialFixtureId,
   onConsumedInitialFixture,
@@ -144,9 +141,6 @@ function FixturesList({
                       clubsById={clubsById}
                       fixture={f}
                       isFavorite={favoriteIds?.has(f.id) ?? false}
-                      isOpen={openFixtureId === f.id}
-                      onOpenRow={() => onOpenRow?.(f.id)}
-                      onCloseRow={() => onCloseRow?.()}
                       onSelectFixture={(fixture) => onSelectFixture?.(fixture)}
                       onToggleFavorite={(fixture) => onToggleFavorite?.(fixture)}
                     />
@@ -166,7 +160,6 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
-  const [openFixtureId, setOpenFixtureId] = useState(null);
   const locale = DATE_LOCALES[language];
 
   const handleToggleFavorite = async (fixture) => {
@@ -238,9 +231,6 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
             currentMatchdayOnly={currentMatchdayOnly}
             favoriteIds={slug === league ? favoriteIds : undefined}
             onToggleFavorite={slug === league ? handleToggleFavorite : undefined}
-            openFixtureId={slug === league ? openFixtureId : null}
-            onOpenRow={slug === league ? setOpenFixtureId : undefined}
-            onCloseRow={slug === league ? () => setOpenFixtureId(null) : undefined}
             onSelectFixture={slug === league ? setSelectedFixture : undefined}
             initialFixtureId={slug === league ? initialFixtureId : null}
             onConsumedInitialFixture={slug === league ? onConsumedInitialFixture : undefined}
