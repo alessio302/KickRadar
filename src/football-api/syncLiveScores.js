@@ -102,7 +102,7 @@ async function pollOnce(supabase) {
     if (m.status !== 'IN_PLAY' && m.status !== 'PAUSED' && m.status !== 'FINISHED') continue;
 
     const newStatus = STATUS_MAP[m.status] || 'live';
-    const { data: rows, error } = await supabase
+    const { error } = await supabase
       .from('fixtures')
       .update({
         status: newStatus,
@@ -110,25 +110,22 @@ async function pollOnce(supabase) {
         away_score: m.score?.fullTime?.away ?? null,
         updated_at: new Date().toISOString(),
       })
-      .eq('external_fixture_id', m.id)
-      .select('id');
+      .eq('external_fixture_id', m.id);
     if (error) {
       console.error(`Failed to update live score for match ${m.id}:`, error.message);
       continue;
     }
     updated += 1;
 
-    // A finished match never goes live again, so an existing favorite on
-    // it can never trigger another push (matchEventNotifier.js, and the
-    // planned highlight-video push) or do anything else useful -- same
-    // reasoning FixtureRow.jsx already applies client-side by hiding the
-    // star once a match is finished, just enforced here too so an
-    // already-favorited fixture doesn't sit there forever once it ends.
-    const fixtureId = rows?.[0]?.id;
-    if (newStatus === 'finished' && fixtureId) {
-      const { error: favErr } = await supabase.from('favorite_fixtures').delete().eq('fixture_id', fixtureId);
-      if (favErr) console.error(`Failed to clear favorites for finished fixture ${fixtureId}:`, favErr.message);
-    }
+    // Not cleared here on newStatus === 'finished' -- confirmed live this
+    // was tried and immediately conflicted with the highlight-video push
+    // feature (src/lineups/syncHighlights.js): a highlight clip typically
+    // isn't posted until minutes-to-hours after full time, so deleting the
+    // favorite the instant the match ends means nobody's left to notify by
+    // the time one shows up. syncHighlights.js clears a fixture's
+    // favorites itself right after successfully pushing its highlight;
+    // the pg_cron job favorite_fixtures_finished_cleanup (034 migration)
+    // is the 24h backstop for a match that never gets a highlight at all.
   }
 
   return { updated, stillLive };

@@ -1,0 +1,29 @@
+name: Highlights sync
+
+on:
+  schedule:
+    # Offset to :07/:37 -- distinct from news-scraper's 4/34, live-events'
+    # 4/19/34/49, live-scores' 9/24/39/54, and lineups-sync's 14/29/44/59.
+    # See those files' own comments on why several workflows sharing one
+    # cron pattern made GitHub Actions' scheduler throttle all of them hard.
+    - cron: '7,37 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/syncHighlights.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

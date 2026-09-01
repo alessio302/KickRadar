@@ -86,7 +86,7 @@ async function findCandidateFixtures(supabase) {
 // (a cuid, unrelated to our numeric id) -- same club-name matching approach
 // as syncLineups.js, grouped by (league, date) so one GOAL API call covers
 // every candidate in that league on that date instead of one call per fixture.
-async function resolveGoalApiIds(supabase, candidates) {
+export async function resolveGoalApiIds(supabase, candidates) {
   if (candidates.length === 0) return new Map();
 
   const { data: dbLeagues, error: leaguesErr } = await supabase.from('leagues').select('id, slug');

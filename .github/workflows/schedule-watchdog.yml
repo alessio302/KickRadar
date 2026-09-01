@@ -106,3 +106,4 @@ jobs:
           check_and_trigger live-events.yml 25      # cadence 15 min
           check_and_trigger live-scores.yml 14      # self-loops ~13 min while live; see comment above
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
+          check_and_trigger highlights-sync.yml 50  # cadence 30 min

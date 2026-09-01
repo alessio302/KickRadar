@@ -50,6 +50,7 @@ export const PUSH_STRINGS = {
       redCard: { icon: '🟥', title: 'Rote Karte' },
       substitution: { icon: '🔄', title: 'Wechsel' },
     },
+    highlights: { title: '🎥 Highlights verfügbar' },
   },
   en: {
     official: 'Official',
@@ -62,6 +63,7 @@ export const PUSH_STRINGS = {
       redCard: { icon: '🟥', title: 'Red Card' },
       substitution: { icon: '🔄', title: 'Substitution' },
     },
+    highlights: { title: '🎥 Highlights available' },
   },
   it: {
     official: 'Ufficiale',
@@ -74,6 +76,7 @@ export const PUSH_STRINGS = {
       redCard: { icon: '🟥', title: 'Cartellino rosso' },
       substitution: { icon: '🔄', title: 'Cambio' },
     },
+    highlights: { title: '🎥 Highlights disponibili' },
   },
   fr: {
     official: 'Officiel',
@@ -86,6 +89,7 @@ export const PUSH_STRINGS = {
       redCard: { icon: '🟥', title: 'Carton rouge' },
       substitution: { icon: '🔄', title: 'Changement' },
     },
+    highlights: { title: '🎥 Highlights disponibles' },
   },
   es: {
     official: 'Oficial',
@@ -98,6 +102,7 @@ export const PUSH_STRINGS = {
       redCard: { icon: '🟥', title: 'Tarjeta roja' },
       substitution: { icon: '🔄', title: 'Cambio' },
     },
+    highlights: { title: '🎥 Highlights disponibles' },
   },
 };
 

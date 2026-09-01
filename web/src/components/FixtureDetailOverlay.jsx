@@ -583,6 +583,29 @@ function StandingRow({ theme, t, club, entry }) {
   );
 }
 
+// fixture.highlight_video_url is a direct .mp4 URL (GOAL API's Videos
+// resource, see src/lineups/syncHighlights.js) -- a plain <video> tag
+// plays it natively, no YouTube iframe/embed API needed. Only reachable
+// via a tab that's itself only shown for a finished fixture (see the tab
+// list below), so "not finished yet" was never a state this needs to
+// handle -- only "finished, but no clip found (yet or ever)" is.
+function HighlightsTab({ theme, t, fixture }) {
+  if (!fixture.highlight_video_url) {
+    return <p style={{ ...HINT_STYLE(theme), textAlign: 'center', padding: '32px 16px' }}>{t.matchInfo.noHighlights}</p>;
+  }
+  return (
+    <div style={{ padding: '16px' }}>
+      <video
+        key={fixture.highlight_video_url}
+        src={fixture.highlight_video_url}
+        controls
+        playsInline
+        style={{ width: '100%', borderRadius: '10px', background: '#000', display: 'block' }}
+      />
+    </div>
+  );
+}
+
 function MatchStatsTab({ theme, t, language, league, homeClub, awayClub }) {
   const locale = DATE_LOCALES[language];
   const { form: homeForm, loading: homeFormLoading } = useTeamForm(homeClub?.id);
@@ -735,7 +758,17 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
               row rather than folding "Spielinfo" in as a third side
               option. */}
           <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
-            {[['lineups', t.matchInfo.tabLineups], ['info', t.matchInfo.tabInfo], ['stats', t.matchInfo.tabStats]].map(([key, label]) => (
+            {[
+              ['lineups', t.matchInfo.tabLineups],
+              ['info', t.matchInfo.tabInfo],
+              ['stats', t.matchInfo.tabStats],
+              // Only offered once the match is actually over -- an upcoming
+              // or live fixture can never have a highlight clip yet, same
+              // reasoning FixtureRow.jsx already applies to the favorite
+              // star for the opposite case (a finished match can't go live
+              // again).
+              ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights]] : []),
+            ].map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setView(key)}
@@ -797,6 +830,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
           {view === 'stats' && (
             <MatchStatsTab theme={theme} t={t} language={language} league={league} homeClub={homeClub} awayClub={awayClub} />
           )}
+          {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
         </div>
       </div>
     </div>
