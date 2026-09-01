@@ -57,6 +57,7 @@ function FixturesList({
   onToggleFavorite,
   onSelectFixture,
   initialFixtureId,
+  initialView,
   onConsumedInitialFixture,
 }) {
   // Own clubs fetch, scoped to this page's own league -- not the
@@ -70,22 +71,30 @@ function FixturesList({
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
   const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
 
-  // Opens the fixture a lineup push notification pointed at, once its
-  // matchday has actually loaded -- initialFixtureId arrives from App.jsx
-  // synchronously on mount, well before this league's fixtures have
+  // Opens the fixture a lineup or highlights push notification pointed at,
+  // once its matchday has actually loaded -- initialFixtureId arrives from
+  // App.jsx synchronously on mount, well before this league's fixtures have
   // finished fetching. Searches all loaded matchdays, not just the
   // "current matchday only" filtered view above, since a confirmed lineup
   // can land on a fixture that toggle would otherwise hide. Reported once
   // via onConsumedInitialFixture so a later matchdays refetch (e.g. after
   // the user closes the overlay) doesn't reopen it.
+  //
+  // initialView is forwarded through onSelectFixture's second argument
+  // rather than read again later from a prop -- onConsumedInitialFixture
+  // clears both initialFixtureId and initialView in App.jsx in the same
+  // batch as this effect's own onSelectFixture call, so by the time
+  // FixtureDetailOverlay actually mounts the initialView prop passed into
+  // this component would already be back to null. Capturing it here, in the
+  // same closure that still sees the pre-clear value, avoids that race.
   useEffect(() => {
     if (initialFixtureId == null || !onSelectFixture) return;
     const found = matchdays.flatMap((m) => m.games).find((f) => f.id === initialFixtureId);
     if (found) {
-      onSelectFixture(found);
+      onSelectFixture(found, initialView);
       onConsumedInitialFixture();
     }
-  }, [initialFixtureId, matchdays, onSelectFixture, onConsumedInitialFixture]);
+  }, [initialFixtureId, initialView, matchdays, onSelectFixture, onConsumedInitialFixture]);
 
   return (
     <div
@@ -155,11 +164,17 @@ function FixturesList({
   );
 }
 
-export default function FixturesTab({ theme, t, language, league, onSelectLeague, onSwipeLeague, initialFixtureId, onConsumedInitialFixture, onFavoriteToast }) {
+export default function FixturesTab({ theme, t, language, league, onSelectLeague, onSwipeLeague, initialFixtureId, initialView, onConsumedInitialFixture, onFavoriteToast }) {
   const { clubs } = useClubs(league);
   const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
+  // Set only alongside selectedFixture, from the push-notification deep
+  // link's second onSelectFixture argument -- see FixturesList's own
+  // comment on why this can't just re-read the initialView prop later. A
+  // plain row tap calls onSelectFixture with one argument, leaving this
+  // null so the overlay falls back to its default lineups tab.
+  const [selectedView, setSelectedView] = useState(null);
   const locale = DATE_LOCALES[language];
 
   const handleToggleFavorite = async (fixture) => {
@@ -231,8 +246,16 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
             currentMatchdayOnly={currentMatchdayOnly}
             favoriteIds={slug === league ? favoriteIds : undefined}
             onToggleFavorite={slug === league ? handleToggleFavorite : undefined}
-            onSelectFixture={slug === league ? setSelectedFixture : undefined}
+            onSelectFixture={
+              slug === league
+                ? (fixture, view) => {
+                    setSelectedFixture(fixture);
+                    setSelectedView(view ?? null);
+                  }
+                : undefined
+            }
             initialFixtureId={slug === league ? initialFixtureId : null}
+            initialView={slug === league ? initialView : null}
             onConsumedInitialFixture={slug === league ? onConsumedInitialFixture : undefined}
           />
         )}
@@ -247,7 +270,11 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
           fixture={selectedFixture}
           homeClub={clubsById.get(selectedFixture.home_club_id)}
           awayClub={clubsById.get(selectedFixture.away_club_id)}
-          onClose={() => setSelectedFixture(null)}
+          initialView={selectedView}
+          onClose={() => {
+            setSelectedFixture(null);
+            setSelectedView(null);
+          }}
         />
       )}
     </div>

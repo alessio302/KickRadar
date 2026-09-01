@@ -101,7 +101,10 @@ function buildHighlightPayloads(fixtureId, leagueSlug, homeTeam, awayTeam) {
   const byLanguage = {};
   for (const lang of SUPPORTED_PUSH_LANGUAGES) {
     const s = pushStringsFor(lang).highlights;
-    byLanguage[lang] = { title: s.title, body: `${homeTeam} - ${awayTeam}`, url: `/?league=${leagueSlug}&fixture=${fixtureId}` };
+    // view=highlights -- App.jsx reads this alongside league/fixture so
+    // tapping the notification opens straight on the highlights tab
+    // instead of the overlay's default lineups tab.
+    byLanguage[lang] = { title: s.title, body: `${homeTeam} - ${awayTeam}`, url: `/?league=${leagueSlug}&fixture=${fixtureId}&view=highlights` };
   }
   return byLanguage;
 }

@@ -668,8 +668,12 @@ function MatchStatsTab({ theme, t, language, league, homeClub, awayClub }) {
   );
 }
 
-export default function FixtureDetailOverlay({ theme, t, language, league, fixture, homeClub, awayClub, onClose }) {
-  const [view, setView] = useState('lineups'); // 'lineups' | 'info' | 'stats'
+export default function FixtureDetailOverlay({ theme, t, language, league, fixture, homeClub, awayClub, initialView, onClose }) {
+  // initialView carries a highlights push notification's deep link (see
+  // FixturesTab.jsx's own comment on why it arrives via onSelectFixture's
+  // second argument rather than a prop read at render time) -- 'lineups'
+  // whenever the overlay was opened by a normal row tap instead.
+  const [view, setView] = useState(initialView || 'lineups'); // 'lineups' | 'info' | 'stats' | 'highlights'
   const [side, setSide] = useState('home');
   const { byClubId } = useLineups(fixture.id);
   const locale = DATE_LOCALES[language];

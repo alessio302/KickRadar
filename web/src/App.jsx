@@ -29,6 +29,7 @@ export default function App() {
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
   const [initialFixtureId, setInitialFixtureId] = useState(null);
+  const [initialView, setInitialView] = useState(null);
 
   // Tapping a push notification about a specific league's transfer should
   // land on that league, not whatever was last open -- the persisted
@@ -44,15 +45,22 @@ export default function App() {
   // detail overlay in the Spiele tab, not just the league's transfer list.
   // Confirmed live: tapping that notification only switched leagues, the
   // user still had to find and open the actual fixture by hand.
+  //
+  // A highlights push (syncHighlights.js) carries the same `fixture` id
+  // plus a `view=highlights` marker -- without it the overlay opened on its
+  // default lineups tab, so tapping a highlights notification still meant
+  // manually switching tabs to actually watch the clip.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedLeague = params.get('league');
     const requestedFixture = params.get('fixture');
+    const requestedView = params.get('view');
     if (requestedLeague && LEAGUE_SLUGS.includes(requestedLeague)) {
       setLeague(requestedLeague);
       const fixtureId = requestedFixture ? Number(requestedFixture) : NaN;
       if (Number.isInteger(fixtureId)) {
         setInitialFixtureId(fixtureId);
+        setInitialView(requestedView || null);
         setTab('spiele');
       } else {
         setTab('transfers');
@@ -250,7 +258,11 @@ export default function App() {
             onSelectLeague={selectLeague}
             onSwipeLeague={swipeLeague}
             initialFixtureId={initialFixtureId}
-            onConsumedInitialFixture={() => setInitialFixtureId(null)}
+            initialView={initialView}
+            onConsumedInitialFixture={() => {
+              setInitialFixtureId(null);
+              setInitialView(null);
+            }}
             onFavoriteToast={setToast}
           />
         )}
