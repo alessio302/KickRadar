@@ -90,6 +90,33 @@ function parseScoreEmbeddedTeams(title) {
   return { home, away };
 }
 
+// Title pattern confirmed live against a minority of the Ligue 1
+// McDonald's official channel's uploads: "LOSC LILLE - PARIS SAINT-GERMAIN
+// (2-2) | Week 2 - Ligue 1 McDonald's 26/27" -- teams first, score in
+// parens at the end of the first pipe segment. Most of this channel's
+// per-match uploads are narrative headline clips instead ("Brunner ÉTEINT
+// l'OM avec un doublé SENSATIONNEL | ..."), which don't have the two team
+// names in any structurally separable segment -- deliberately left
+// unparsed rather than guessing at free text, same conservative-matching
+// stance as resolveClub() itself. Ligue 1 coverage from this feed is
+// therefore lower than the other leagues here; only the "Week N" clean
+// recap uploads resolve automatically.
+//
+// The lazy first group stops at the FIRST " - ", so a HOME team name that
+// itself contains a hyphen would split wrong (confirmed live this is safe
+// for the away side -- "PARIS SAINT-GERMAIN" resolves correctly because
+// the mandatory "(N-N)$" anchor forces the lazy away-group to backtrack
+// past its own hyphen); no Ligue 1 club's home-side name has one today.
+function parseParenScoreTeams(title) {
+  const teamsPart = title.split('|')[0].trim();
+  const m = teamsPart.match(/^(.+?)\s*-\s*(.+?)\s*\(\d+\s*-\s*\d+\)$/);
+  if (!m) return null;
+  const home = m[1].trim();
+  const away = m[2].trim();
+  if (!home || !away) return null;
+  return { home, away };
+}
+
 const YOUTUBE_SOURCE_BY_LEAGUE_SLUG = {
   'serie-a': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?playlist_id=PLcv0mBdEYNdk', parseTeams: parseDashSeparatedTeams },
   bundesliga: { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UClCIWcZNvq15p0Y-E4ToGOw', parseTeams: parseBundesligaTeams },
@@ -115,6 +142,12 @@ const YOUTUBE_SOURCE_BY_LEAGUE_SLUG = {
   // leagues here -- same "catch it within the next sync run" reasoning
   // applies, just with a tighter margin.
   'la-liga': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCTv-XvfzLX3i4IGWAm4sbmA', parseTeams: parseScoreEmbeddedTeams },
+  // Ligue 1 McDonald's own official channel (channel_id resolved directly
+  // from the user-provided playlist's own <yt:channelId>, same as LaLiga).
+  // See parseParenScoreTeams' own comment: most of this channel's uploads
+  // are narrative clips this can't parse, so coverage here starts lower
+  // than the other leagues until more "Week N" clean recaps accumulate.
+  'ligue-1': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCQsH5XtIc9hONE1BQjucM0g', parseTeams: parseParenScoreTeams },
 };
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
