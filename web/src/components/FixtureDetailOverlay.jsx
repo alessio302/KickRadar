@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
+import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
+import { supabase } from '../lib/supabaseClient.js';
 import { useLineups } from '../hooks/useLineups.js';
 import { useMatchEvents } from '../hooks/useMatchEvents.js';
 import { useTeamForm } from '../hooks/useTeamForm.js';
@@ -40,6 +42,14 @@ function playerLabel(p, t) {
   );
 }
 
+// Same `players` table field set TransfersTab.jsx's own onOpenProfile
+// already selects via its transfers-join, requested here directly by
+// goal_api_id (the id every lineup entry already carries -- see
+// syncLineups.js's normalizePlayer) since a lineup entry has no such join
+// to piggyback on.
+const PLAYER_PROFILE_FIELDS =
+  'transfermarkt_url, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, stats, goal_api_updated_at, stats_refreshed_at, resolved_at';
+
 // initialLineup's own row grouping (GK, then each tactical line, forwards
 // last) already *is* a formation layout -- one horizontal rank per row,
 // top to bottom -- so no separate formation-string parsing is needed to
@@ -66,7 +76,7 @@ const PITCH_SAFE_ROWS = 5;
 // Up from 44 -- more vertical breathing room between ranks, per feedback.
 const PITCH_ROW_HEIGHT = 58;
 
-function PitchFormation({ formation, rows }) {
+function PitchFormation({ formation, rows, onSelectPlayer }) {
   return (
     <div
       style={{
@@ -152,7 +162,21 @@ function PitchFormation({ formation, rows }) {
         {rows.map((rank, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-evenly' }}>
             {rank.map((p) => (
-              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '54px' }}>
+              <button
+                key={p.id}
+                onClick={() => onSelectPlayer?.(p)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  width: '54px',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
                 {p.photo ? (
                   // Real player photo (GOAL API's own CDN, already embedded
                   // in every lineup entry -- see syncLineups.js's
@@ -201,7 +225,7 @@ function PitchFormation({ formation, rows }) {
                 >
                   {p.name}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         ))}
@@ -210,7 +234,7 @@ function PitchFormation({ formation, rows }) {
   );
 }
 
-function LineupList({ theme, t, row }) {
+function LineupList({ theme, t, row, onSelectPlayer }) {
   if (!row) {
     return (
       <div style={{ padding: '32px 16px', textAlign: 'center' }}>
@@ -236,7 +260,7 @@ function LineupList({ theme, t, row }) {
         <p style={{ fontSize: '13px', color: theme.textMuted, margin: '0 0 16px' }}>{t.lineup.noPlayers}</p>
       ) : (
         <div style={{ marginBottom: subs.length ? '16px' : 0 }}>
-          <PitchFormation formation={row.formation} rows={rows} />
+          <PitchFormation formation={row.formation} rows={rows} onSelectPlayer={onSelectPlayer} />
         </div>
       )}
 
@@ -247,7 +271,13 @@ function LineupList({ theme, t, row }) {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {subs.map((p) => (
-              <div key={p.id} style={{ fontSize: '13px', color: theme.textMuted }}>{playerLabel(p, t)}</div>
+              <button
+                key={p.id}
+                onClick={() => onSelectPlayer?.(p)}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, font: 'inherit', fontSize: '13px', color: theme.textMuted, cursor: 'pointer' }}
+              >
+                {playerLabel(p, t)}
+              </button>
             ))}
           </div>
         </>
@@ -700,6 +730,23 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
   const activeClub = side === 'home' ? homeClub : awayClub;
   const activeRow = activeClub ? byClubId.get(activeClub.id) : null;
 
+  // Tapping a lineup/substitute entry opens PlayerProfileOverlay, same as
+  // TransfersTab.jsx's onOpenProfile -- shown immediately from the lineup
+  // entry's own fields (name/photo/position, always present) so the sheet
+  // never opens on nothing, then upgraded in place with the fuller
+  // `players` table row (stats, birthdate, current club) if one resolves
+  // by goal_api_id. Most players won't have one at all -- that table is
+  // only populated by transfer-story matching, not every squad member --
+  // so a miss here just leaves the minimal profile showing, not an error.
+  const [profilePlayer, setProfilePlayer] = useState(null);
+  const handleSelectPlayer = async (p) => {
+    if (!p) return;
+    setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position });
+    if (!p.id) return;
+    const { data } = await supabase.from('players').select(PLAYER_PROFILE_FIELDS).eq('goal_api_id', p.id).maybeSingle();
+    if (data) setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position, ...data });
+  };
+
   // Pointer capture (not window listeners) so move/up events keep routing
   // to the handle even once the finger/cursor drifts off it -- avoids an
   // effect just to attach/detach window-level handlers for one gesture.
@@ -728,6 +775,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
   };
 
   return (
+    <>
     <div
       onClick={onClose}
       style={{
@@ -852,7 +900,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {view === 'lineups' && (
             <>
-              <LineupList theme={theme} t={t} row={activeRow} />
+              <LineupList theme={theme} t={t} row={activeRow} onSelectPlayer={handleSelectPlayer} />
               <MatchInfoFooter theme={theme} t={t} fixture={fixture} homeClub={homeClub} />
             </>
           )}
@@ -866,5 +914,9 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
         </div>
       </div>
     </div>
+    {profilePlayer && (
+      <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} onClose={() => setProfilePlayer(null)} />
+    )}
+    </>
   );
 }
