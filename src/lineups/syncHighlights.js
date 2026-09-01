@@ -34,12 +34,15 @@ import { resolveClub } from '../news/clubMatch.js';
 import { sendPushToFixtureFavoriters } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
-// Title pattern confirmed live against the Serie A playlist: "<headline> |
-// HOME-AWAY | HIGHLIGHTS | Serie A 2026/27" -- the "HOME-AWAY" segment is
-// always the second pipe-separated field; split again on "-" for the two
-// team names. Caps here ("CAGLIARI-INTER") don't matter -- resolveClub()
+// Title pattern confirmed live against both the Serie A playlist
+// ("<headline> | CAGLIARI-INTER | HIGHLIGHTS | Serie A 2026/27") and the
+// Sky Sport Premier League channel ("<headline> | Aston Villa - FC Arsenal
+// | Highlights - Premier League 2026/27", trailing league/season sometimes
+// missing entirely) -- the two team names are always the second
+// pipe-separated field, hyphen-separated with or without surrounding
+// spaces either way. Caps in Serie A's version don't matter -- resolveClub()
 // normalizes case itself.
-function parseSerieATeams(title) {
+function parseDashSeparatedTeams(title) {
   const segments = title.split('|').map((s) => s.trim());
   if (segments.length < 2) return null;
   const dashIndex = segments[1].indexOf('-');
@@ -69,8 +72,21 @@ function parseBundesligaTeams(title) {
 }
 
 const YOUTUBE_SOURCE_BY_LEAGUE_SLUG = {
-  'serie-a': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?playlist_id=PLcv0mBdEYNdk', parseTeams: parseSerieATeams },
+  'serie-a': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?playlist_id=PLcv0mBdEYNdk', parseTeams: parseDashSeparatedTeams },
   bundesliga: { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UClCIWcZNvq15p0Y-E4ToGOw', parseTeams: parseBundesligaTeams },
+  // Confirmed live: Premier League highlights aren't centralized on one
+  // official league channel the way Serie A's is -- the user found a
+  // "2. Spieltag | 2026/27" playlist from Sky Sport Premier League's own
+  // channel (German-commentated, same broadcaster-channel pattern as
+  // ZDFsportstudio for Bundesliga) that turned out to be per-matchday, same
+  // staleness risk as Bundesliga's playlist. That channel's uploads feed
+  // (channel_id UC_VsQmcsFWUhGn3DTwiO8bg) carries the same match highlights
+  // without the weekly-id problem, mixed with single-moment clips that
+  // parseDashSeparatedTeams naturally filters out (no second pipe segment
+  // shaped like "TEAM - TEAM"). The UK "Sky Sports Premier League" channel
+  // (UCNAf1k0yIjyGu3k9BwAg3lg, plural "Sports") was checked too but mostly
+  // posts pundit analysis/reaction content rather than match highlights.
+  'premier-league': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC_VsQmcsFWUhGn3DTwiO8bg', parseTeams: parseDashSeparatedTeams },
 };
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
