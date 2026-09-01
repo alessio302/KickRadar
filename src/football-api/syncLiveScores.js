@@ -101,17 +101,34 @@ async function pollOnce(supabase) {
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') stillLive = true;
     if (m.status !== 'IN_PLAY' && m.status !== 'PAUSED' && m.status !== 'FINISHED') continue;
 
-    const { error } = await supabase
+    const newStatus = STATUS_MAP[m.status] || 'live';
+    const { data: rows, error } = await supabase
       .from('fixtures')
       .update({
-        status: STATUS_MAP[m.status] || 'live',
+        status: newStatus,
         home_score: m.score?.fullTime?.home ?? null,
         away_score: m.score?.fullTime?.away ?? null,
         updated_at: new Date().toISOString(),
       })
-      .eq('external_fixture_id', m.id);
-    if (error) console.error(`Failed to update live score for match ${m.id}:`, error.message);
-    else updated += 1;
+      .eq('external_fixture_id', m.id)
+      .select('id');
+    if (error) {
+      console.error(`Failed to update live score for match ${m.id}:`, error.message);
+      continue;
+    }
+    updated += 1;
+
+    // A finished match never goes live again, so an existing favorite on
+    // it can never trigger another push (matchEventNotifier.js, and the
+    // planned highlight-video push) or do anything else useful -- same
+    // reasoning FixtureRow.jsx already applies client-side by hiding the
+    // star once a match is finished, just enforced here too so an
+    // already-favorited fixture doesn't sit there forever once it ends.
+    const fixtureId = rows?.[0]?.id;
+    if (newStatus === 'finished' && fixtureId) {
+      const { error: favErr } = await supabase.from('favorite_fixtures').delete().eq('fixture_id', fixtureId);
+      if (favErr) console.error(`Failed to clear favorites for finished fixture ${fixtureId}:`, favErr.message);
+    }
   }
 
   return { updated, stillLive };

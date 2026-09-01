@@ -68,12 +68,14 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
       ) : (
         <span style={{ width: '30px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
-      <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '46px', flex: '0 0 auto' }}>
-        {fixture.status === 'live' && fixture.live_minute
-          ? fixture.live_minute === 'HT'
-            ? fixture.live_minute
-            : `${fixture.live_minute}'`
-          : formatTime(fixture.kickoff_at, locale)}
+      <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, minWidth: '46px', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+        {fixture.status === 'finished'
+          ? t.fixtures.finished
+          : fixture.status === 'live' && fixture.live_minute
+            ? fixture.live_minute === 'HT'
+              ? fixture.live_minute
+              : `${fixture.live_minute}'`
+            : formatTime(fixture.kickoff_at, locale)}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
         <ClubJersey club={clubsById.get(fixture.home_club_id)} size={20} theme={theme} />
