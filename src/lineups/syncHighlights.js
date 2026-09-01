@@ -71,6 +71,25 @@ function parseBundesligaTeams(title) {
   return { home, away };
 }
 
+// Title pattern confirmed live against LALIGA EA SPORTS' own official
+// channel: "FC BARCELONA 5 - 2 RAYO VALLECANO | RESUMEN LALIGA EA SPORTS"
+// -- unlike every other league here, the score sits INSIDE the first
+// pipe segment, between the two team names, rather than the teams having
+// their own dedicated segment. Matches the first "<home> N - M <away>"
+// shape in that segment; a title with no embedded score (the channel also
+// posts player-highlight shorts, transfer news, presser clips) simply
+// doesn't match and is skipped -- no separate competition filter needed
+// the way Bundesliga's channel required one.
+function parseScoreEmbeddedTeams(title) {
+  const scoreLine = title.split('|')[0].trim();
+  const m = scoreLine.match(/^(.+?)\s+\d+\s*-\s*\d+\s+(.+)$/);
+  if (!m) return null;
+  const home = m[1].trim();
+  const away = m[2].trim();
+  if (!home || !away) return null;
+  return { home, away };
+}
+
 const YOUTUBE_SOURCE_BY_LEAGUE_SLUG = {
   'serie-a': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?playlist_id=PLcv0mBdEYNdk', parseTeams: parseDashSeparatedTeams },
   bundesliga: { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UClCIWcZNvq15p0Y-E4ToGOw', parseTeams: parseBundesligaTeams },
@@ -87,6 +106,15 @@ const YOUTUBE_SOURCE_BY_LEAGUE_SLUG = {
   // (UCNAf1k0yIjyGu3k9BwAg3lg, plural "Sports") was checked too but mostly
   // posts pundit analysis/reaction content rather than match highlights.
   'premier-league': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC_VsQmcsFWUhGn3DTwiO8bg', parseTeams: parseDashSeparatedTeams },
+  // LALIGA EA SPORTS' own official channel (channel_id resolved directly
+  // from the user-provided playlist's own <yt:channelId> -- confirmed
+  // live it's the league's real channel, not a third-party broadcaster's
+  // like Bundesliga/Premier League needed). Its uploads feed is prolific
+  // (transfer news, player clips, press conferences several times a day)
+  // so match highlights roll off the 15-item window faster than the other
+  // leagues here -- same "catch it within the next sync run" reasoning
+  // applies, just with a tighter margin.
+  'la-liga': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCTv-XvfzLX3i4IGWAm4sbmA', parseTeams: parseScoreEmbeddedTeams },
 };
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
