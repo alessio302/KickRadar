@@ -583,25 +583,34 @@ function StandingRow({ theme, t, club, entry }) {
   );
 }
 
-// fixture.highlight_video_url is a direct .mp4 URL (GOAL API's Videos
-// resource, see src/lineups/syncHighlights.js) -- a plain <video> tag
-// plays it natively, no YouTube iframe/embed API needed. Only reachable
-// via a tab that's itself only shown for a finished fixture (see the tab
-// list below), so "not finished yet" was never a state this needs to
-// handle -- only "finished, but no clip found (yet or ever)" is.
+// fixture.highlight_video_url is a YouTube embed URL
+// (https://www.youtube.com/embed/<id>) -- see src/lineups/syncHighlights.js.
+// GOAL API's own Videos resource was tried first (a direct .mp4, playable
+// in a plain <video> tag) but confirmed live to only hold historical
+// (~2025) clips in this environment, nothing for the current 2026/27
+// season being tracked; the leagues' own official YouTube highlight
+// playlists turned out to have same-day current-season clips instead, at
+// the cost of needing an <iframe> embed (YouTube's own playback requires
+// it -- no direct file URL to hand to <video>). Only reachable via a tab
+// that's itself only shown for a finished fixture (see the tab list
+// below), so "not finished yet" was never a state this needs to handle --
+// only "finished, but no clip found (yet or ever)" is.
 function HighlightsTab({ theme, t, fixture }) {
   if (!fixture.highlight_video_url) {
     return <p style={{ ...HINT_STYLE(theme), textAlign: 'center', padding: '32px 16px' }}>{t.matchInfo.noHighlights}</p>;
   }
   return (
     <div style={{ padding: '16px' }}>
-      <video
-        key={fixture.highlight_video_url}
-        src={fixture.highlight_video_url}
-        controls
-        playsInline
-        style={{ width: '100%', borderRadius: '10px', background: '#000', display: 'block' }}
-      />
+      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: '10px', overflow: 'hidden', background: '#000' }}>
+        <iframe
+          key={fixture.highlight_video_url}
+          src={fixture.highlight_video_url}
+          title={t.matchInfo.tabHighlights}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+        />
+      </div>
     </div>
   );
 }
