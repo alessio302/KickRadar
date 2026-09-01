@@ -58,7 +58,7 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
             color: league === l.slug ? theme.accent : theme.textMuted,
           }}
         >
-          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: l.color, flex: '0 0 auto' }} />
+          <img src={l.logo} alt="" width={16} height={16} style={{ flex: '0 0 auto', objectFit: 'contain' }} />
           {l.label}
         </button>
       ))}
