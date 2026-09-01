@@ -60,6 +60,18 @@
         display: none;
       }
 
+      /* Nothing in the app should be selectable/copyable -- no text input
+         fields exist anywhere in the UI (confirmed: no <input>/<textarea>
+         in web/src), so a blanket rule needs no per-field exception.
+         -webkit-touch-callout additionally suppresses iOS's long-press
+         "Copy"/"Save Image" callout menu, which user-select alone doesn't
+         cover. */
+      html, body {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+
       /* Static pre-hydration fallback for the same gap App.jsx's effect
          fixes at runtime (a bottom-safe-area sliver falling back to the
          browser's default white before React has mounted) -- matches
