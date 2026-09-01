@@ -10,16 +10,21 @@ async function main() {
   const laLigaGoalApiId = 'cmr77dvnt006nrx063v3w622e';
   const fixtures = await getLeagueFixtures(laLigaGoalApiId, '2026-08-31');
   console.log('fixtures found:', fixtures.length);
+  console.log('all matchups:', fixtures.map((f) => `${f.homeTeamName} vs ${f.awayTeamName}`));
   const match = fixtures.find(
-    (f) => /barcelona/i.test(f.homeTeam?.name || '') || /barcelona/i.test(f.homeTeamName || '')
+    (f) => /rayo/i.test(f.homeTeamName || '') || /rayo/i.test(f.awayTeamName || '')
   );
   console.log('matched fixture:', match?.id, match?.homeTeamName, match?.awayTeamName);
   if (!match) return;
 
   const lineups = await getFixtureLineups(match.id);
+  console.log('lineups top-level keys:', lineups ? Object.keys(lineups) : null);
   console.log('hasLineups:', lineups?.hasLineups);
+  console.log('home keys:', lineups?.home ? Object.keys(lineups.home) : null);
+  console.log('home.startingLineups length:', lineups?.home?.startingLineups?.length);
   const firstPlayer = lineups?.home?.startingLineups?.[0];
   console.log('first player raw entry:', JSON.stringify(firstPlayer, null, 2));
+  console.log('full lineups (truncated):', JSON.stringify(lineups, null, 2).slice(0, 3000));
 }
 
 main().catch((err) => {
