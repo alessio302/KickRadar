@@ -153,6 +153,25 @@ function PitchFormation({ formation, rows }) {
           <div key={i} style={{ display: 'flex', justifyContent: 'space-evenly' }}>
             {rank.map((p) => (
               <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '54px' }}>
+                {p.photo ? (
+                  // Real player photo (GOAL API's own CDN, already embedded
+                  // in every lineup entry -- see syncLineups.js's
+                  // normalizePlayer -- no extra fetch needed). Falls back to
+                  // the jersey-number circle below for whatever fraction of
+                  // players GOAL API has no photo for, rather than showing
+                  // a broken image icon.
+                  <img
+                    src={p.photo}
+                    alt=""
+                    width={30}
+                    height={30}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextSibling.style.display = 'flex';
+                    }}
+                    style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid rgba(255,255,255,0.85)' }}
+                  />
+                ) : null}
                 <div
                   style={{
                     width: '26px',
@@ -160,7 +179,7 @@ function PitchFormation({ formation, rows }) {
                     borderRadius: '50%',
                     background: 'rgba(255,255,255,0.94)',
                     color: '#15181D',
-                    display: 'flex',
+                    display: p.photo ? 'none' : 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '12px',

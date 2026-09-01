@@ -69,6 +69,11 @@ function normalizePlayer(entry) {
     name: entry.lineupPlayer,
     number: entry.lineupNumber ? Number(entry.lineupNumber) : null,
     position: POSITION_SINGULAR[entry.playerPosition] || entry.playerPosition || null,
+    // Confirmed live: every lineup entry already carries this (GOAL API's
+    // own CDN, e.g. https://media.goal-api.com/badges/players/96401_j-garcia.jpg)
+    // -- no separate /players/:id call needed per player the way
+    // playerProfileResolver.js needs for transfer stories.
+    photo: entry.playerImage || null,
   };
 }
 
