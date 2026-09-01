@@ -1,0 +1,26 @@
+name: Club GOAL API ids sync
+
+on:
+  schedule:
+    # Weekly -- a club's GOAL API id, founding year, and venue capacity
+    # essentially never change mid-season (see syncClubGoalApiIds.js's own
+    # comment). Offset to :17 Sunday, distinct from every other cron here.
+    - cron: '17 3 * * 0'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/syncClubGoalApiIds.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}

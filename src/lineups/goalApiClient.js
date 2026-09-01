@@ -91,6 +91,28 @@ export async function getLeagueFixtures(leagueId, date) {
   return data.data ?? [];
 }
 
+// Every team GOAL API has ever tracked for this league (confirmed live:
+// Serie A returns 40 for a 20-club top flight -- includes past
+// seasons'/inactive clubs, not just this season's 20; callers filter by
+// name match against their own current roster rather than trusting the
+// count). Each entry already carries id, name, badge, founded, and full
+// venue detail -- one call resolves every club's GOAL API id at once,
+// rather than needing to sample fixture dates across a season to
+// eventually see each club as home or away.
+export async function getLeagueTeams(leagueId) {
+  const data = await call(`/leagues/${leagueId}/teams`);
+  return data.data ?? [];
+}
+
+// Full current squad for one team -- id, name, image, number, position
+// (type), age, birthdate, injured, isCaptain, plus a season stats
+// snapshot per player (same fields as getPlayer(), just without a
+// separate call per squad member).
+export async function getTeamSquad(teamId) {
+  const data = await call(`/teams/${teamId}/players`);
+  return data.data ?? [];
+}
+
 // { data: { home: { startingLineups, substitutes, coach, missingPlayers },
 // away: { ...same shape... }, homeFormation, awayFormation, hasLineups } } --
 // confirmed live. Each lineup entry is a flat row (lineupPlayer,
