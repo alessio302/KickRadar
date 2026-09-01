@@ -1,8 +1,8 @@
 // Attaches a highlight-clip URL to a finished fixture by matching entries
-// from each league's own official YouTube highlights playlist (public
-// RSS/Atom feed -- no API key, no quota: https://www.youtube.com/feeds/
-// videos.xml?playlist_id=<id>) against our fixtures, then pushes whoever
-// favorited it once one shows up.
+// from each league's own official YouTube presence (public RSS/Atom feed --
+// no API key, no quota: https://www.youtube.com/feeds/videos.xml?
+// playlist_id=<id> or ?channel_id=<id>) against our fixtures, then pushes
+// whoever favorited it once one shows up.
 //
 // Replaces an earlier version of this file built on GOAL API's Videos
 // resource (/videos/match/:matchId) -- confirmed live (diagnostic against
@@ -14,31 +14,70 @@
 // own redirect: since each league already runs an official YouTube channel
 // for this, use that instead.
 //
-// Serie A only for now (confirmed live via diagnoseYoutubeHighlights.js
-// against the "English Highlights | Serie A 2026/27" playlist -- real,
-// current-season entries, e.g. "Calhanoglu The Nerazzurri Hero |
-// CAGLIARI-INTER | HIGHLIGHTS | Serie A 2026/27"), per the user's explicit
-// request to verify the approach on one league first. Add the other 4
-// leagues' playlist ids to PLAYLIST_ID_BY_LEAGUE_SLUG once confirmed --
-// a league with no entry here is silently skipped, not an error.
+// Two feed shapes in use, per league, since not every broadcaster runs
+// things the same way (both confirmed live via diagnostic scripts before
+// being folded in here):
+//  - Serie A: a single season-long playlist ("English Highlights | Serie A
+//    2026/27", id PLcv0mBdEYNdk) that the league's own channel keeps
+//    appending to all season -- confirmed live, so a playlist_id feed is
+//    stable to hardcode here.
+//  - Bundesliga: ZDFsportstudio's per-matchday playlist ("Bundesliga
+//    Highlights 1. Spieltag 2026/27") turned out to look like a fresh
+//    playlist made every Spieltag, which would go stale after one round.
+//    Its CHANNEL's uploads feed (channel_id UClCIWcZNvq15p0Y-E4ToGOw,
+//    "sportstudio fußball") carries the same clips without that weekly-id
+//    problem, at the cost of also carrying 2. Bundesliga, Frauen-Bundesliga
+//    and unrelated #shorts uploads mixed in -- parseTeams below filters
+//    those out by title before ever reaching resolveClub().
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { sendPushToFixtureFavoriters } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
-const PLAYLIST_ID_BY_LEAGUE_SLUG = {
-  'serie-a': 'PLcv0mBdEYNdk',
+// Title pattern confirmed live against the Serie A playlist: "<headline> |
+// HOME-AWAY | HIGHLIGHTS | Serie A 2026/27" -- the "HOME-AWAY" segment is
+// always the second pipe-separated field; split again on "-" for the two
+// team names. Caps here ("CAGLIARI-INTER") don't matter -- resolveClub()
+// normalizes case itself.
+function parseSerieATeams(title) {
+  const segments = title.split('|').map((s) => s.trim());
+  if (segments.length < 2) return null;
+  const dashIndex = segments[1].indexOf('-');
+  if (dashIndex === -1) return null;
+  const home = segments[1].slice(0, dashIndex).trim();
+  const away = segments[1].slice(dashIndex + 1).trim();
+  if (!home || !away) return null;
+  return { home, away };
+}
+
+// Title pattern confirmed live against the ZDFsportstudio channel feed:
+// "TEAM1 – TEAM2 | Bundesliga, X. Spieltag 2026/27 | ZDFsportstudio" -- an
+// EN DASH (not a hyphen) between the team names. Only matches when "|
+// Bundesliga," follows immediately (whitespace aside): confirmed live this
+// excludes "| 2. Bundesliga," and "| Frauen-Bundesliga," (the "2. "/
+// "Frauen-" prefix sits between the pipe and "Bundesliga," so the anchored
+// match never fires for those), which the same channel also uploads to.
+function parseBundesligaTeams(title) {
+  if (!/\|\s*Bundesliga,/.test(title)) return null;
+  const teamsPart = title.split('|')[0];
+  const dashIndex = teamsPart.indexOf('–'); // en dash
+  if (dashIndex === -1) return null;
+  const home = teamsPart.slice(0, dashIndex).trim();
+  const away = teamsPart.slice(dashIndex + 1).trim();
+  if (!home || !away) return null;
+  return { home, away };
+}
+
+const YOUTUBE_SOURCE_BY_LEAGUE_SLUG = {
+  'serie-a': { feedUrl: 'https://www.youtube.com/feeds/videos.xml?playlist_id=PLcv0mBdEYNdk', parseTeams: parseSerieATeams },
+  bundesliga: { feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UClCIWcZNvq15p0Y-E4ToGOw', parseTeams: parseBundesligaTeams },
 };
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const RECHECK_INTERVAL_MS = 30 * 60 * 1000;
 
-function feedUrl(playlistId) {
-  return `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
-}
-
-async function fetchPlaylistEntries(playlistId) {
-  const res = await fetch(feedUrl(playlistId), {
+async function fetchFeedEntries(feedUrl) {
+  const res = await fetch(feedUrl, {
     headers: {
       // Confirmed live (diagnoseYoutubeHighlights.js): the feed serves fine
       // without this, but a real UA is kept here as cheap insurance against
@@ -56,22 +95,6 @@ async function fetchPlaylistEntries(playlistId) {
       title: entry.match(/<title>(.*?)<\/title>/)?.[1] ?? null,
     }))
     .filter((e) => e.videoId && e.title);
-}
-
-// Title pattern confirmed live against the Serie A playlist: "<headline> |
-// HOME-AWAY | HIGHLIGHTS | Serie A 2026/27" -- the "HOME-AWAY" segment is
-// always the second pipe-separated field; split again on "-" for the two
-// team names. Caps here ("CAGLIARI-INTER") don't matter -- resolveClub()
-// normalizes case itself.
-function parseTeams(title) {
-  const segments = title.split('|').map((s) => s.trim());
-  if (segments.length < 2) return null;
-  const dashIndex = segments[1].indexOf('-');
-  if (dashIndex === -1) return null;
-  const home = segments[1].slice(0, dashIndex).trim();
-  const away = segments[1].slice(dashIndex + 1).trim();
-  if (!home || !away) return null;
-  return { home, away };
 }
 
 function buildHighlightPayloads(fixtureId, leagueSlug, homeTeam, awayTeam) {
@@ -110,8 +133,8 @@ export async function syncHighlights() {
   let pushed = 0;
 
   for (const league of leagues ?? []) {
-    const playlistId = PLAYLIST_ID_BY_LEAGUE_SLUG[league.slug];
-    if (!playlistId) continue;
+    const source = YOUTUBE_SOURCE_BY_LEAGUE_SLUG[league.slug];
+    if (!source) continue;
 
     const candidates = await findCandidates(supabase, league.id);
     if (candidates.length === 0) continue;
@@ -125,9 +148,9 @@ export async function syncHighlights() {
 
     let entries;
     try {
-      entries = await fetchPlaylistEntries(playlistId);
+      entries = await fetchFeedEntries(source.feedUrl);
     } catch (err) {
-      console.error(`YouTube playlist fetch failed for ${league.slug}:`, err.message);
+      console.error(`YouTube feed fetch failed for ${league.slug}:`, err.message);
       continue;
     }
 
@@ -135,7 +158,7 @@ export async function syncHighlights() {
     // not once per candidate fixture below.
     const parsedEntries = entries
       .map((entry) => {
-        const teams = parseTeams(entry.title);
+        const teams = source.parseTeams(entry.title);
         if (!teams) return null;
         const homeClub = resolveClub(teams.home, clubs ?? []);
         const awayClub = resolveClub(teams.away, clubs ?? []);
