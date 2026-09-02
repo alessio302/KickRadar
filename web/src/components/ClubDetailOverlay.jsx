@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { Crown } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
 import TransferCard from './TransferCard.jsx';
@@ -15,11 +14,12 @@ const DISMISS_THRESHOLD_PX = 100;
 
 // Squad roster grouping, by the same 4 broad categories syncLineups.js
 // uses as its fallback (a roster tab has no formation to chunk by, unlike
-// a fixture's pitch lineup) -- GOAL API's squad response uses the same
-// plural type names ("Goalkeepers" etc.), so this reuses the exact
-// position keys the app's own i18n (t.lineup.positions) already covers.
-const ROW_ORDER = ['Goalkeepers', 'Defenders', 'Midfielders', 'Forwards'];
-const SINGULAR = { Goalkeepers: 'Goalkeeper', Defenders: 'Defender', Midfielders: 'Midfielder', Forwards: 'Forward' };
+// a fixture's pitch lineup). get-team-squad now reads position straight
+// from the `players` table (see that function's own comment on why),
+// which already stores the singular keys t.lineup.positions expects --
+// same convention playerLabel()/PlayerProfileOverlay.jsx already use, so
+// no separate plural->singular map is needed here anymore.
+const ROW_ORDER = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
 
 function SquadTab({ theme, t, clubId, onSelectPlayer }) {
   const { squad, squadAvailable, loading } = useClubSquad(clubId);
@@ -41,7 +41,7 @@ function SquadTab({ theme, t, clubId, onSelectPlayer }) {
       {rows.map((row, i) => (
         <div key={i} style={{ marginBottom: '14px' }}>
           <p style={{ fontSize: '11px', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px' }}>
-            {t.lineup.positions[SINGULAR[ROW_ORDER[i]]] || ROW_ORDER[i]}
+            {t.lineup.positions[ROW_ORDER[i]] || ROW_ORDER[i]}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {row.map((p) => (
@@ -73,7 +73,6 @@ function SquadTab({ theme, t, clubId, onSelectPlayer }) {
                 <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.name}
                 </span>
-                {p.isCaptain && <Crown size={14} style={{ color: theme.accent, flexShrink: 0 }} title={t.clubDetail.captain} />}
                 {p.injured && (
                   <span style={{ fontSize: '10px', fontWeight: 700, color: theme.danger, border: `1px solid ${theme.danger}`, borderRadius: '999px', padding: '1px 6px', flexShrink: 0 }}>
                     {t.clubDetail.injured}
