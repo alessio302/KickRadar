@@ -9,6 +9,7 @@ import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 // The transfer feed for one league -- rendered twice by LeagueCarousel
@@ -85,6 +86,16 @@ export default function TransfersTab({
   const [summaryTransfer, setSummaryTransfer] = useState(null);
   const [profilePlayer, setProfilePlayer] = useState(null);
 
+  // Immediate placeholder from the already-fetched, possibly-stale
+  // `players` join (so the overlay isn't blank while the live call is in
+  // flight), then upgraded to the same live profile a lineup/squad tap
+  // would show for this exact player -- see lib/playerProfile.js.
+  const handleOpenProfile = async (transfer) => {
+    setProfilePlayer({ name: transfer.player_name, ...transfer.players });
+    const live = await fetchPlayerProfile(transfer.players?.goal_api_id);
+    if (live) setProfilePlayer(live);
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
@@ -154,7 +165,7 @@ export default function TransfersTab({
             league={slug}
             officialOnly={officialOnly}
             activeFilter={slug === league ? activeFilter : null}
-            onOpenProfile={slug === league ? setProfilePlayer : undefined}
+            onOpenProfile={slug === league ? handleOpenProfile : undefined}
             onOpenSummary={slug === league ? setSummaryTransfer : undefined}
           />
         )}

@@ -8,20 +8,10 @@ import { useClubSquad } from '../hooks/useClubSquad.js';
 import { useClubFixtures } from '../hooks/useClubFixtures.js';
 import { useClubTransfers } from '../hooks/useClubTransfers.js';
 import { useClubs } from '../hooks/useClubs.js';
-import { supabase } from '../lib/supabaseClient.js';
+import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 const DISMISS_THRESHOLD_PX = 100;
-
-// Same field list/lookup pattern as FixtureDetailOverlay.jsx's
-// handleSelectPlayer -- a squad member's own record (photo, number,
-// position) only comes from the get-team-squad Edge Function, which has no
-// stats/birthdate/nationality; those live in the `players` table and only
-// exist there for a player some transfer story has already resolved by
-// goal_api_id. Upgrading after an immediate minimal profile keeps the
-// overlay responsive instead of blocking on this lookup.
-const PLAYER_PROFILE_FIELDS =
-  'transfermarkt_url, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, stats, goal_api_updated_at, stats_refreshed_at, resolved_at';
 
 // Same 4-category grouping syncLineups.js's groupByPositionRows() already
 // uses for a fixture's lineup -- GOAL API's squad response uses the same
@@ -173,39 +163,30 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   const [profilePlayer, setProfilePlayer] = useState(null);
   const [summaryTransfer, setSummaryTransfer] = useState(null);
 
-  // get-team-squad now returns each player's own season stats and
-  // birthdate directly from GOAL API (see the Edge Function's STAT_FIELDS)
-  // -- unlike the fixture-lineup profile lookup, this doesn't need the
-  // `players` table to show stats at all, since that table only has a row
-  // for players some transfer story has already resolved. Still queries it
-  // afterward for the handful of fields the squad response doesn't carry
-  // (nationality, transfermarkt_url) -- layered on top rather than
-  // replacing the base object, so a miss there (the common case) doesn't
-  // blank out the stats/birthdate that are already showing.
+  // Same live get-player-profile call every player-profile entry point in
+  // the app now goes through (see lib/playerProfile.js) -- a squad tap and
+  // a transfer card's "View profile" tap on the same player used to be
+  // able to show different stats (one from the squad response's own
+  // embedded fields, one from a `players` table snapshot that's only as
+  // fresh as the last scheduled refresh). An immediate minimal profile
+  // from the squad row keeps the overlay responsive while that call is in
+  // flight, but the live result always wins once it lands.
   const handleSelectSquadPlayer = async (p) => {
     if (!p) return;
     const position = SINGULAR[p.position] || p.position || null;
-    const base = {
-      name: p.name,
-      photo_url: p.photo,
-      position,
-      injured: p.injured,
-      birthdate: p.birthdate,
-      squad_number: p.number,
-      stats: p.stats,
-      goal_api_updated_at: p.goal_api_updated_at,
-    };
-    setProfilePlayer(base);
-    if (!p.id) return;
-    const { data } = await supabase.from('players').select(PLAYER_PROFILE_FIELDS).eq('goal_api_id', p.id).maybeSingle();
-    if (data) {
-      setProfilePlayer({
-        ...base,
-        transfermarkt_url: data.transfermarkt_url,
-        nationality_name: data.nationality_name,
-        nationality_badge: data.nationality_badge,
-      });
-    }
+    setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured });
+    const live = await fetchPlayerProfile(p.id);
+    if (live) setProfilePlayer(live);
+  };
+
+  // Same pattern for a transfer card's "View profile" tap -- see
+  // TransfersTab.jsx's own handleOpenProfile, kept as a second copy since
+  // this overlay has no shared parent component with that tab to hoist it
+  // into.
+  const handleOpenTransferProfile = async (transfer) => {
+    setProfilePlayer({ name: transfer.player_name, ...transfer.players });
+    const live = await fetchPlayerProfile(transfer.players?.goal_api_id);
+    if (live) setProfilePlayer(live);
   };
 
   const [dragY, setDragY] = useState(0);
@@ -319,7 +300,7 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
               t={t}
               language={language}
               clubId={club.id}
-              onOpenProfile={setProfilePlayer}
+              onOpenProfile={handleOpenTransferProfile}
               onOpenSummary={setSummaryTransfer}
             />
           )}

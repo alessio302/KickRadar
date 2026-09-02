@@ -43,9 +43,9 @@ export default function TransferCard({ theme, t, language, transfer, onOpenProfi
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: '11px', color: theme.textMuted }}>{transfer.source}</span>
         <div style={{ display: 'flex', gap: '10px' }}>
-          {transfer.players?.photo_url ? (
+          {transfer.players?.goal_api_id ? (
             <button
-              onClick={() => onOpenProfile?.({ name: transfer.player_name, ...transfer.players })}
+              onClick={() => onOpenProfile?.(transfer)}
               title={t.transfers.viewProfileTitle}
               style={{
                 color: theme.textMuted,

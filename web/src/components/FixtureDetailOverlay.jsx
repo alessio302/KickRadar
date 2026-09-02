@@ -3,7 +3,7 @@ import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-rea
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
-import { supabase } from '../lib/supabaseClient.js';
+import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { useLineups } from '../hooks/useLineups.js';
 import { useMatchEvents } from '../hooks/useMatchEvents.js';
 import { useTeamForm } from '../hooks/useTeamForm.js';
@@ -41,14 +41,6 @@ function playerLabel(p, t) {
     </>
   );
 }
-
-// Same `players` table field set TransfersTab.jsx's own onOpenProfile
-// already selects via its transfers-join, requested here directly by
-// goal_api_id (the id every lineup entry already carries -- see
-// syncLineups.js's normalizePlayer) since a lineup entry has no such join
-// to piggyback on.
-const PLAYER_PROFILE_FIELDS =
-  'transfermarkt_url, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, stats, goal_api_updated_at, stats_refreshed_at, resolved_at';
 
 // initialLineup's own row grouping (GK, then each tactical line, forwards
 // last) already *is* a formation layout -- one horizontal rank per row,
@@ -731,20 +723,19 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
   const activeRow = activeClub ? byClubId.get(activeClub.id) : null;
 
   // Tapping a lineup/substitute entry opens PlayerProfileOverlay, same as
-  // TransfersTab.jsx's onOpenProfile -- shown immediately from the lineup
-  // entry's own fields (name/photo/position, always present) so the sheet
-  // never opens on nothing, then upgraded in place with the fuller
-  // `players` table row (stats, birthdate, current club) if one resolves
-  // by goal_api_id. Most players won't have one at all -- that table is
-  // only populated by transfer-story matching, not every squad member --
-  // so a miss here just leaves the minimal profile showing, not an error.
+  // TransfersTab.jsx's onOpenProfile and ClubDetailOverlay.jsx's squad tap
+  // -- shown immediately from the lineup entry's own fields (name/photo/
+  // position, always present) so the sheet never opens on nothing, then
+  // upgraded to the same live get-player-profile call every other
+  // player-profile entry point uses (see lib/playerProfile.js), so the
+  // same player shows identical stats regardless of which of the three
+  // opened the overlay.
   const [profilePlayer, setProfilePlayer] = useState(null);
   const handleSelectPlayer = async (p) => {
     if (!p) return;
     setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position });
-    if (!p.id) return;
-    const { data } = await supabase.from('players').select(PLAYER_PROFILE_FIELDS).eq('goal_api_id', p.id).maybeSingle();
-    if (data) setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position, ...data });
+    const live = await fetchPlayerProfile(p.id);
+    if (live) setProfilePlayer(live);
   };
 
   // Pointer capture (not window listeners) so move/up events keep routing
