@@ -173,13 +173,31 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   const [profilePlayer, setProfilePlayer] = useState(null);
   const [summaryTransfer, setSummaryTransfer] = useState(null);
 
+  // get-team-squad now returns each player's own season stats and
+  // birthdate directly from GOAL API (see the Edge Function's STAT_FIELDS)
+  // -- unlike the fixture-lineup profile lookup, this doesn't need the
+  // `players` table to show stats at all, since that table only has a row
+  // for players some transfer story has already resolved. Still queries it
+  // afterward for the handful of fields the squad response doesn't carry
+  // (nationality, transfermarkt_url) -- layered on top rather than
+  // replacing the base object, so a miss there (the common case) doesn't
+  // blank out the stats/birthdate that are already showing.
   const handleSelectSquadPlayer = async (p) => {
     if (!p) return;
     const position = SINGULAR[p.position] || p.position || null;
-    setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured });
+    const base = { name: p.name, photo_url: p.photo, position, injured: p.injured, birthdate: p.birthdate, stats: p.stats, goal_api_updated_at: p.goal_api_updated_at };
+    setProfilePlayer(base);
     if (!p.id) return;
     const { data } = await supabase.from('players').select(PLAYER_PROFILE_FIELDS).eq('goal_api_id', p.id).maybeSingle();
-    if (data) setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured, ...data });
+    if (data) {
+      setProfilePlayer({
+        ...base,
+        transfermarkt_url: data.transfermarkt_url,
+        nationality_name: data.nationality_name,
+        nationality_badge: data.nationality_badge,
+        squad_number: data.squad_number,
+      });
+    }
   };
 
   const [dragY, setDragY] = useState(0);
