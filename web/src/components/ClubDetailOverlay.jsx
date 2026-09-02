@@ -185,7 +185,16 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   const handleSelectSquadPlayer = async (p) => {
     if (!p) return;
     const position = SINGULAR[p.position] || p.position || null;
-    const base = { name: p.name, photo_url: p.photo, position, injured: p.injured, birthdate: p.birthdate, stats: p.stats, goal_api_updated_at: p.goal_api_updated_at };
+    const base = {
+      name: p.name,
+      photo_url: p.photo,
+      position,
+      injured: p.injured,
+      birthdate: p.birthdate,
+      squad_number: p.number,
+      stats: p.stats,
+      goal_api_updated_at: p.goal_api_updated_at,
+    };
     setProfilePlayer(base);
     if (!p.id) return;
     const { data } = await supabase.from('players').select(PLAYER_PROFILE_FIELDS).eq('goal_api_id', p.id).maybeSingle();
@@ -195,7 +204,6 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
         transfermarkt_url: data.transfermarkt_url,
         nationality_name: data.nationality_name,
         nationality_badge: data.nationality_badge,
-        squad_number: data.squad_number,
       });
     }
   };
