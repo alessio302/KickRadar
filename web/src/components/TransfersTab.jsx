@@ -85,6 +85,7 @@ export default function TransfersTab({
   const locale = DATE_LOCALES[language];
   const [summaryTransfer, setSummaryTransfer] = useState(null);
   const [profilePlayer, setProfilePlayer] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Immediate placeholder from the already-fetched, possibly-stale
   // `players` join (so the overlay isn't blank while the live call is in
@@ -92,8 +93,10 @@ export default function TransfersTab({
   // would show for this exact player -- see lib/playerProfile.js.
   const handleOpenProfile = async (transfer) => {
     setProfilePlayer({ name: transfer.player_name, ...transfer.players });
+    setProfileLoading(true);
     const live = await fetchPlayerProfile(transfer.players?.goal_api_id);
     if (live) setProfilePlayer(live);
+    setProfileLoading(false);
   };
 
   return (
@@ -175,7 +178,7 @@ export default function TransfersTab({
         <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />
       )}
       {profilePlayer && (
-        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} onClose={() => setProfilePlayer(null)} />
+        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} loading={profileLoading} onClose={() => setProfilePlayer(null)} />
       )}
     </div>
   );

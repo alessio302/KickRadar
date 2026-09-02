@@ -731,11 +731,14 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
   // same player shows identical stats regardless of which of the three
   // opened the overlay.
   const [profilePlayer, setProfilePlayer] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const handleSelectPlayer = async (p) => {
     if (!p) return;
     setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position });
+    setProfileLoading(true);
     const live = await fetchPlayerProfile(p.id);
     if (live) setProfilePlayer(live);
+    setProfileLoading(false);
   };
 
   // Pointer capture (not window listeners) so move/up events keep routing
@@ -906,7 +909,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
       </div>
     </div>
     {profilePlayer && (
-      <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} onClose={() => setProfilePlayer(null)} />
+      <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} loading={profileLoading} onClose={() => setProfilePlayer(null)} />
     )}
     </>
   );

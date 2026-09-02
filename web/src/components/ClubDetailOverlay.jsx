@@ -161,6 +161,7 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   const locale = DATE_LOCALES[language];
 
   const [profilePlayer, setProfilePlayer] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [summaryTransfer, setSummaryTransfer] = useState(null);
 
   // Same live get-player-profile call every player-profile entry point in
@@ -175,8 +176,10 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
     if (!p) return;
     const position = SINGULAR[p.position] || p.position || null;
     setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured });
+    setProfileLoading(true);
     const live = await fetchPlayerProfile(p.id);
     if (live) setProfilePlayer(live);
+    setProfileLoading(false);
   };
 
   // Same pattern for a transfer card's "View profile" tap -- see
@@ -185,8 +188,10 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   // into.
   const handleOpenTransferProfile = async (transfer) => {
     setProfilePlayer({ name: transfer.player_name, ...transfer.players });
+    setProfileLoading(true);
     const live = await fetchPlayerProfile(transfer.players?.goal_api_id);
     if (live) setProfilePlayer(live);
+    setProfileLoading(false);
   };
 
   const [dragY, setDragY] = useState(0);
@@ -308,7 +313,7 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
       </div>
     </div>
     {profilePlayer && (
-      <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} onClose={() => setProfilePlayer(null)} />
+      <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} loading={profileLoading} onClose={() => setProfilePlayer(null)} />
     )}
     {summaryTransfer && (
       <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />

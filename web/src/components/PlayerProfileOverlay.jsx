@@ -59,7 +59,7 @@ function formatStatsDate(iso, locale) {
   return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export default function PlayerProfileOverlay({ theme, t, player, locale, onClose }) {
+export default function PlayerProfileOverlay({ theme, t, player, locale, onClose, loading }) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef(null);
@@ -187,12 +187,12 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px', borderTop: `1px solid ${theme.border}` }}>
-          {hasStats && player.goal_api_updated_at && (
+          {!loading && hasStats && player.goal_api_updated_at && (
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: theme.textMuted, margin: '0 0 10px' }}>
               {t.playerProfile.statsAsOf(formatStatsDate(player.goal_api_updated_at, locale))}
             </p>
           )}
-          {showTabs && (
+          {!loading && showTabs && (
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', borderBottom: `1px solid ${theme.border}` }}>
               {groups.map((group) => (
                 <button
@@ -214,7 +214,9 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
               ))}
             </div>
           )}
-          {!hasStats ? (
+          {loading ? (
+            <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>
+          ) : !hasStats ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.playerProfile.noStats}</p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
