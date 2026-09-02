@@ -83,6 +83,13 @@ export const STAT_FIELDS = [
   'interceptions',
   'duelsWon',
   'dribbleSucc',
+  // Goalkeeper-specific -- null for every outfield player (confirmed live,
+  // e.g. 27 sampled Cologne/Hoffenheim/etc. squad entries), so extractStats()'s
+  // existing != null filter already keeps these off an outfield player's
+  // card for free; no separate position check needed here.
+  'saves',
+  'insideBoxSaves',
+  'goalsConceded',
 ];
 
 export function extractStats(profile) {

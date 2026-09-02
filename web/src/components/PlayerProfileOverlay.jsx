@@ -22,6 +22,12 @@ const DISMISS_THRESHOLD_PX = 100;
 // split out once it grew.
 const STAT_GROUPS = [
   { key: 'overview', labelKey: 'tabOverview', fields: ['matchPlayed', 'minutes', 'rating'] },
+  // Goalkeeper-only fields (null for every outfield player, see
+  // playerProfileResolver.js's STAT_FIELDS) -- placed right after
+  // overview so it's the first tab a keeper's profile actually lands on,
+  // ahead of attack/defense groups that are mostly empty for a keeper
+  // anyway.
+  { key: 'goalkeeping', labelKey: 'tabGoalkeeping', fields: ['saves', 'insideBoxSaves', 'goalsConceded'] },
   { key: 'attack', labelKey: 'tabAttack', fields: ['goals', 'assists', 'shotsTotal', 'passes', 'keyPasses', 'dribbleSucc'] },
   { key: 'defense', labelKey: 'tabDefense', fields: ['tackles', 'interceptions', 'duelsWon'] },
   { key: 'discipline', labelKey: 'tabDiscipline', fields: ['yellowCards', 'redCards'] },
