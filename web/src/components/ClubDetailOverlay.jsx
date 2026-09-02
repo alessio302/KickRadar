@@ -8,9 +8,20 @@ import { useClubSquad } from '../hooks/useClubSquad.js';
 import { useClubFixtures } from '../hooks/useClubFixtures.js';
 import { useClubTransfers } from '../hooks/useClubTransfers.js';
 import { useClubs } from '../hooks/useClubs.js';
+import { supabase } from '../lib/supabaseClient.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 const DISMISS_THRESHOLD_PX = 100;
+
+// Same field list/lookup pattern as FixtureDetailOverlay.jsx's
+// handleSelectPlayer -- a squad member's own record (photo, number,
+// position) only comes from the get-team-squad Edge Function, which has no
+// stats/birthdate/nationality; those live in the `players` table and only
+// exist there for a player some transfer story has already resolved by
+// goal_api_id. Upgrading after an immediate minimal profile keeps the
+// overlay responsive instead of blocking on this lookup.
+const PLAYER_PROFILE_FIELDS =
+  'transfermarkt_url, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, stats, goal_api_updated_at, stats_refreshed_at, resolved_at';
 
 // Same 4-category grouping syncLineups.js's groupByPositionRows() already
 // uses for a fixture's lineup -- GOAL API's squad response uses the same
@@ -162,6 +173,15 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   const [profilePlayer, setProfilePlayer] = useState(null);
   const [summaryTransfer, setSummaryTransfer] = useState(null);
 
+  const handleSelectSquadPlayer = async (p) => {
+    if (!p) return;
+    const position = SINGULAR[p.position] || p.position || null;
+    setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured });
+    if (!p.id) return;
+    const { data } = await supabase.from('players').select(PLAYER_PROFILE_FIELDS).eq('goal_api_id', p.id).maybeSingle();
+    if (data) setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured, ...data });
+  };
+
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef(null);
@@ -265,14 +285,7 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {tab === 'squad' && (
-            <SquadTab
-              theme={theme}
-              t={t}
-              clubId={club.id}
-              onSelectPlayer={(p) => setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position, injured: p.injured })}
-            />
-          )}
+          {tab === 'squad' && <SquadTab theme={theme} t={t} clubId={club.id} onSelectPlayer={handleSelectSquadPlayer} />}
           {tab === 'fixtures' && <FixturesTabContent theme={theme} t={t} locale={locale} clubId={club.id} leagueSlug={league} />}
           {tab === 'transfers' && (
             <TransfersTabContent
