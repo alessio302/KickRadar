@@ -303,10 +303,30 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
           try {
             const freshCandidates = await findCandidateFixtures(supabase);
             const freshResolved = await resolveGoalApiIds(supabase, freshCandidates);
+            let droppedForCapacity = 0;
             for (const [fixtureId, info] of freshResolved) {
-              if (byGoalApiId.has(info.goalApiId) || byGoalApiId.size >= MAX_SUBSCRIPTIONS) continue;
+              if (byGoalApiId.has(info.goalApiId)) continue;
+              if (byGoalApiId.size >= MAX_SUBSCRIPTIONS) {
+                droppedForCapacity += 1;
+                continue;
+              }
               byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
               subscribeTo(info.goalApiId);
+            }
+            // Confirmed live: MAX_SUBSCRIPTIONS (GOAL API FREE plan's own
+            // cap) was silently dropping any candidate past the 25th, on
+            // both the run's initial batch (see syncLiveEvents() below) and
+            // here on every rescan -- a busy Saturday with overlapping
+            // kickoffs across all 5 tracked leagues can realistically reach
+            // it, and nothing surfaced that some fixtures got no live WS
+            // coverage that run. Logged (not just silently counted) so it
+            // shows up in the workflow run's own output, same visibility
+            // level as every other failure path in this file.
+            counts.droppedForCapacity += droppedForCapacity;
+            if (droppedForCapacity > 0) {
+              console.error(
+                `Live events: MAX_SUBSCRIPTIONS (${MAX_SUBSCRIPTIONS}) reached during rescan -- ${droppedForCapacity} newly-live fixture(s) got no live WS coverage this run.`
+              );
             }
           } catch (err) {
             console.error('Live events rescan failed:', err.message);
@@ -361,10 +381,10 @@ export async function syncLiveEvents() {
   const deadline = Date.now() + JOB_BUDGET_MS;
 
   const candidates = await findCandidateFixtures(supabase);
-  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, reconnects: 0 };
+  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
 
   const resolved = await resolveGoalApiIds(supabase, candidates);
-  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, reconnects: 0 };
+  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
 
   // goalApiId -> { fixtureId, homeClubId, awayClubId, leagueSlug }
   const byGoalApiId = new Map();
@@ -372,10 +392,19 @@ export async function syncLiveEvents() {
     if (byGoalApiId.size >= MAX_SUBSCRIPTIONS) break;
     byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
   }
+  // See connectAndTrack()'s rescan loop for why this is logged, not just
+  // silently dropped -- same MAX_SUBSCRIPTIONS cap, hit here on the run's
+  // very first batch instead of a later rescan.
+  const droppedAtStart = resolved.size - byGoalApiId.size;
+  if (droppedAtStart > 0) {
+    console.error(
+      `Live events: MAX_SUBSCRIPTIONS (${MAX_SUBSCRIPTIONS}) reached at run start -- ${droppedAtStart} candidate fixture(s) got no live WS coverage this run.`
+    );
+  }
 
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
   const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
-  const counts = { updatesHandled: 0, rowsWritten: 0 };
+  const counts = { updatesHandled: 0, rowsWritten: 0, droppedForCapacity: droppedAtStart };
   let reconnects = 0;
 
   // Keeps reconnecting on an early/unexpected close until the deadline
@@ -403,7 +432,13 @@ export async function syncLiveEvents() {
     await sleep(RECONNECT_DELAY_MS);
   }
 
-  return { subscribed: byGoalApiId.size, updatesHandled: counts.updatesHandled, rowsWritten: counts.rowsWritten, reconnects };
+  return {
+    subscribed: byGoalApiId.size,
+    updatesHandled: counts.updatesHandled,
+    rowsWritten: counts.rowsWritten,
+    droppedForCapacity: counts.droppedForCapacity,
+    reconnects,
+  };
 }
 
 const isMain = process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href;
