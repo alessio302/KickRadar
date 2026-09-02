@@ -1,0 +1,16 @@
+name: Diagnose direct players table read (anon key)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query players table directly via PostgREST (Mattia Perin, by name)
+        run: |
+          curl -sS "https://inwncmfpcjbebwivmovc.supabase.co/rest/v1/players?select=name,photo_url,position,stats,goal_api_updated_at&name=eq.Mattia%20Perin" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud25jbWZwY2piZWJ3aXZtb3ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0OTM3MjksImV4cCI6MjEwMzA2OTcyOX0.3s2MN79Vonn1HSYahKYyvUNiow7OT7ZtV_Flf8yGtQc" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud25jbWZwY2piZWJ3aXZtb3ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0OTM3MjksImV4cCI6MjEwMzA2OTcyOX0.3s2MN79Vonn1HSYahKYyvUNiow7OT7ZtV_Flf8yGtQc"
+          echo
