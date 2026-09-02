@@ -23,15 +23,16 @@ function formatKickoff(iso, locale) {
   return new Date(iso).toLocaleString(locale, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-// initialLineup is an array of arrays -- one per formation row (GK, then
-// each tactical line, forwards last) -- not a flat list, and each player
-// is { name, number, position, id }. substitutes is a flat array of the
-// same player shape. This grouping is built server-side in
-// syncLineups.js's groupByPositionRows() (GOAL API's own lineup data is a
-// flat list with a broad position category per player, not pre-grouped by
-// tactical line), so this frontend contract stays fixed regardless of
-// which upstream provider is behind it. position uses the English enum
-// keys Goalkeeper/Defender/Midfielder/Forward -- t.lineup.positions (see
+// initialLineup is an array of arrays -- one per tactical line, GK first
+// and forwards last -- not a flat list, and each player is { name,
+// number, position, id }. substitutes is a flat array of the same player
+// shape. This grouping is built server-side in syncLineups.js's
+// groupByFormationRows() (GOAL API's own lineup data is a flat list, one
+// sequential lineupPosition per player, not pre-grouped by tactical
+// line), so this frontend contract stays fixed regardless of which
+// upstream provider is behind it -- it just renders whatever rows it's
+// given. position uses the English enum keys
+// Goalkeeper/Defender/Midfielder/Forward -- t.lineup.positions (see
 // i18n/translations.js) supplies the translated value per language.
 function playerLabel(p, t) {
   const pos = t.lineup.positions[p.position] || p.position;
@@ -62,10 +63,12 @@ function playerLabel(p, t) {
 // each other (a 4-rank and a 5-rank one) rendered at visibly different
 // pitch heights, which read as a layout bug even though nothing was
 // actually cropped. 5 covers every shape actually seen: syncLineups.js's
-// groupByPositionRows() caps *new* lineups at 4 ranks (GK/DF/MF/FW), and
-// older lineups stored before that migration can have one extra
-// split-out tactical line. Math.max keeps the original safety net for
-// anything unexpectedly taller instead of silently cropping it.
+// groupByFormationRows() produces GK + one row per formation-string
+// segment, and every formation stored so far tops out at 4 segments
+// (e.g. "4-2-3-1", "3-1-4-2") -- 5 rows total. Math.max keeps the
+// original safety net for anything unexpectedly taller (a 5-segment
+// formation GOAL API hasn't returned yet, or the broad-category
+// fallback) instead of silently cropping it.
 const PITCH_SAFE_ROWS = 5;
 // Up from 44 -- more vertical breathing room between ranks, per feedback.
 const PITCH_ROW_HEIGHT = 58;

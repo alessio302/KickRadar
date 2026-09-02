@@ -13,8 +13,9 @@ import { DATE_LOCALES } from '../i18n/languages.js';
 
 const DISMISS_THRESHOLD_PX = 100;
 
-// Same 4-category grouping syncLineups.js's groupByPositionRows() already
-// uses for a fixture's lineup -- GOAL API's squad response uses the same
+// Squad roster grouping, by the same 4 broad categories syncLineups.js
+// uses as its fallback (a roster tab has no formation to chunk by, unlike
+// a fixture's pitch lineup) -- GOAL API's squad response uses the same
 // plural type names ("Goalkeepers" etc.), so this reuses the exact
 // position keys the app's own i18n (t.lineup.positions) already covers.
 const ROW_ORDER = ['Goalkeepers', 'Defenders', 'Midfielders', 'Forwards'];

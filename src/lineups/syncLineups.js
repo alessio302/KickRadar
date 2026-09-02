@@ -78,23 +78,58 @@ function normalizePlayer(entry) {
 }
 
 // GOAL API's lineup entries are a flat list (confirmed live), not
-// pre-grouped by formation line the way Highlightly's initialLineup was.
-// Bucketing into the 4 broad position categories (GK/DF/MF/FW), rather
-// than also splitting by the formation string's own sub-lines (e.g.
-// "4-2-3-1"'s 2 defensive mid + 3 attacking mid), is a deliberate
-// simplification: correct player membership, just one row per category
-// instead of matching the exact tactical shape -- PitchFormation
-// (FixtureDetailOverlay.jsx) renders whatever rows it's given either way.
-function groupByPositionRows(entries) {
-  const players = (entries ?? []).map(normalizePlayer);
-  return ROW_ORDER.map((pos) => players.filter((p) => p.position === pos)).filter((row) => row.length > 0);
+// pre-grouped by formation line -- but each entry carries a sequential
+// lineupPosition, and the match's own formation string (e.g. "4-2-3-1")
+// is available alongside it. Confirmed live across 16 sampled lineup
+// sides spanning back-three/four/five, single and double pivots, a
+// diamond midfield and lopsided attacking lines: lineupPosition is a
+// strict back-to-front sequence with the goalkeeper always first, and
+// chunking the rest by the formation string's own digits reproduces the
+// real tactical shape exactly -- including wing-backs whose broad
+// `position` category (e.g. "Forward") disagrees with the line they
+// actually played in that match (one sampled back-five had a
+// Forward-tagged wing-back on *each* end of the same 5-player row). That
+// broad category is a player's general profile, not the role played, so
+// it's unsuitable for row grouping on its own -- it only remains as a
+// per-player label and as the fallback below.
+//
+// Falls back to bucketing by the 4 broad categories (GK/DF/MF/FW)
+// whenever the formation string is missing or its digits don't add up to
+// the rest of the entries (a malformed/partial formation string, or GOAL
+// API not fully reporting the lineup that run) -- both make the exact
+// row split unverifiable, so this degrades to "correct membership, not
+// necessarily the exact tactical shape" rather than guessing.
+function groupByFormationRows(entries, formation) {
+  const sorted = (entries ?? [])
+    .slice()
+    .sort((a, b) => Number(a.lineupPosition) - Number(b.lineupPosition))
+    .map(normalizePlayer);
+
+  const rowSizes = (formation || '')
+    .split('-')
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const expectedOutfield = rowSizes.reduce((a, b) => a + b, 0);
+
+  if (sorted.length > 1 && rowSizes.length > 0 && expectedOutfield === sorted.length - 1) {
+    const [goalkeeper, ...outfield] = sorted;
+    const rows = [[goalkeeper]];
+    let idx = 0;
+    for (const size of rowSizes) {
+      rows.push(outfield.slice(idx, idx + size));
+      idx += size;
+    }
+    return rows;
+  }
+
+  return ROW_ORDER.map((pos) => sorted.filter((p) => p.position === pos)).filter((row) => row.length > 0);
 }
 
-function buildLineupTeam(section) {
+function buildLineupTeam(section, formation) {
   if (!section) return null;
   return {
     formation: null, // set by the caller from homeFormation/awayFormation, shared per fixture not per section
-    initialLineup: groupByPositionRows(section.startingLineups),
+    initialLineup: groupByFormationRows(section.startingLineups, formation),
     substitutes: (section.substitutes ?? []).map(normalizePlayer),
   };
 }
@@ -278,8 +313,8 @@ export async function syncLineups() {
         }
 
         if (lineups?.hasLineups) {
-          const homeTeam = buildLineupTeam(lineups.home);
-          const awayTeam = buildLineupTeam(lineups.away);
+          const homeTeam = buildLineupTeam(lineups.home, lineups.homeFormation);
+          const awayTeam = buildLineupTeam(lineups.away, lineups.awayFormation);
           if (homeTeam) homeTeam.formation = lineups.homeFormation || null;
           if (awayTeam) awayTeam.formation = lineups.awayFormation || null;
 

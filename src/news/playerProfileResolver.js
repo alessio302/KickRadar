@@ -43,7 +43,7 @@ async function throttleGoalApi(fn) {
 // GOAL API's own singular/plural mismatch with this app's existing
 // position keys (web/src/i18n/translations.js's t.lineup.positions,
 // inherited from Highlightly's enum) -- same normalization
-// syncLineups.js's groupByPositionRows() already applies to lineup data,
+// syncLineups.js's own POSITION_SINGULAR already applies to lineup data,
 // duplicated here rather than shared since it's 4 lines either way.
 // Exported for syncPlayerProfiles.js's own field mapping -- see that
 // file's own comment on why it can't just call buildProfileFields()
