@@ -45,7 +45,14 @@ async function throttleGoalApi(fn) {
 // inherited from Highlightly's enum) -- same normalization
 // syncLineups.js's groupByPositionRows() already applies to lineup data,
 // duplicated here rather than shared since it's 4 lines either way.
-const POSITION_SINGULAR = {
+// Exported for syncPlayerProfiles.js's own field mapping -- see that
+// file's own comment on why it can't just call buildProfileFields()
+// below directly (a squad-endpoint entry and a single-player-endpoint
+// profile don't share the same raw shape), but the actual stat field
+// list and position vocabulary genuinely are identical between the two,
+// so those two pieces stay a single source of truth rather than a second
+// copy that could quietly drift from this one.
+export const POSITION_SINGULAR = {
   Goalkeepers: 'Goalkeeper',
   Defenders: 'Defender',
   Midfielders: 'Midfielder',
@@ -61,7 +68,7 @@ const POSITION_SINGULAR = {
 // almost certainly the current season given how low matchPlayed reads
 // early in one, but that's an inference from the number, not something
 // the API states.
-const STAT_FIELDS = [
+export const STAT_FIELDS = [
   'matchPlayed',
   'goals',
   'assists',
@@ -78,7 +85,7 @@ const STAT_FIELDS = [
   'dribbleSucc',
 ];
 
-function extractStats(profile) {
+export function extractStats(profile) {
   const stats = {};
   for (const key of STAT_FIELDS) {
     if (profile[key] != null) stats[key] = profile[key];

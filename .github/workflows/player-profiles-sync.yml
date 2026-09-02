@@ -1,0 +1,30 @@
+name: Player profiles sync
+
+on:
+  schedule:
+    # Every 6h -- decouples matchday freshness from whether/when a user
+    # happens to tap a given player (see syncPlayerProfiles.js's own
+    # comment). ~96 GOAL API calls per run (one per tracked club), well
+    # within the shared 1000/day budget even at this cadence.
+    - cron: '25 */6 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # ~96 clubs x ~20-30 players each, one DB write per player -- generous
+    # budget for that many sequential round trips plus the GOAL API calls
+    # themselves.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/syncPlayerProfiles.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
