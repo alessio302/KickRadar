@@ -19,23 +19,25 @@ async function main() {
 
   const lineups = await getFixtureLineups(info.goalApiId);
   console.log('homeFormation:', lineups.homeFormation, 'awayFormation:', lineups.awayFormation);
-  console.log(
-    'HOME raw startingLineups (sorted by lineupPosition):',
-    JSON.stringify(
-      (lineups.home?.startingLineups ?? [])
-        .slice()
-        .sort((a, b) => Number(a.lineupPosition) - Number(b.lineupPosition))
-        .map((p) => ({
-          lineupPosition: p.lineupPosition,
-          name: p.lineupPlayer,
-          number: p.lineupNumber,
-          playerPosition: p.playerPosition,
-          photo: p.playerImage,
-        })),
-      null,
-      2
-    )
-  );
+  for (const side of ['home', 'away']) {
+    console.log(
+      `\n${side.toUpperCase()} raw startingLineups (sorted by lineupPosition):`,
+      JSON.stringify(
+        (lineups[side]?.startingLineups ?? [])
+          .slice()
+          .sort((a, b) => Number(a.lineupPosition) - Number(b.lineupPosition))
+          .map((p) => ({
+            lineupPosition: p.lineupPosition,
+            name: p.lineupPlayer,
+            number: p.lineupNumber,
+            playerPosition: p.playerPosition,
+            photo: p.playerImage,
+          })),
+        null,
+        2
+      )
+    );
+  }
 }
 
 main().catch((err) => {
