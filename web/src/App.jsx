@@ -267,7 +267,7 @@ export default function App() {
           />
         )}
         {tab === 'tabelle' && (
-          <StandingsTab theme={theme} t={t} league={league} onSelectLeague={selectLeague} onSwipeLeague={swipeLeague} />
+          <StandingsTab theme={theme} t={t} language={language} league={league} onSelectLeague={selectLeague} onSwipeLeague={swipeLeague} />
         )}
         {tab === 'einstellungen' && (
           <SettingsTab

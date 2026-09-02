@@ -1,0 +1,44 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient.js';
+
+// Transfer news filtered to one club (either side of the move), for the
+// club-detail overlay's "Transfers" tab -- same table/filters useTransfers.js
+// already applies league-wide (a resolved player_name and both club sides,
+// see that file's own comment on why), just scoped by club id directly
+// instead of by league, so no new sync job is needed for this tab either.
+export function useClubTransfers(clubId) {
+  const [transfers, setTransfers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (clubId == null) return;
+    let cancelled = false;
+    setLoading(true);
+
+    supabase
+      .from('transfers')
+      .select('id, player_name, from_club, to_club, from_club_id, to_club_id, is_official, source, published_at')
+      .or(`from_club_id.eq.${clubId},to_club_id.eq.${clubId}`)
+      .not('player_name', 'is', null)
+      .not('from_club', 'is', null)
+      .not('to_club', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(30)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error('Failed to load club transfers', clubId, error);
+          setTransfers([]);
+        } else {
+          setTransfers(data);
+        }
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clubId]);
+
+  return { transfers, loading };
+}

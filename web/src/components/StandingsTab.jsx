@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import ClubJersey from './ClubJersey.jsx';
+import ClubDetailOverlay from './ClubDetailOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useStandings } from '../hooks/useStandings.js';
 
@@ -32,7 +33,7 @@ function NumCell({ children, bold, theme }) {
 // The table itself, for one league -- rendered twice by LeagueCarousel
 // while a swipe is in progress (the active league and whichever neighbor
 // is being dragged into view), each instance fetching its own data.
-function StandingsTable({ theme, t, league }) {
+function StandingsTable({ theme, t, league, onSelectClub }) {
   const { clubs } = useClubs(league);
   const { table, loading } = useStandings(league);
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
@@ -61,9 +62,22 @@ function StandingsTable({ theme, t, league }) {
             {table.map((row) => {
               const club = clubsById.get(row.club_id);
               return (
-                <div
+                <button
                   key={row.club_id}
-                  style={{ display: 'flex', alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${theme.border}` }}
+                  onClick={() => club && onSelectClub?.(club)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    width: '100%',
+                    padding: '9px 0',
+                    border: 'none',
+                    borderBottom: `1px solid ${theme.border}`,
+                    background: 'none',
+                    font: 'inherit',
+                    color: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
                 >
                   <div style={{ width: '20px', flexShrink: 0, fontSize: '12px', color: theme.textMuted, fontVariantNumeric: 'tabular-nums' }}>
                     {row.position}
@@ -80,7 +94,7 @@ function StandingsTable({ theme, t, league }) {
                   <NumCell theme={theme}>{row.lost}</NumCell>
                   <NumCell theme={theme}>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</NumCell>
                   <NumCell theme={theme} bold>{row.points}</NumCell>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -90,7 +104,9 @@ function StandingsTable({ theme, t, league }) {
   );
 }
 
-export default function StandingsTab({ theme, t, league, onSelectLeague, onSwipeLeague }) {
+export default function StandingsTab({ theme, t, language, league, onSelectLeague, onSwipeLeague }) {
+  const [selectedClub, setSelectedClub] = useState(null);
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
@@ -100,8 +116,21 @@ export default function StandingsTab({ theme, t, league, onSelectLeague, onSwipe
       <LeagueCarousel
         league={league}
         onSwitchLeague={onSwipeLeague}
-        renderPage={(slug) => <StandingsTable key={slug} theme={theme} t={t} league={slug} />}
+        renderPage={(slug) => (
+          <StandingsTable key={slug} theme={theme} t={t} league={slug} onSelectClub={slug === league ? setSelectedClub : undefined} />
+        )}
       />
+
+      {selectedClub && (
+        <ClubDetailOverlay
+          theme={theme}
+          t={t}
+          language={language}
+          league={league}
+          club={selectedClub}
+          onClose={() => setSelectedClub(null)}
+        />
+      )}
     </div>
   );
 }
