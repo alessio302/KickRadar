@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
-import { ArrowRightCircle, User, Sparkles } from 'lucide-react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import QuickFilters from './QuickFilters.jsx';
+import TransferCard from './TransferCard.jsx';
 import TransferSummaryOverlay from './TransferSummaryOverlay.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useTransfers } from '../hooks/useTransfers.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
-import { relativeTime } from '../lib/relativeTime.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 // The transfer feed for one league -- rendered twice by LeagueCarousel
@@ -50,107 +49,15 @@ function TransfersList({ theme, t, language, league, officialOnly, activeFilter,
           </p>
         )}
         {filtered.map((transfer) => (
-          <div
+          <TransferCard
             key={transfer.id}
-            style={{ background: theme.surfaceRaised, borderRadius: '12px', padding: '12px 14px', border: `1px solid ${theme.border}` }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  background: transfer.is_official ? theme.accent : 'transparent',
-                  color: transfer.is_official ? theme.accentText : theme.danger,
-                  border: transfer.is_official ? 'none' : `1px solid ${theme.danger}`,
-                }}
-              >
-                {transfer.is_official ? t.transfers.official : t.transfers.rumor}
-              </span>
-              <span style={{ fontSize: '11px', color: theme.textMuted }}>{relativeTime(transfer.published_at, t)}</span>
-            </div>
-            <p style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 6px' }}>{transfer.player_name ?? transfer.summary}</p>
-            {(transfer.from_club || transfer.to_club) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                {/* Arrow only when both sides are known -- confirmed live that a
-                    lone club can be misdirected by the extraction (a "sale"
-                    story mislabels the player's *current* club as the
-                    destination), so asserting a direction from one club alone
-                    can actively mislead. A bare, arrow-less name is neutral
-                    context instead of a (possibly wrong) directional claim. */}
-                {transfer.from_club && transfer.to_club ? (
-                  <>
-                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{transfer.from_club}</span>
-                    <ArrowRightCircle size={13} style={{ color: theme.textMuted, margin: '0 2px', flex: '0 0 auto' }} />
-                    <span style={{ fontSize: '12px', color: theme.textMuted }}>{transfer.to_club}</span>
-                  </>
-                ) : (
-                  <span style={{ fontSize: '12px', color: theme.textMuted }}>{transfer.from_club ?? transfer.to_club}</span>
-                )}
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: theme.textMuted }}>{transfer.source}</span>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {transfer.players?.photo_url ? (
-                  <button
-                    onClick={() => onOpenProfile?.({ name: transfer.player_name, ...transfer.players })}
-                    title={t.transfers.viewProfileTitle}
-                    style={{
-                      color: theme.textMuted,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      fontSize: '11px',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    <User size={13} /> {t.transfers.viewProfile}
-                  </button>
-                ) : (
-                  transfer.players?.transfermarkt_url && (
-                    <a
-                      href={transfer.players.transfermarkt_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={t.transfers.searchPlayerTitle}
-                      style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
-                    >
-                      <User size={13} /> {t.transfers.searchPlayer}
-                    </a>
-                  )
-                )}
-                {transfer[`ai_summary_${language}`] && (
-                  <button
-                    onClick={() => onOpenSummary?.(transfer)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: theme.accent,
-                      background: `${theme.accent}24`,
-                      border: 'none',
-                      borderRadius: '999px',
-                      padding: '4px 9px 4px 7px',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    <Sparkles size={12} /> AI Summary
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+            theme={theme}
+            t={t}
+            language={language}
+            transfer={transfer}
+            onOpenProfile={onOpenProfile}
+            onOpenSummary={onOpenSummary}
+          />
         ))}
       </div>
     </div>

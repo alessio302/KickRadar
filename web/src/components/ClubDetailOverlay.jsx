@@ -2,11 +2,12 @@ import { useRef, useState } from 'react';
 import { Crown } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
+import TransferCard from './TransferCard.jsx';
+import TransferSummaryOverlay from './TransferSummaryOverlay.jsx';
 import { useClubSquad } from '../hooks/useClubSquad.js';
 import { useClubFixtures } from '../hooks/useClubFixtures.js';
 import { useClubTransfers } from '../hooks/useClubTransfers.js';
 import { useClubs } from '../hooks/useClubs.js';
-import { relativeTime } from '../lib/relativeTime.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 const DISMISS_THRESHOLD_PX = 100;
@@ -127,7 +128,7 @@ function FixturesTabContent({ theme, t, locale, clubId, leagueSlug }) {
   );
 }
 
-function TransfersTabContent({ theme, t, clubId }) {
+function TransfersTabContent({ theme, t, language, clubId, onOpenProfile, onOpenSummary }) {
   const { transfers, loading } = useClubTransfers(clubId);
 
   if (loading) {
@@ -140,30 +141,15 @@ function TransfersTabContent({ theme, t, clubId }) {
   return (
     <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {transfers.map((tr) => (
-        <div key={tr.id} style={{ background: theme.surfaceRaised, borderRadius: '12px', padding: '12px 14px', border: `1px solid ${theme.border}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <span
-              style={{
-                fontSize: '10px',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '999px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em',
-                background: tr.is_official ? theme.accent : 'transparent',
-                color: tr.is_official ? theme.accentText : theme.danger,
-                border: tr.is_official ? 'none' : `1px solid ${theme.danger}`,
-              }}
-            >
-              {tr.is_official ? t.transfers.official : t.transfers.rumor}
-            </span>
-            <span style={{ fontSize: '11px', color: theme.textMuted }}>{relativeTime(tr.published_at, t)}</span>
-          </div>
-          <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 4px' }}>{tr.player_name}</p>
-          <p style={{ fontSize: '12px', color: theme.textMuted, margin: 0 }}>
-            {tr.from_club} → {tr.to_club}
-          </p>
-        </div>
+        <TransferCard
+          key={tr.id}
+          theme={theme}
+          t={t}
+          language={language}
+          transfer={tr}
+          onOpenProfile={onOpenProfile}
+          onOpenSummary={onOpenSummary}
+        />
       ))}
     </div>
   );
@@ -174,6 +160,7 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   const locale = DATE_LOCALES[language];
 
   const [profilePlayer, setProfilePlayer] = useState(null);
+  const [summaryTransfer, setSummaryTransfer] = useState(null);
 
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -278,20 +265,33 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {tab === 'squad' && <SquadTab theme={theme} t={t} clubId={club.id} onSelectPlayer={setProfilePlayer} />}
+          {tab === 'squad' && (
+            <SquadTab
+              theme={theme}
+              t={t}
+              clubId={club.id}
+              onSelectPlayer={(p) => setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position, injured: p.injured })}
+            />
+          )}
           {tab === 'fixtures' && <FixturesTabContent theme={theme} t={t} locale={locale} clubId={club.id} leagueSlug={league} />}
-          {tab === 'transfers' && <TransfersTabContent theme={theme} t={t} clubId={club.id} />}
+          {tab === 'transfers' && (
+            <TransfersTabContent
+              theme={theme}
+              t={t}
+              language={language}
+              clubId={club.id}
+              onOpenProfile={setProfilePlayer}
+              onOpenSummary={setSummaryTransfer}
+            />
+          )}
         </div>
       </div>
     </div>
     {profilePlayer && (
-      <PlayerProfileOverlay
-        theme={theme}
-        t={t}
-        player={{ name: profilePlayer.name, photo_url: profilePlayer.photo, position: profilePlayer.position, injured: profilePlayer.injured }}
-        locale={locale}
-        onClose={() => setProfilePlayer(null)}
-      />
+      <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} onClose={() => setProfilePlayer(null)} />
+    )}
+    {summaryTransfer && (
+      <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />
     )}
     </>
   );
