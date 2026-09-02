@@ -33,7 +33,10 @@ function NumCell({ children, bold, theme }) {
 // The table itself, for one league -- rendered twice by LeagueCarousel
 // while a swipe is in progress (the active league and whichever neighbor
 // is being dragged into view), each instance fetching its own data.
-function StandingsTable({ theme, t, league, onSelectClub }) {
+// Exported so FixtureDetailOverlay.jsx's own "Tabelle" tab can reuse the
+// exact same component (per explicit request: 1:1 identical to this
+// tab), rather than a second copy of the same markup.
+export function StandingsTable({ theme, t, league, onSelectClub }) {
   const { clubs } = useClubs(league);
   const { table, loading } = useStandings(league);
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);

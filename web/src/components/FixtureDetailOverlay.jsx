@@ -3,6 +3,8 @@ import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-rea
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
+import ClubDetailOverlay from './ClubDetailOverlay.jsx';
+import { StandingsTable } from './StandingsTab.jsx';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { useLineups } from '../hooks/useLineups.js';
 import { useMatchEvents } from '../hooks/useMatchEvents.js';
@@ -732,6 +734,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
   // opened the overlay.
   const [profilePlayer, setProfilePlayer] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [selectedClub, setSelectedClub] = useState(null);
   const handleSelectPlayer = async (p) => {
     if (!p) return;
     setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position });
@@ -836,6 +839,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
               ['lineups', t.matchInfo.tabLineups],
               ['info', t.matchInfo.tabInfo],
               ['stats', t.matchInfo.tabStats],
+              ['table', t.matchInfo.tabTable],
               // Only offered once the match is actually over -- an upcoming
               // or live fixture can never have a highlight clip yet, same
               // reasoning FixtureRow.jsx already applies to the favorite
@@ -904,12 +908,16 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
           {view === 'stats' && (
             <MatchStatsTab theme={theme} t={t} language={language} league={league} homeClub={homeClub} awayClub={awayClub} />
           )}
+          {view === 'table' && <StandingsTable theme={theme} t={t} league={league} onSelectClub={setSelectedClub} />}
           {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
         </div>
       </div>
     </div>
     {profilePlayer && (
       <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} loading={profileLoading} onClose={() => setProfilePlayer(null)} />
+    )}
+    {selectedClub && (
+      <ClubDetailOverlay theme={theme} t={t} language={language} league={league} club={selectedClub} onClose={() => setSelectedClub(null)} />
     )}
     </>
   );
