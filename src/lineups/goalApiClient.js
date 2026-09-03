@@ -1,4 +1,5 @@
 import { normalize } from '../util/normalize.js';
+import { getSupabaseClient } from '../db/supabaseClient.js';
 
 // Thin adapter around GOAL API's REST + WebSocket surface. Replaces
 // Highlightly for lineup confirmation and match events (goals/cards/
@@ -54,6 +55,25 @@ function retryDelayMs(res, attempt) {
   return RETRY_BACKOFFS_MS[attempt];
 }
 
+// Confirmed live this account sits on GOAL API's FREE plan (1,000
+// requests/day) -- until this, nothing tracked actual usage against that
+// anywhere, so knowing how much budget a given day's jobs had already
+// spent meant reading cron schedules and counting clubs/players by hand.
+// One row per day (goal_api_usage, see sql/041), incremented once per raw
+// HTTP attempt here -- including retries, since a 429 still counts against
+// GOAL API's own window, not just a successful response -- so this stays
+// the single place every Node-side caller's usage gets recorded, same as
+// this file's own retry logic already is. Best-effort: a failure to
+// record must never be why a real GOAL API call fails, so this only logs.
+async function recordUsage() {
+  try {
+    const { error } = await getSupabaseClient().rpc('increment_goal_api_usage');
+    if (error) console.error('Failed to record GOAL API usage:', error.message);
+  } catch (err) {
+    console.error('Failed to record GOAL API usage:', err.message);
+  }
+}
+
 async function call(path, params = {}) {
   const apiKey = process.env.GOAL_API_KEY;
   if (!apiKey) {
@@ -67,6 +87,7 @@ async function call(path, params = {}) {
 
   for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+    await recordUsage();
     const body = await res.text();
     if (res.ok) return JSON.parse(body);
 
@@ -191,6 +212,7 @@ export async function getWsToken() {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}` },
   });
+  await recordUsage();
   const body = await res.text();
   if (!res.ok) {
     throw new Error(`GOAL API ws/token request failed: ${res.status} ${res.statusText} ${body}`);
