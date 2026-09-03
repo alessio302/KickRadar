@@ -4,7 +4,8 @@ on:
   schedule:
     # Every 6h -- decouples matchday freshness from whether/when a user
     # happens to tap a given player (see syncPlayerProfiles.js's own
-    # comment). ~96 GOAL API calls per run (one per tracked club), well
+    # comment). ~96 GOAL API calls per run (one per tracked club) plus a
+    # capped number of gap-fill searches (MAX_GAP_FILLS_PER_RUN), well
     # within the shared 1000/day budget even at this cadence.
     - cron: '25 */6 * * *'
   workflow_dispatch: {}
@@ -15,10 +16,14 @@ jobs:
     # ~96 clubs x ~20-30 players each (~2000+ total), one DB write per
     # player -- confirmed live a full pass takes well over 20 minutes at
     # roughly one player per second (sequential DB round trips, plus any
-    # GOAL API retry backoff along the way). 45 minutes leaves real
-    # headroom so every run covers every club rather than always stalling
-    # partway through the same early clubs.
-    timeout-minutes: 45
+    # GOAL API retry backoff along the way). Now also fetches each club's
+    # real squad from football-data.org (rate-limited to 10 req/min, ~6.5s
+    # spacing -- ~10 more minutes across ~96 clubs) and, for any player
+    # that turns up missing from GOAL API's own squad response, an
+    # additional throttled GOAL API search (up to MAX_GAP_FILLS_PER_RUN of
+    # those, ~13s each). 90 minutes leaves real headroom for a worst-case
+    # run so it covers every club rather than stalling partway through.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,3 +36,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
