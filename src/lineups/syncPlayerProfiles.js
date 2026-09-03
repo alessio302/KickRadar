@@ -43,7 +43,22 @@ async function getFootballDataSquad(externalTeamId) {
 // Arsenal/Inter/Roma case this was built for) can't blow past GOAL API's
 // shared 1000/day budget or run indefinitely -- gapFilled vs
 // gapUnresolved in the return value shows whether the cap was ever hit.
-const MAX_GAP_FILLS_PER_RUN = 200;
+//
+// Confirmed live: 200 was still too high in practice. GOAL API's 1000/900s
+// window is shared with lineups-sync.yml's own 15-min-cadence runs, which
+// keep drawing from the same window while this job is also running -- so
+// once the window is under real contention, every gap-fill call can hit
+// goalApiClient.js's own reactive 429 backoff (8s, then 16s, then up to
+// 60s if the server names a longer Retry-After), not just this file's own
+// 1.5s proactive spacing between calls. That backoff cost, not the
+// proactive pacing, is what dominates once the window is contended --
+// confirmed live: with the cap at 200, a single early club with many gaps
+// (Toulouse) alone ate 10+ minutes of a run entirely on gap-fill retries,
+// never reaching the rest of the alphabet. Lowered so covering every club
+// at least once wins over exhaustively filling gaps in whichever club
+// happens to come first -- the remaining gaps close gradually across
+// several 6h runs instead of one run trying to close them all at once.
+const MAX_GAP_FILLS_PER_RUN = 30;
 
 // Confirmed live: a first version of this reused playerProfileResolver.js's
 // resolveGoalApiProfile(), which paces every GOAL API call 6.5s apart via
@@ -154,6 +169,15 @@ export async function syncPlayerProfiles() {
   let gapFilled = 0;
   let gapUnresolved = 0;
   let gapFillBudgetLeft = MAX_GAP_FILLS_PER_RUN;
+  // A run of failures this long means GOAL API's rate-limit window is
+  // genuinely contended right now (see MAX_GAP_FILLS_PER_RUN's own
+  // comment) -- confirmed live, once that's true, every further attempt
+  // just eats another 8-60s of goalApiClient.js's own backoff for the
+  // same result. Zeroing the budget here stops burning run time on gap
+  // fills that won't succeed anyway; the remaining clubs still get their
+  // free in-memory matches, just no more live searches this run.
+  const MAX_CONSECUTIVE_GAP_FILL_FAILURES = 5;
+  let consecutiveGapFillFailures = 0;
 
   for (const club of clubs) {
     let fdSquad;
@@ -194,8 +218,14 @@ export async function syncPlayerProfiles() {
             gapFillBudgetLeft -= 1;
             resolvedFields = await gapFillProfile(fp.name, [club.name]);
           }
-          if (resolvedFields) gapFilled += 1;
-          else gapUnresolved += 1;
+          if (resolvedFields) {
+            gapFilled += 1;
+            consecutiveGapFillFailures = 0;
+          } else {
+            gapUnresolved += 1;
+            consecutiveGapFillFailures += 1;
+            if (consecutiveGapFillFailures >= MAX_CONSECUTIVE_GAP_FILL_FAILURES) gapFillBudgetLeft = 0;
+          }
         }
 
         // football-data.org's own dateOfBirth/position (the authoritative
