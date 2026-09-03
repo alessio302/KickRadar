@@ -1,0 +1,19 @@
+-- football-data.org distinguishes SCHEDULED (date fixed, exact kickoff
+-- time not yet announced -- broadcaster/TV scheduling for a round that far
+-- out just isn't public yet) from TIMED (kickoff time confirmed), both of
+-- which syncFixtures.js's STATUS_MAP already collapses into our own
+-- 'scheduled' status (correctly -- both behave the same for live-tracking
+-- purposes). Confirmed live: for a SCHEDULED match, utcDate is a literal
+-- 00:00:00 UTC placeholder, which the frontend was displaying as if it
+-- were a real kickoff time (e.g. "02:00" CEST) -- misleading, even though
+-- the underlying kickoff_at value does get corrected automatically once
+-- football-data.org publishes the real time (every scheduled fixtures-sync
+-- run re-fetches and overwrites kickoff_at unconditionally).
+--
+-- Default true, not false: every fixture already synced before this
+-- column existed has a real kickoff_at (the old rolling sync window only
+-- ever reached ~3 weeks out, well within TV scheduling's own lead time),
+-- and the very next scheduled fixtures-sync run corrects this for every
+-- row going forward anyway -- a default of false would briefly mislabel
+-- every already-correct near-term fixture as unconfirmed instead.
+alter table fixtures add column if not exists kickoff_confirmed boolean not null default true;

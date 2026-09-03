@@ -75,7 +75,18 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
             ? fixture.live_minute === 'HT'
               ? fixture.live_minute
               : `${fixture.live_minute}'`
-            : formatTime(fixture.kickoff_at, locale)}
+            : // Confirmed live: a fixture far enough out that the
+              // broadcaster hasn't announced its kickoff time yet still
+              // carries a kickoff_at (football-data.org's own 00:00:00 UTC
+              // placeholder, see syncFixtures.js's own comment) -- showing
+              // that formatted as a real clock time read as a live time
+              // that just happened to be wrong. kickoff_confirmed flips to
+              // true automatically once a scheduled sync re-fetches after
+              // the real time is published, so this resolves itself with
+              // no further action once that happens.
+              fixture.kickoff_confirmed === false
+              ? t.fixtures.kickoffTbd
+              : formatTime(fixture.kickoff_at, locale)}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
         <ClubJersey club={clubsById.get(fixture.home_club_id)} size={20} theme={theme} />

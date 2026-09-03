@@ -73,6 +73,14 @@ export async function syncFixturesForLeague(supabase, league) {
       home_club_id: clubIdByExternalId.get(m.homeTeam.id),
       away_club_id: clubIdByExternalId.get(m.awayTeam.id),
       kickoff_at: m.utcDate,
+      // Confirmed live: SCHEDULED means the date is fixed but football-
+      // data.org hasn't got a real kickoff time yet -- utcDate is a bare
+      // 00:00:00 UTC placeholder in that case, not an actual local
+      // midnight kickoff. Every other status (TIMED, IN_PLAY, FINISHED,
+      // ...) carries a real utcDate. See sql/042 for why this doesn't
+      // affect STATUS_MAP's own 'scheduled' bucket, which both SCHEDULED
+      // and TIMED still map into.
+      kickoff_confirmed: m.status !== 'SCHEDULED',
       status: regressing ? existing.status : fetchedStatus,
       home_score: regressing ? existing.home_score : (m.score?.fullTime?.home ?? null),
       away_score: regressing ? existing.away_score : (m.score?.fullTime?.away ?? null),

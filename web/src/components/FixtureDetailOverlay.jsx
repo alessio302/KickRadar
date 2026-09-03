@@ -19,7 +19,14 @@ import { DATE_LOCALES } from '../i18n/languages.js';
 // one interaction.
 const DISMISS_THRESHOLD_PX = 100;
 
-function formatKickoff(iso, locale) {
+// kickoffConfirmed false means kickoff_at is football-data.org's own
+// 00:00:00 UTC placeholder (see syncFixtures.js's own comment) -- the date
+// is real, the time on it isn't, so this drops the time portion instead of
+// formatting a clock reading nobody actually announced yet.
+function formatKickoff(iso, locale, kickoffConfirmed, tbdLabel) {
+  if (kickoffConfirmed === false) {
+    return `${new Date(iso).toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' })} · ${tbdLabel}`;
+  }
   return new Date(iso).toLocaleString(locale, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -829,7 +836,9 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
               <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '14px', fontWeight: 700 }} />
               <ClubJersey club={awayClub} size={22} theme={theme} />
             </div>
-            <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>{formatKickoff(fixture.kickoff_at, locale)}</p>
+            <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>
+              {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
+            </p>
           </div>
 
           {/* Which tab is open at all -- Aufstellungen/Spielinfo -- versus
