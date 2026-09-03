@@ -107,6 +107,38 @@ regex-only fallback with no code change (just remove `GEMINI_API_KEY`).
 
 ## Known limitations / things to verify with real internet access
 
+- **Tech debt: `PlayerProfileOverlay`'s stats are not reliably season-scoped.**
+  GOAL API's player profile (`player.stats`, via `getPlayer`/`getTeamSquad`)
+  carries no season identifier at all -- confirmed live (2026-09) that it can
+  return last season's numbers with nothing to distinguish them from this
+  season's (e.g. a player showed `matchPlayed: 6` while his club had played
+  only 2 league matches all season). Goals/assists/matches for the
+  **Top Scorers** view (`syncTopScorers.js`) were already fixed by aggregating
+  from `match_events` instead, which is reliably current-season since fixtures
+  are only ever synced for the season in progress -- the same fix (plus
+  yellow/red cards, also present in `match_events`) still needs to be applied
+  to the individual player profile overlay used everywhere else (squad taps,
+  transfer cards, lineup taps, top-scorer taps). The remaining stat
+  categories shown there (minutes, rating, shots, passes, key passes,
+  tackles, interceptions, duels won, dribbles succeeded, saves, inside-box
+  saves, goals conceded) have **no alternative source in this project's own
+  data** and would stay fully GOAL-API-dependent with unknown season even
+  after that fix.
+  Researched replacing/supplementing GOAL API for this (2026-09): football-data.org
+  (already integrated) gates player-level match stats behind its paid "Deep
+  Data" add-on on the free tier; SportMonks' free tier only covers the Danish
+  Superliga and Scottish Premiership, not our five leagues; TheSportsDB is
+  crowd-sourced and too inconsistent; API-Football was already ruled out once
+  below. No free-tier source was found that provides season-clean detailed
+  player stats for our leagues -- Flashscore/LiveScore-grade data comes from
+  paid commercial feeds (Genius Sports/Sportradar/Stats Perform) with direct
+  league data-rights deals plus paid stadium scouting, not a public API tier.
+  Options on the table for when this gets picked up: (1) replace the core
+  fields (goals/assists/cards/matches) with `match_events` aggregation like
+  top scorers, and add a clearer "unverified season" caveat on the rest, (2)
+  same, but hide the unverifiable categories entirely, (3) leave the data as
+  is and just sharpen the existing `goal_api_updated_at`-based freshness
+  label. Deliberately left undone for now -- parked as tech debt.
 - **API-Football's free plan blocks the current season** (confirmed live:
   "Free plans do not have access to this season, try from 2022 to 2024").
   Switched to football-data.org instead, which includes the current season
