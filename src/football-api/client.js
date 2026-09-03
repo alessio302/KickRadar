@@ -37,8 +37,13 @@ export async function getTeams({ competitionId }) {
   return data.teams;
 }
 
-// `dateFrom`/`dateTo` are 'YYYY-MM-DD'.
-export async function getMatches({ competitionId, dateFrom, dateTo }) {
+// `dateFrom`/`dateTo` are 'YYYY-MM-DD', both optional -- confirmed live
+// (dumpSeasonMatches.js, since removed): omitting both returns the whole
+// current season in one call (380 matches for a 20-team league, matchdays
+// 1-38), not just "today" or some small default window. syncFixtures.js
+// relies on exactly that to sync the full season instead of a rolling
+// window.
+export async function getMatches({ competitionId, dateFrom, dateTo } = {}) {
   const data = await call(`/competitions/${competitionId}/matches`, { dateFrom, dateTo });
   return data.matches;
 }

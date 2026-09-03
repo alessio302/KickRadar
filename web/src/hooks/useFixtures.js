@@ -2,13 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { useLeagueId } from './useLeagueId.js';
 
-// How far back to include already-played fixtures. Kept in sync with
-// syncFixturesForLeague's own FIXTURE_PAST_WINDOW_DAYS (src/football-api/
-// syncFixtures.js) -- a fixture that sync now backfills but this query
-// still excludes would sync successfully and still never appear. See that
-// file's comment: a season opener can span much wider than a typical
-// Fri-Mon round (confirmed live: LaLiga's 2026/27 Jornada 1 ran 15-27 Aug).
-const PAST_WINDOW_DAYS = 15;
+// How far back to include already-played fixtures. syncFixturesForLeague
+// (src/football-api/syncFixtures.js) now syncs the WHOLE current season in
+// one call, not just a rolling window -- confirmed live, a top-5 league
+// season runs mid-August to end of May, ~290 days. This used to sit at 15,
+// which meant the "nur aktueller Spieltag" toggle's "off" state could only
+// ever show whichever ~2 weeks of matchdays sync itself had bothered to
+// fetch -- confirmed live via a user report that most of the season was
+// simply missing with the toggle off. 300 comfortably covers one full
+// season with a little margin either side, without querying every fixture
+// ever synced once multiple seasons' worth of rows exist in this
+// never-deleted table.
+const PAST_WINDOW_DAYS = 300;
 
 // Same module-level warm-start cache as useClubs.js/useStandings.js -- see
 // useClubs.js's own comment for why (the league swipe carousel in
