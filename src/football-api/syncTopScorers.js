@@ -1,6 +1,13 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getLeagueTeams, getTeamSquad, sleep } from '../lineups/goalApiClient.js';
+import { getLeagueTeams, getTeamSquad } from '../lineups/goalApiClient.js';
+
+// goalApiClient.js's own sleep() is internal (not exported) -- unlike
+// football-data.org's client.js, which does export one. This module needs
+// its own pacing between squad calls, so it gets its own local copy.
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // Top N scorers per league to store (full season is ~38 matchdays,
 // so keeping top 30-50 scorers per league is reasonable coverage)
