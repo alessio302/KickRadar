@@ -2,10 +2,12 @@ name: Top scorers sync
 
 on:
   schedule:
-    # Once per day at 02:00 UTC -- top scorers update as matches are played,
-    # but don't need realtime updates. GOAL API budget (1000/day) is shared
-    # with lineups-sync + live-events, so keeping this to once daily leaves
-    # plenty of headroom (~100 calls for all 5 leagues).
+    # Once per day at 02:00 UTC. Aggregates from our own match_events
+    # table (see syncTopScorers.js's own comment on why that replaced
+    # GOAL API's squad-embedded stats) -- no external API budget involved
+    # any more, just DB reads, so this cadence is purely "often enough to
+    # feel current" rather than a rate-limit constraint. Could safely run
+    # more often if that ever matters.
     - cron: '0 2 * * *'
   workflow_dispatch: {}
 
@@ -24,4 +26,3 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
