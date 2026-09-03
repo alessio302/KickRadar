@@ -182,8 +182,23 @@ export async function getFixtureSubstitutions(fixtureId) {
 // LaLiga/Ligue 1 players, falling back to the transfermarkt.de scrape every
 // time. GOAL API's own player records keep the real accented name (only
 // the search query needed plain ASCII), so this doesn't lose match quality.
+//
+// normalize()'s NFD strip only catches a "base letter + combining accent"
+// pair (é -> e + ́) -- confirmed live it leaves genuinely distinct
+// Latin letters like ø untouched (no NFD decomposition exists for them),
+// so "Martin Ødegaard" still 400'd with the same "invalid characters"
+// error even through normalize(). Folded separately here, scoped to just
+// this outgoing search query -- not widened into normalize() itself,
+// which also drives the DB's own normalized_name column elsewhere and
+// shouldn't change behavior there without a wider audit.
+const NON_NFD_LATIN_FOLD = { ø: 'o', æ: 'ae', œ: 'oe', ß: 'ss', đ: 'd', ð: 'd', þ: 'th', ł: 'l' };
+
+function foldForGoalApiSearch(name) {
+  return normalize(name).replace(/[øæœßđðþł]/g, (ch) => NON_NFD_LATIN_FOLD[ch] ?? ch);
+}
+
 export async function searchPlayers(name) {
-  const data = await call('/players', { search: normalize(name) });
+  const data = await call('/players', { search: foldForGoalApiSearch(name) });
   return data.data ?? [];
 }
 
