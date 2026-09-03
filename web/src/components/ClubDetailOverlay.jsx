@@ -174,8 +174,10 @@ export default function ClubDetailOverlay({ theme, t, language, league, club, on
   // flight, but the live result always wins once it lands.
   const handleSelectSquadPlayer = async (p) => {
     if (!p) return;
-    const position = SINGULAR[p.position] || p.position || null;
-    setProfilePlayer({ name: p.name, photo_url: p.photo, position, injured: p.injured });
+    // get-team-squad already returns singular position keys (see that
+    // function's own comment) -- no plural-to-singular mapping needed here
+    // anymore.
+    setProfilePlayer({ name: p.name, photo_url: p.photo, position: p.position, injured: p.injured });
     setProfileLoading(true);
     const live = await fetchPlayerProfile(p.id);
     if (live) setProfilePlayer(live);
