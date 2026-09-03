@@ -91,9 +91,20 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
   const positionLabel = player.position ? t.lineup.positions[player.position] || player.position : null;
   const stats = player.stats || {};
 
-  const groups = STAT_GROUPS.map((group) => ({ ...group, rows: group.fields.filter((key) => stats[key] != null) })).filter(
-    (group) => group.rows.length > 0
-  );
+  // Confirmed live (Alessio Romagnoli, a defender): goalsConceded isn't
+  // exclusively a goalkeeper stat in GOAL API's data the way STAT_FIELDS'
+  // own comment assumed (saves/insideBoxSaves stay genuinely GK-only, but
+  // goalsConceded showed up non-null, "0", for an outfield defender too) --
+  // showing a "Torwart" tab with "0 Gegentore" on a center-back's profile
+  // read as a data bug even though the number itself wasn't wrong. Gating
+  // the whole goalkeeping group on the player's actual position, not just
+  // on whether the field happens to be non-null, is the fix -- every other
+  // group stays field-presence-based since STAT_FIELDS' outfield/GK split
+  // is otherwise reliable (confirmed live: saves/insideBoxSaves are null
+  // for every non-goalkeeper sampled).
+  const groups = STAT_GROUPS.filter((group) => group.key !== 'goalkeeping' || player.position === 'Goalkeeper')
+    .map((group) => ({ ...group, rows: group.fields.filter((key) => stats[key] != null) }))
+    .filter((group) => group.rows.length > 0);
   const hasStats = groups.length > 0;
   // A lone populated group (a sparse profile, e.g. only overview numbers on
   // file) shows its grid directly -- a one-tab bar would just be a label
