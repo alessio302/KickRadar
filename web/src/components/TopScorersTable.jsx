@@ -1,17 +1,26 @@
 import { useTopScorers } from '../hooks/useTopScorers.js';
 
-// Fixed pixel widths for numeric columns, same pattern as StandingsTable.jsx
-const NUM_COL_WIDTH = '30px';
+// Wider than StandingsTable.jsx's own 26px -- that table's header labels
+// are pre-abbreviated ("Sp", "TD", "Pkt"), short enough for a narrow
+// numeric column. This one's headers are full words (German "Vorlagen",
+// French "Passes décisives", ...) with no abbreviated translation key to
+// fall back on, so the column itself needs to be wide enough for those,
+// not just for the 1-2 digit numbers underneath -- confirmed live: at the
+// old 30px width, "Vorlagen"/"Spiele" had nowhere to wrap and ran into
+// each other instead.
+const NUM_COL_WIDTH = '46px';
 
-function NumCell({ children, theme }) {
+function NumCell({ children, theme, header }) {
   return (
     <div
       style={{
         width: NUM_COL_WIDTH,
         flexShrink: 0,
         textAlign: 'center',
-        fontSize: '12.5px',
-        fontWeight: 500,
+        fontSize: header ? '11px' : '12.5px',
+        fontWeight: header ? 600 : 500,
+        lineHeight: header ? 1.15 : undefined,
+        whiteSpace: header ? 'normal' : 'nowrap',
         fontVariantNumeric: 'tabular-nums',
         color: theme.textMuted,
       }}
@@ -44,9 +53,9 @@ export function TopScorersTable({ theme, t, league }) {
             <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 8px', borderBottom: `1px solid ${theme.border}` }}>
               <div style={{ width: '20px', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }} />
-              <NumCell theme={theme}>{t.topscorers?.goals ?? 'Tore'}</NumCell>
-              <NumCell theme={theme}>{t.topscorers?.assists ?? 'Assists'}</NumCell>
-              <NumCell theme={theme}>{t.topscorers?.matches ?? 'Spiele'}</NumCell>
+              <NumCell theme={theme} header>{t.topscorers?.goals ?? 'Tore'}</NumCell>
+              <NumCell theme={theme} header>{t.topscorers?.assists ?? 'Assists'}</NumCell>
+              <NumCell theme={theme} header>{t.topscorers?.matches ?? 'Spiele'}</NumCell>
             </div>
 
             {scorers.map((row) => (
