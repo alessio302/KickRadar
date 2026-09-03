@@ -304,7 +304,22 @@ async function scrapeSource(supabase, league, dbLeague, allClubs, sourceKey) {
         console.error(`[${league.slug}] squad lookup failed:`, err.message);
       }
       if (membership) resolvedPlayerName = membership.fullName;
-      if (membership?.clubId === toClubMatch.id) {
+      // Both corrections below assume squad_memberships still shows the
+      // player at their *old* club because the move hasn't happened yet --
+      // true for a developing rumor, false for an already-official one.
+      // Confirmed live (Miguel Gutiérrez Napoli->Leverkusen, Gonçalo Ramos
+      // PSG->Milan, Raoul Bellanova Torino->Atalanta, all isOfficial:
+      // true): squad_memberships/players had already caught up to the
+      // player's real new club by the time these ran, which this flip read
+      // as "the extraction must be backwards" and reversed a correct
+      // direction into a wrong one -- each case confirmed by the story's
+      // own generated aiSummary describing the opposite of what got
+      // stored. isOfficial is the same "already happened" signal the
+      // extraction itself already gives, so trust it here: only apply
+      // squad data as a direction override for stories not yet confirmed.
+      if (isOfficial) {
+        // no-op: keep the extracted direction as-is
+      } else if (membership?.clubId === toClubMatch.id) {
         // The extracted story has the player leaving for the club they're
         // actually already at -- backwards. Flip it.
         resolvedFromClub = toClub;

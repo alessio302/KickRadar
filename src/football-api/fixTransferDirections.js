@@ -45,12 +45,20 @@ async function backfillClubIds(supabase, allClubs) {
 }
 
 async function fixDirections(supabase) {
+  // Excludes is_official: true -- confirmed live (Miguel Gutiérrez,
+  // Gonçalo Ramos, Raoul Bellanova, all fixed by hand after a user report)
+  // this same flip, unconditional, reversed three already-correct official
+  // transfers because squad data had already caught up to the player's
+  // real new club by the time this ran -- expected for an official/done
+  // deal, not a sign the extraction got the direction wrong. See
+  // runNewsScraper.js's own isOfficial guard on the equivalent live check.
   const { data: transfers, error } = await supabase
     .from('transfers')
-    .select('id, player_name, from_club, to_club, from_club_id, to_club_id, players(normalized_name)')
+    .select('id, player_name, from_club, to_club, from_club_id, to_club_id, is_official, players(normalized_name)')
     .not('from_club_id', 'is', null)
     .not('to_club_id', 'is', null)
-    .not('player_id', 'is', null);
+    .not('player_id', 'is', null)
+    .eq('is_official', false);
   if (error) throw error;
 
   console.log(`Phase 2: checking ${transfers.length} transfers with both clubs and a resolved player...`);
