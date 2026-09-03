@@ -160,7 +160,7 @@ export default function StandingsTab({ theme, t, language, league, onSelectLeagu
           subTab === 'table' ? (
             <StandingsTable key={`${slug}-table`} theme={theme} t={t} league={slug} onSelectClub={slug === league ? setSelectedClub : undefined} />
           ) : (
-            <TopScorersTable key={`${slug}-scorers`} theme={theme} t={t} league={slug} />
+            <TopScorersTable key={`${slug}-scorers`} theme={theme} t={t} language={language} league={slug} />
           )
         }
       />

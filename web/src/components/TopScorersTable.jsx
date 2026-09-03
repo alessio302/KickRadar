@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { useTopScorers } from '../hooks/useTopScorers.js';
+import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
+import { fetchPlayerProfile } from '../lib/playerProfile.js';
+import { DATE_LOCALES } from '../i18n/languages.js';
 
 // Same fixed width and single text style for header and data cells alike
 // as StandingsTable.jsx's own NumCell -- that table abbreviates every
@@ -26,8 +30,29 @@ function NumCell({ children, theme }) {
   );
 }
 
-export function TopScorersTable({ theme, t, league }) {
+export function TopScorersTable({ theme, t, language, league }) {
   const { scorers, loading } = useTopScorers(league);
+  const locale = DATE_LOCALES[language];
+
+  const [profilePlayer, setProfilePlayer] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Same live get-player-profile call every player-profile entry point in
+  // the app goes through (see lib/playerProfile.js) -- an immediate
+  // minimal profile from the row's own already-resolved fields keeps the
+  // overlay responsive while that call is in flight, then the live result
+  // wins once it lands. Only rows syncTopScorers.js managed to resolve to
+  // a real players row (see that file's own resolvePlayerLinks()) carry a
+  // goal_api_id at all -- an unresolved row has nothing to open, so it's
+  // simply not tappable rather than opening a mostly-empty overlay.
+  const handleSelectPlayer = async (row) => {
+    if (!row.player_id) return;
+    setProfilePlayer({ name: row.player_name, photo_url: row.photo_url });
+    setProfileLoading(true);
+    const live = await fetchPlayerProfile(row.goal_api_id);
+    if (live) setProfilePlayer(live);
+    setProfileLoading(false);
+  };
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
@@ -60,12 +85,14 @@ export function TopScorersTable({ theme, t, league }) {
             {scorers.map((row) => (
               <div
                 key={`${row.rank}-${row.player_name}`}
+                onClick={row.player_id ? () => handleSelectPlayer(row) : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   width: '100%',
                   padding: '9px 0',
                   borderBottom: `1px solid ${theme.border}`,
+                  cursor: row.player_id ? 'pointer' : 'default',
                 }}
               >
                 <div
@@ -85,20 +112,19 @@ export function TopScorersTable({ theme, t, league }) {
                     minWidth: 0,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '10px',
                   }}
                 >
-                  {row.club_badge && (
+                  {row.photo_url ? (
                     <img
-                      src={row.club_badge}
+                      src={row.photo_url}
                       alt=""
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        flexShrink: 0,
-                        borderRadius: '2px',
-                      }}
+                      width={34}
+                      height={34}
+                      style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: theme.surfaceRaised }}
                     />
+                  ) : (
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: theme.surfaceRaised, flexShrink: 0 }} />
                   )}
                   <div style={{ overflow: 'hidden' }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -116,6 +142,10 @@ export function TopScorersTable({ theme, t, league }) {
             ))}
           </div>
         </div>
+      )}
+
+      {profilePlayer && (
+        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} loading={profileLoading} onClose={() => setProfilePlayer(null)} />
       )}
     </div>
   );

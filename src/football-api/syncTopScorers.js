@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
+import { normalize } from '../util/normalize.js';
 
 // Top N scorers per league to store.
 const TOP_SCORERS_LIMIT = 50;
@@ -11,6 +12,52 @@ const TOP_SCORERS_LIMIT = 50;
 // double-counting risk. 'Own Goal' is deliberately excluded: it's never
 // credited to the scorer in standard top-scorer charts.
 const GOAL_EVENT_TYPES = ['Goal', 'Penalty'];
+
+// Lets a tap on a top-scorers row open the same PlayerProfileOverlay every
+// other player-facing spot in the app does, and show a real photo instead
+// of the club badge -- per explicit request. match_events' player names
+// are abbreviated ("D. Malen"), not the full names `players.name` stores
+// ("Donyell Malen"), so this can't be a straight FK/name join -- instead,
+// within each row's own club (players.current_club_name matches clubs.name
+// exactly, confirmed live for every club currently tracked), it looks for
+// a SINGLE player whose own last name-token matches the event name's last
+// token after diacritics/case normalization ("K. Mbappe" -> "mbappe"
+// matches "Kylian Mbappé" -> normalized last token "mbappe"). Ambiguous
+// (0 or 2+ matches) is left unresolved on purpose: the row's player_id/
+// photo_url/goal_api_id stay null, and the frontend simply doesn't make
+// that row tappable rather than guessing wrong.
+async function resolvePlayerLinks(supabase, rows) {
+  const clubNames = [...new Set(rows.map((r) => r.club_name).filter(Boolean))];
+  if (clubNames.length === 0) return;
+
+  const { data: candidates, error } = await supabase
+    .from('players')
+    .select('id, name, photo_url, goal_api_id, current_club_name')
+    .in('current_club_name', clubNames);
+  if (error) throw error;
+
+  const candidatesByClub = new Map();
+  for (const p of candidates ?? []) {
+    if (!candidatesByClub.has(p.current_club_name)) candidatesByClub.set(p.current_club_name, []);
+    candidatesByClub.get(p.current_club_name).push(p);
+  }
+
+  const lastToken = (name) => {
+    const parts = normalize(name).trim().split(/\s+/);
+    return parts[parts.length - 1];
+  };
+
+  for (const row of rows) {
+    const pool = candidatesByClub.get(row.club_name) ?? [];
+    const target = lastToken(row.player_name);
+    const matches = pool.filter((p) => lastToken(p.name) === target);
+    if (matches.length === 1) {
+      row.player_id = matches[0].id;
+      row.photo_url = matches[0].photo_url ?? null;
+      row.goal_api_id = matches[0].goal_api_id ?? null;
+    }
+  }
+}
 
 // Switched away from GOAL API's squad-embedded stats (player.goals/
 // assists/matchPlayed on /teams/{id}/players) after confirming live that
@@ -109,6 +156,8 @@ export async function syncTopScorersForLeague(supabase, league) {
       updated_at: new Date().toISOString(),
     };
   });
+
+  await resolvePlayerLinks(supabase, rows);
 
   const { error: deleteErr } = await supabase.from('top_scorers').delete().eq('league_id', dbLeague.id);
   if (deleteErr) throw deleteErr;
