@@ -230,10 +230,35 @@ export async function syncPlayerProfiles() {
             .insert({ name: fp.name, normalized_name: normalizedName, resolved_at: new Date().toISOString(), ...row })
             .select('id')
             .single();
-          if (error) throw error;
-          inserted += 1;
-          if (goalApiId) byGoalApiId.set(goalApiId, insertedRow.id);
-          byNormalizedName.set(normalizedName, insertedRow.id);
+          if (error) {
+            // 23505 = unique_violation on normalized_name -- confirmed live
+            // this can happen when two overlapping runs (e.g. a still-
+            // finishing previous run and a freshly-triggered one) both hit
+            // the same new player: this run's in-memory byNormalizedName
+            // map was built before the other run's insert landed, so it
+            // looked like a genuinely new player here too. Falls back to
+            // an update against whichever row actually won the race,
+            // rather than losing this player's fresher data outright.
+            if (error.code === '23505') {
+              const { data: existing, error: lookupErr } = await supabase
+                .from('players')
+                .select('id')
+                .eq('normalized_name', normalizedName)
+                .single();
+              if (lookupErr) throw lookupErr;
+              const { error: updateErr } = await supabase.from('players').update(row).eq('id', existing.id);
+              if (updateErr) throw updateErr;
+              updated += 1;
+              if (goalApiId) byGoalApiId.set(goalApiId, existing.id);
+              byNormalizedName.set(normalizedName, existing.id);
+            } else {
+              throw error;
+            }
+          } else {
+            inserted += 1;
+            if (goalApiId) byGoalApiId.set(goalApiId, insertedRow.id);
+            byNormalizedName.set(normalizedName, insertedRow.id);
+          }
         }
       } catch (err) {
         console.error(`Player sync failed for ${fp.name} (${club.name}):`, err.message);
