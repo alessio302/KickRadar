@@ -140,8 +140,7 @@ const de = {
     title: 'Torschützen',
     empty: 'Torschützen-Ranking noch nicht verfügbar.',
     goals: 'Tore',
-    assists: 'Vorlagen',
-    matches: 'Spiele',
+    assists: 'Vorl',
   },
   stats: {
     form: 'Form',
@@ -302,8 +301,7 @@ const en = {
     title: 'Top Scorers',
     empty: 'Top scorers ranking not yet available.',
     goals: 'Goals',
-    assists: 'Assists',
-    matches: 'Matches',
+    assists: 'Ast',
   },
   stats: {
     form: 'Form',
@@ -464,8 +462,7 @@ const it = {
     title: 'Capocannonieri',
     empty: 'Classifica capocannonieri non ancora disponibile.',
     goals: 'Gol',
-    assists: 'Assist',
-    matches: 'Presenze',
+    assists: 'Ass',
   },
   stats: {
     form: 'Forma',
@@ -626,8 +623,7 @@ const fr = {
     title: 'Meilleurs buteurs',
     empty: 'Classement des meilleurs buteurs pas encore disponible.',
     goals: 'Buts',
-    assists: 'Passes décisives',
-    matches: 'Matchs',
+    assists: 'PD',
   },
   stats: {
     form: 'Forme',
@@ -788,8 +784,7 @@ const es = {
     title: 'Máximos goleadores',
     empty: 'Clasificación de máximos goleadores aún no disponible.',
     goals: 'Goles',
-    assists: 'Asistencias',
-    matches: 'Partidos',
+    assists: 'Asis',
   },
   stats: {
     form: 'Forma',
