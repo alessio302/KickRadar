@@ -3,6 +3,7 @@ import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import ClubJersey from './ClubJersey.jsx';
 import ClubDetailOverlay from './ClubDetailOverlay.jsx';
+import { TopScorersTable } from './TopScorersTable.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useStandings } from '../hooks/useStandings.js';
 
@@ -109,6 +110,7 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
 
 export default function StandingsTab({ theme, t, language, league, onSelectLeague, onSwipeLeague }) {
   const [selectedClub, setSelectedClub] = useState(null);
+  const [subTab, setSubTab] = useState('table');
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -116,12 +118,51 @@ export default function StandingsTab({ theme, t, language, league, onSelectLeagu
         <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
       </div>
 
+      <div style={{ flexShrink: 0, display: 'flex', gap: '12px', padding: '12px 16px', borderBottom: `1px solid ${theme.border}` }}>
+        <button
+          onClick={() => setSubTab('table')}
+          style={{
+            padding: '6px 12px',
+            border: 'none',
+            borderRadius: '6px',
+            background: subTab === 'table' ? theme.accent : theme.surfaceRaised,
+            color: subTab === 'table' ? theme.surface : theme.text,
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 200ms',
+          }}
+        >
+          {t.standings?.title ?? 'Tabelle'}
+        </button>
+        <button
+          onClick={() => setSubTab('scorers')}
+          style={{
+            padding: '6px 12px',
+            border: 'none',
+            borderRadius: '6px',
+            background: subTab === 'scorers' ? theme.accent : theme.surfaceRaised,
+            color: subTab === 'scorers' ? theme.surface : theme.text,
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 200ms',
+          }}
+        >
+          {t.topscorers?.title ?? 'Torschützen'}
+        </button>
+      </div>
+
       <LeagueCarousel
         league={league}
         onSwitchLeague={onSwipeLeague}
-        renderPage={(slug) => (
-          <StandingsTable key={slug} theme={theme} t={t} league={slug} onSelectClub={slug === league ? setSelectedClub : undefined} />
-        )}
+        renderPage={(slug) =>
+          subTab === 'table' ? (
+            <StandingsTable key={`${slug}-table`} theme={theme} t={t} league={slug} onSelectClub={slug === league ? setSelectedClub : undefined} />
+          ) : (
+            <TopScorersTable key={`${slug}-scorers`} theme={theme} t={t} league={slug} />
+          )
+        }
       />
 
       {selectedClub && (

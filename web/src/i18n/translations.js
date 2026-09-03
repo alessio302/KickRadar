@@ -127,6 +127,7 @@ const de = {
     assistLabel: (name) => `Vorlage: ${name}`,
   },
   standings: {
+    title: 'Tabelle',
     empty: 'Tabelle noch nicht verfügbar.',
     played: 'Sp',
     won: 'S',
@@ -134,6 +135,13 @@ const de = {
     lost: 'N',
     points: 'Pkt',
     goalDiff: 'TD',
+  },
+  topscorers: {
+    title: 'Torschützen',
+    empty: 'Torschützen-Ranking noch nicht verfügbar.',
+    goals: 'Tore',
+    assists: 'Vorlagen',
+    matches: 'Spiele',
   },
   stats: {
     form: 'Form',
@@ -281,6 +289,7 @@ const en = {
     assistLabel: (name) => `Assist: ${name}`,
   },
   standings: {
+    title: 'Table',
     empty: 'Table not available yet.',
     played: 'P',
     won: 'W',
@@ -288,6 +297,13 @@ const en = {
     lost: 'L',
     points: 'Pts',
     goalDiff: 'GD',
+  },
+  topscorers: {
+    title: 'Top Scorers',
+    empty: 'Top scorers ranking not yet available.',
+    goals: 'Goals',
+    assists: 'Assists',
+    matches: 'Matches',
   },
   stats: {
     form: 'Form',
@@ -435,6 +451,7 @@ const it = {
     assistLabel: (name) => `Assist: ${name}`,
   },
   standings: {
+    title: 'Classifica',
     empty: 'Classifica non ancora disponibile.',
     played: 'PG',
     won: 'V',
@@ -442,6 +459,13 @@ const it = {
     lost: 'P',
     points: 'Pt',
     goalDiff: 'DR',
+  },
+  topscorers: {
+    title: 'Capocannonieri',
+    empty: 'Classifica capocannonieri non ancora disponibile.',
+    goals: 'Gol',
+    assists: 'Assist',
+    matches: 'Presenze',
   },
   stats: {
     form: 'Forma',
@@ -589,6 +613,7 @@ const fr = {
     assistLabel: (name) => `Passe décisive : ${name}`,
   },
   standings: {
+    title: 'Classement',
     empty: 'Classement pas encore disponible.',
     played: 'J',
     won: 'G',
@@ -596,6 +621,13 @@ const fr = {
     lost: 'P',
     points: 'Pts',
     goalDiff: 'Diff',
+  },
+  topscorers: {
+    title: 'Meilleurs buteurs',
+    empty: 'Classement des meilleurs buteurs pas encore disponible.',
+    goals: 'Buts',
+    assists: 'Passes décisives',
+    matches: 'Matchs',
   },
   stats: {
     form: 'Forme',
@@ -743,6 +775,7 @@ const es = {
     assistLabel: (name) => `Asistencia: ${name}`,
   },
   standings: {
+    title: 'Clasificación',
     empty: 'Clasificación aún no disponible.',
     played: 'PJ',
     won: 'G',
@@ -750,6 +783,13 @@ const es = {
     lost: 'P',
     points: 'Pts',
     goalDiff: 'DG',
+  },
+  topscorers: {
+    title: 'Máximos goleadores',
+    empty: 'Clasificación de máximos goleadores aún no disponible.',
+    goals: 'Goles',
+    assists: 'Asistencias',
+    matches: 'Partidos',
   },
   stats: {
     form: 'Forma',
