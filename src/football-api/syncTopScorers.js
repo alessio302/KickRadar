@@ -56,9 +56,16 @@ export async function syncTopScorersForLeague(supabase, league) {
         });
       }
       const entry = scorersByPlayer.get(key);
-      entry.goals = (player.stats?.goals ?? 0) + entry.goals;
-      entry.assists = (player.stats?.assists ?? 0) + entry.assists;
-      entry.matches = (player.stats?.matchPlayed ?? 0) + entry.matches;
+      // Confirmed live (playerProfileResolver.js's extractStats(), which
+      // reads these same fields straight off a squad entry, not nested
+      // under a `stats` sub-object): GOAL API's squad response carries
+      // goals/assists/matchPlayed as top-level fields on each player, not
+      // under player.stats -- the first version of this script read
+      // player.stats?.goals, which is always undefined, so every player
+      // synced as 0/0/0.
+      entry.goals = (player.goals ?? 0) + entry.goals;
+      entry.assists = (player.assists ?? 0) + entry.assists;
+      entry.matches = (player.matchPlayed ?? 0) + entry.matches;
     }
 
     // Pace calls to stay under GOAL API's 1000/day budget
