@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useSupabase } from './useSupabase.js';
+import { supabase } from '../lib/supabaseClient.js';
 
 export function useTopScorers(league) {
-  const supabase = useSupabase();
   const [scorers, setScorers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetch() {
+    async function fetchScorers() {
       setLoading(true);
       try {
         const { data: leagues } = await supabase
@@ -34,8 +33,8 @@ export function useTopScorers(league) {
       }
     }
 
-    fetch();
-  }, [supabase, league]);
+    fetchScorers();
+  }, [league]);
 
   return { scorers, loading };
 }
