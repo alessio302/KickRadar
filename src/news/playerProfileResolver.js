@@ -130,7 +130,7 @@ function extractClubAndNationality(profile) {
 // resolved (from_club/to_club) -- multiple ambiguous matches are left
 // unresolved rather than guessed at, same principle
 // runNewsScraper.js's lookupSquadMembership() already applies.
-function pickBestMatch(results, candidateClubNames) {
+export function pickBestMatch(results, candidateClubNames) {
   if (results.length === 0) return null;
   if (results.length === 1) return results[0];
 
@@ -154,7 +154,7 @@ function pickBestMatch(results, candidateClubNames) {
 // which bumps to now() on every successful poll regardless of whether
 // anything changed. Storing this separately is what lets the UI show a
 // real freshness date instead of "when we last happened to ask".
-function buildProfileFields(profile) {
+export function buildProfileFields(profile) {
   return {
     goal_api_id: profile.id,
     photo_url: profile.image || null,

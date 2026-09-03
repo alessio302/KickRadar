@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
-import { getTeamSquad } from './goalApiClient.js';
+import { getTeamSquad, searchPlayers, getPlayer } from './goalApiClient.js';
 import { normalize } from '../util/normalize.js';
-import { POSITION_SINGULAR, STAT_FIELDS, extractStats, resolveGoalApiProfile } from '../news/playerProfileResolver.js';
+import { POSITION_SINGULAR, STAT_FIELDS, extractStats, pickBestMatch, buildProfileFields } from '../news/playerProfileResolver.js';
 
 const FOOTBALL_DATA_BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://api.football-data.org/v4';
 
@@ -13,9 +13,9 @@ const FOOTBALL_DATA_BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://ap
 // API's own database right now (their `team` field falls back to their
 // national team instead -- likely a September international-break side
 // effect), and the club-scoped endpoint can only return players it has
-// linked to that club id. GOAL API's NAME-based global search
-// (playerProfileResolver.js's resolveGoalApiProfile(), not club-scoped)
-// still finds these players fine, with a real photo and full stats.
+// linked to that club id. GOAL API's NAME-based global search (not
+// club-scoped, see gapFillProfile() below) still finds these players
+// fine, with a real photo and full stats.
 //
 // football-data.org's own /teams/{id} squad list has no such gap --
 // confirmed live, Arsenal's list there was a correct, complete 25/25 --
@@ -25,9 +25,9 @@ const FOOTBALL_DATA_BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://ap
 // name it lists, first try an in-memory match against the (possibly
 // incomplete) GOAL API squad response already fetched for this club --
 // free, no extra call. Only the names that GOAL API's squad listing
-// dropped fall through to a live resolveGoalApiProfile() search, so the
-// common case (GOAL API's listing already has the player) costs nothing
-// extra over the old squad-only approach.
+// dropped fall through to a live gapFillProfile() search, so the common
+// case (GOAL API's listing already has the player) costs nothing extra
+// over the old squad-only approach.
 async function getFootballDataSquad(externalTeamId) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) throw new Error('Missing FOOTBALL_DATA_API_KEY env var.');
@@ -37,18 +37,60 @@ async function getFootballDataSquad(externalTeamId) {
   return data.squad || [];
 }
 
+// A gap-fill resolution costs 2 GOAL API calls (search + fetch), vastly
+// more expensive per player than the free in-memory match. Capped so one
+// run with an unusually large gap (a provider-side hiccup wider than the
+// Arsenal/Inter/Roma case this was built for) can't blow past GOAL API's
+// shared 1000/day budget or run indefinitely -- gapFilled vs
+// gapUnresolved in the return value shows whether the cap was ever hit.
+const MAX_GAP_FILLS_PER_RUN = 200;
+
+// Confirmed live: a first version of this reused playerProfileResolver.js's
+// resolveGoalApiProfile(), which paces every GOAL API call 6.5s apart via
+// its own throttleGoalApi(). That pacing was tuned for the news scraper's
+// use (a handful of calls per run, sharing the budget with several other
+// 15-min-cadence jobs) -- for this job's gap-filling, which can hit
+// dozens of players in one club (Arsenal alone needed 14), it meant a
+// single club could take minutes and the full ~96-club run projected to
+// ~4.5h, far past any reasonable workflow timeout. GOAL API's own stated
+// limit is 1000 requests per 900s sliding window (see goalApiClient.js's
+// own comment on that header) -- an average 0.9s/call -- so 1.5s stays a
+// safe, deliberately conservative margin under that while still being
+// ~4x faster than the news-scraper pacing. A separate, local throttle
+// here (not a shared module-level one) keeps this from affecting
+// playerProfileResolver.js's own callers at all.
+const GAP_FILL_INTERVAL_MS = 1500;
+let lastGapFillCallAt = 0;
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// A gap-fill resolution costs 2 throttled GOAL API calls (search + fetch,
-// ~6.5s apart each -- see playerProfileResolver.js's throttleGoalApi),
-// vastly more expensive per player than the free in-memory match. Capped
-// so one run with an unusually large gap (a provider-side hiccup wider
-// than the Arsenal/Inter/Roma case this was built for) can't blow past
-// GOAL API's shared 1000/day budget or run indefinitely -- gapFilled vs
-// gapUnresolved in the return value shows whether the cap was ever hit.
-const MAX_GAP_FILLS_PER_RUN = 200;
+async function throttledGapFillCall(fn) {
+  const wait = lastGapFillCallAt + GAP_FILL_INTERVAL_MS - Date.now();
+  if (wait > 0) await sleep(wait);
+  lastGapFillCallAt = Date.now();
+  return fn();
+}
+
+// Same two-step search-then-fetch resolveGoalApiProfile() does, reusing
+// its own pickBestMatch()/buildProfileFields() so the actual matching and
+// field-shaping logic has one source -- only the pacing differs.
+async function gapFillProfile(playerName, candidateClubNames) {
+  try {
+    const results = await throttledGapFillCall(() => searchPlayers(playerName));
+    const match = pickBestMatch(results, candidateClubNames);
+    if (!match) return null;
+
+    const profile = await throttledGapFillCall(() => getPlayer(match.id));
+    if (!profile) return null;
+
+    return buildProfileFields(profile);
+  } catch (err) {
+    console.error(`Gap-fill resolution failed for "${playerName}":`, err.message);
+    return null;
+  }
+}
 
 function lastToken(name) {
   const parts = normalize(name).trim().split(/\s+/);
@@ -150,7 +192,7 @@ export async function syncPlayerProfiles() {
         if (!goalEntry) {
           if (gapFillBudgetLeft > 0) {
             gapFillBudgetLeft -= 1;
-            resolvedFields = await resolveGoalApiProfile(fp.name, [club.name]);
+            resolvedFields = await gapFillProfile(fp.name, [club.name]);
           }
           if (resolvedFields) gapFilled += 1;
           else gapUnresolved += 1;
@@ -159,8 +201,8 @@ export async function syncPlayerProfiles() {
         // football-data.org's own dateOfBirth/position (the authoritative
         // "who's really on this squad" source) win over whichever GOAL
         // API path filled in the rest, current_club_name/badge always
-        // come from `club` itself -- a resolveGoalApiProfile() hit here
-        // can carry a stale/wrong club (its own team fallback, e.g. "England"
+        // come from `club` itself -- a gapFillProfile() hit here can carry
+        // a stale/wrong club (its own team fallback, e.g. "England"
         // instead of Arsenal, see this file's top comment), and even a
         // clean goalEntry match is redundant with the club we already know
         // we're iterating.
@@ -200,9 +242,10 @@ export async function syncPlayerProfiles() {
     }
 
     // Free tier: 10 requests/minute for football-data.org's own call
-    // above. GOAL API's calls (club-scoped squad + any gap-fill searches)
-    // ride their own shared throttle/retry logic in goalApiClient.js /
-    // playerProfileResolver.js, no extra pacing needed for those here.
+    // above. GOAL API's club-scoped squad call rides goalApiClient.js's
+    // own retry/backoff (no proactive pacing needed there); any gap-fill
+    // searches for this club already paced themselves via
+    // throttledGapFillCall() above.
     await sleep(6500);
   }
 
