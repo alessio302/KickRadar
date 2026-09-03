@@ -10,7 +10,8 @@
   "scripts": {
     "scrape:news": "node --env-file=.env src/news/runNewsScraper.js",
     "sync:clubs": "node --env-file=.env src/football-api/syncClubs.js",
-    "sync:fixtures": "node --env-file=.env src/football-api/syncFixtures.js"
+    "sync:fixtures": "node --env-file=.env src/football-api/syncFixtures.js",
+    "sync:topscorers": "node --env-file=.env src/football-api/syncTopScorers.js"
   },
   "dependencies": {
     "@google/genai": "^2.18.0",

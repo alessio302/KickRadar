@@ -1,0 +1,27 @@
+name: Top scorers sync
+
+on:
+  schedule:
+    # Once per day at 02:00 UTC -- top scorers update as matches are played,
+    # but don't need realtime updates. GOAL API budget (1000/day) is shared
+    # with lineups-sync + live-events, so keeping this to once daily leaves
+    # plenty of headroom (~100 calls for all 5 leagues).
+    - cron: '0 2 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncTopScorers.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
