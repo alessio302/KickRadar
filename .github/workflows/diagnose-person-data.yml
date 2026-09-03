@@ -16,4 +16,4 @@ jobs:
       - run: npm ci
       - run: node src/football-api/diagnosePersonData.js
         env:
-          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}

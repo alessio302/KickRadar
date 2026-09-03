@@ -1,45 +1,27 @@
-// Temporary diagnostic: checking whether football-data.org's free tier
-// could replace GOAL API for player profiles (photo, stats, squad
-// completeness) -- see this session's GOAL API squad-gap investigation
-// (Saka/Ødegaard missing from GOAL API's own /teams/{id}/players for
-// Arsenal). Removed once answered.
-const BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://api.football-data.org/v4';
-const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+// Temporary diagnostic, part 2: GOAL API's squad-LIST endpoint
+// (/teams/{id}/players) is missing Saka/Ødegaard/Çalhanoğlu entirely (see
+// this session's earlier diagnostic). Checking whether GOAL API's own
+// GLOBAL player search (/players?search=...) still has them in its
+// database even though the squad listing doesn't surface them -- if so, a
+// hybrid (football-data.org for "who's really on this squad", GOAL API
+// search for each name's photo+stats) could close the gap without losing
+// GOAL API's richer per-player data. Removed once answered.
+import { searchPlayers, getPlayer } from '../lineups/goalApiClient.js';
 
-async function call(path) {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: { 'X-Auth-Token': apiKey } });
-  const body = await res.json();
-  if (!res.ok) {
-    console.log(`  ${path} -> ${res.status} ${res.statusText}`, JSON.stringify(body));
-    return null;
-  }
-  return body;
-}
+const NAMES = ['Bukayo Saka', 'Martin Odegaard', 'Hakan Calhanoglu'];
 
 async function main() {
-  if (!apiKey) throw new Error('Missing FOOTBALL_DATA_API_KEY');
-
-  console.log('=== Arsenal FC squad (/teams/57) ===');
-  const team = await call('/teams/57');
-  if (team) {
-    console.log(`squad length: ${team.squad?.length ?? 0}`);
-    const hasSaka = team.squad?.some((p) => p.name.toLowerCase().includes('saka'));
-    const hasOdegaard = team.squad?.some((p) => p.name.toLowerCase().includes('degaard'));
-    console.log(`Saka present: ${hasSaka}, Ødegaard present: ${hasOdegaard}`);
-    console.log('First squad entry, full raw shape:', JSON.stringify(team.squad?.[0], null, 2));
-    console.log('All squad names:', team.squad?.map((p) => p.name).join(', '));
-  }
-
-  // Free tier rate limit: 10 req/min -- wait before the next call.
-  await new Promise((r) => setTimeout(r, 6500));
-
-  // Try the /persons/{id} endpoint (individual player detail) using
-  // whatever id the squad array gave us for its first entry.
-  const firstPlayerId = team?.squad?.[0]?.id;
-  if (firstPlayerId) {
-    console.log(`\n=== /persons/${firstPlayerId} ===`);
-    const person = await call(`/persons/${firstPlayerId}`);
-    if (person) console.log('Full raw shape:', JSON.stringify(person, null, 2));
+  for (const name of NAMES) {
+    console.log(`\n=== search "${name}" ===`);
+    const hits = await searchPlayers(name);
+    console.log(`  ${hits.length} hit(s)`);
+    for (const h of hits.slice(0, 3)) {
+      console.log(`  id=${h.id} name="${h.name}" team=${h.team?.name ?? 'null'}`);
+    }
+    if (hits[0]) {
+      const full = await getPlayer(hits[0].id);
+      console.log('  full profile of first hit:', JSON.stringify(full, null, 2));
+    }
   }
 }
 
