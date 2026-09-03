@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getLeagueTeams, getTeamSquad } from '../lineups/goalApiClient.js';
+import { getTeamSquad } from '../lineups/goalApiClient.js';
 
 // goalApiClient.js's own sleep() is internal (not exported) -- unlike
 // football-data.org's client.js, which does export one. This module needs
@@ -15,10 +15,20 @@ const TOP_SCORERS_LIMIT = 50;
 
 // Confirmed live: GOAL API's squad endpoint (/teams/{id}/players) returns
 // full current squad with season stats per player (matchPlayed, goals, assists,
-// ...) -- see src/news/playerProfileResolver.js's STAT_FIELDS for the full list.
-// Goals/assists aggregation from match_events would only get completed fixtures,
-// but squad stats are live-updating from the provider, so this is faster and
-// more current.
+// ...) as top-level fields on each player -- see
+// src/news/playerProfileResolver.js's extractStats(), which reads them the
+// same way for the identical squad-entry shape.
+//
+// Iterates OUR OWN curated clubs (via clubs.goal_api_id) rather than
+// getLeagueTeams(): confirmed live (a corrupted first backfill run) that
+// getLeagueTeams() returns up to ~40 entries for a 20-club league --
+// "includes past seasons'/inactive clubs" per goalApiClient.js's own
+// comment -- and some of those duplicate the SAME team.id as the current
+// club multiple times. That silently multiplied every current player's
+// goals/assists by however many times their club's id repeated in that
+// list (Julián Álvarez showed 10100 "goals"). clubs.goal_api_id already
+// gives a clean one-row-per-real-club mapping -- syncPlayerProfiles.js
+// uses the exact same source for the exact same reason.
 export async function syncTopScorersForLeague(supabase, league) {
   const { data: dbLeague, error: leagueErr } = await supabase
     .from('leagues')
@@ -29,53 +39,40 @@ export async function syncTopScorersForLeague(supabase, league) {
 
   const { data: clubs, error: clubsErr } = await supabase
     .from('clubs')
-    .select('id, name, external_team_id')
-    .eq('league_id', dbLeague.id);
+    .select('id, name, crest_url, goal_api_id')
+    .eq('league_id', dbLeague.id)
+    .not('goal_api_id', 'is', null);
   if (clubsErr) throw clubsErr;
-  const clubsByExternalId = new Map(clubs.map((c) => [c.external_team_id, c]));
 
-  // Fetch teams for this league once to get GOAL API team ids
-  const teams = await getLeagueTeams(league.goalApiLeagueId);
-  const scorersByPlayer = new Map(); // player_name -> { goals, assists, matches, club }
+  const scorers = [];
 
-  // Fetch squad for each team and aggregate scorer stats
-  for (const team of teams) {
-    const squad = await getTeamSquad(team.id);
-    for (const player of squad) {
-      const key = `${player.name}|${team.id}`;
-      if (!scorersByPlayer.has(key)) {
-        const club = clubsByExternalId.get(team.id);
-        scorersByPlayer.set(key, {
-          player_name: player.name,
-          club_id: club?.id ?? null,
-          club_name: team.name,
-          club_badge: team.badge,
-          goals: 0,
-          assists: 0,
-          matches: 0,
-        });
-      }
-      const entry = scorersByPlayer.get(key);
-      // Confirmed live (playerProfileResolver.js's extractStats(), which
-      // reads these same fields straight off a squad entry, not nested
-      // under a `stats` sub-object): GOAL API's squad response carries
-      // goals/assists/matchPlayed as top-level fields on each player, not
-      // under player.stats -- the first version of this script read
-      // player.stats?.goals, which is always undefined, so every player
-      // synced as 0/0/0.
-      entry.goals = (player.goals ?? 0) + entry.goals;
-      entry.assists = (player.assists ?? 0) + entry.assists;
-      entry.matches = (player.matchPlayed ?? 0) + entry.matches;
+  for (const club of clubs) {
+    let squad;
+    try {
+      squad = await getTeamSquad(club.goal_api_id);
+    } catch (err) {
+      console.error(`Squad fetch failed for ${club.name}:`, err.message);
+      continue;
     }
 
-    // Pace calls to stay under GOAL API's 1000/day budget
-    // getLeagueTeams already took 1 call, then getTeamSquad per team
-    // With 5 leagues × ~20 teams = ~100 calls, we have plenty of budget
+    for (const player of squad) {
+      scorers.push({
+        player_name: player.name,
+        club_id: club.id,
+        club_name: club.name,
+        club_badge: club.crest_url ?? null,
+        goals: player.goals ?? 0,
+        assists: player.assists ?? 0,
+        matches: player.matchPlayed ?? 0,
+      });
+    }
+
+    // Pace calls to stay well under GOAL API's 1000/day + 15-min-window budget
     await sleep(100);
   }
 
   // Sort by goals (then assists as tiebreaker) and take top N
-  const sorted = Array.from(scorersByPlayer.values())
+  const sorted = scorers
     .sort((a, b) => {
       if (b.goals !== a.goals) return b.goals - a.goals;
       return b.assists - a.assists;
