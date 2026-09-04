@@ -355,6 +355,42 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       lastCounts.set(goalApiId, count);
 
       const rows = buildLiveEventRows(info.fixtureId, info.homeClubId, info.awayClubId, data);
+
+      // GOAL API's own payload can retract an event after this file already
+      // wrote it -- confirmed live the goals/cards/substitutions endpoints
+      // never carry a dedicated type for it, but a goal disallowed on VAR
+      // review (or, less commonly, a card rescinded) simply disappears from
+      // data.goalscorer/cards/substitutions on a later match_update. rows
+      // above is always the FULL current set (buildLiveEventRows rebuilds
+      // it from scratch every time, not incrementally), so anything already
+      // stored under this fixture's own 'live-' event_keys that ISN'T in
+      // that current set has fallen out and needs deleting -- upsert alone
+      // only ever adds/updates, it never removes a row on its own. Scoped
+      // to the 'live-' prefix specifically: syncLineups.js's own REST-
+      // sourced rows (goal:/card:/sub: prefixes) are a separate, later
+      // reconciliation (a wholesale delete-then-reinsert once the fixture
+      // is confirmed finished) and must never be touched from here.
+      const currentKeys = new Set(rows.map((r) => r.event_key));
+      const { data: existingLiveRows, error: existingErr } = await supabase
+        .from('match_events')
+        .select('event_key')
+        .eq('fixture_id', info.fixtureId)
+        .like('event_key', 'live-%');
+      if (existingErr) {
+        console.error(`Failed to read existing live events for fixture ${info.fixtureId}:`, existingErr.message);
+      } else {
+        const staleKeys = existingLiveRows.map((r) => r.event_key).filter((k) => !currentKeys.has(k));
+        if (staleKeys.length > 0) {
+          const { error: deleteErr } = await supabase
+            .from('match_events')
+            .delete()
+            .eq('fixture_id', info.fixtureId)
+            .in('event_key', staleKeys);
+          if (deleteErr) console.error(`Failed to delete retracted events for fixture ${info.fixtureId}:`, deleteErr.message);
+          else counts.rowsDeleted += staleKeys.length;
+        }
+      }
+
       if (rows.length === 0) return;
 
       const { error } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
@@ -381,10 +417,10 @@ export async function syncLiveEvents() {
   const deadline = Date.now() + JOB_BUDGET_MS;
 
   const candidates = await findCandidateFixtures(supabase);
-  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
+  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: 0, reconnects: 0 };
 
   const resolved = await resolveGoalApiIds(supabase, candidates);
-  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
+  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: 0, reconnects: 0 };
 
   // goalApiId -> { fixtureId, homeClubId, awayClubId, leagueSlug }
   const byGoalApiId = new Map();
@@ -404,7 +440,7 @@ export async function syncLiveEvents() {
 
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
   const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
-  const counts = { updatesHandled: 0, rowsWritten: 0, droppedForCapacity: droppedAtStart };
+  const counts = { updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: droppedAtStart };
   let reconnects = 0;
 
   // Keeps reconnecting on an early/unexpected close until the deadline
@@ -436,6 +472,7 @@ export async function syncLiveEvents() {
     subscribed: byGoalApiId.size,
     updatesHandled: counts.updatesHandled,
     rowsWritten: counts.rowsWritten,
+    rowsDeleted: counts.rowsDeleted,
     droppedForCapacity: counts.droppedForCapacity,
     reconnects,
   };
