@@ -128,21 +128,24 @@ function groupByFormationRows(entries, formation) {
 // GOAL API's lineups response carries a `coach` field per side alongside
 // startingLineups/substitutes (see goalApiClient.js's getFixtureLineups
 // comment) -- previously read by nothing here, so it never reached the
-// `lineups` table or the frontend at all. Its exact shape is unconfirmed
-// (this project has no logged sample of a real response with a populated
-// coach field, and this sandbox has no network access to GOAL API to
-// check) -- normalized defensively to handle either a bare name string or
-// a player-shaped object (GOAL API uses {name, image, ...} for players
-// elsewhere, e.g. normalizePlayer() above), rather than assuming one and
-// breaking on the other. Worth confirming against a real `lineups.players`
-// row once this has synced live, and simplifying this if only one shape
-// ever actually shows up.
+// `lineups` table or the frontend at all.
+//
+// Confirmed live (diagnostic run against a real finished fixture, Real
+// Sociedad vs Celta de Vigo 2026-09-03): `coach` is an ARRAY of one entry
+// per side, shaped exactly like a normal lineup row (same fields
+// startingLineups/substitutes entries have -- id, playerId, lineupPlayer,
+// lineupNumber, playerPosition, playerImage, ...) with `type: "coach"`
+// marking it apart from an actual player. The coach's name is in
+// `lineupPlayer` (matching normalizePlayer() above, not a `.name` field
+// as first guessed) -- `playerPosition`/`playerAge` on a coach entry
+// carry garbage leftover player-schema values (e.g. "Goalkeepers", "18")
+// and are ignored here.
 function normalizeCoach(coach) {
-  if (!coach) return null;
-  if (typeof coach === 'string') return { name: coach, photo: null };
-  const name = coach.name || coach.coachName || coach.fullName || null;
+  const entry = Array.isArray(coach) ? coach[0] : coach;
+  if (!entry) return null;
+  const name = entry.lineupPlayer || null;
   if (!name) return null;
-  return { name, photo: coach.image || coach.photo || null };
+  return { name, photo: entry.playerImage || null };
 }
 
 function buildLineupTeam(section, formation) {
