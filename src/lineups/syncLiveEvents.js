@@ -245,7 +245,7 @@ function countLiveEvents(data) {
 // one left off -- already-known matches, minutes and event counts don't
 // need rediscovering, and a reconnect's own auth_success re-subscribes to
 // all of them in one go, same as the very first connection did.
-async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, counts }) {
+async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, confirmedRetractions, counts }) {
   const { token } = await getWsToken();
 
   return new Promise((resolve, reject) => {
@@ -288,6 +288,21 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       try {
         msg = JSON.parse(event.data);
       } catch {
+        return;
+      }
+
+      // GOAL API signals a score correction (VAR disallowed goal, data fix)
+      // without a new match_update by sending score.changed. The affected
+      // goal will be absent from the next match_update's goalscorer array, but
+      // our normal 2-miss threshold would wait for a second absent observation
+      // before deleting it -- unnecessarily slow when the server has already
+      // told us a retraction happened. Mark the match so the next
+      // match_update's first miss is treated as confirmed-stale immediately.
+      if (msg.type === 'score.changed') {
+        const goalApiId = String(msg.data?.id ?? msg.matchId ?? '');
+        if (goalApiId && byGoalApiId.has(goalApiId)) {
+          confirmedRetractions.add(goalApiId);
+        }
         return;
       }
 
@@ -388,7 +403,11 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       } else {
         const missingNow = existingLiveRows.map((r) => r.event_key).filter((k) => !currentKeys.has(k));
         const previouslyMissing = pendingRemovals.get(goalApiId) ?? new Set();
-        const confirmedStale = missingNow.filter((k) => previouslyMissing.has(k));
+        // score.changed already confirmed a retraction -- one miss is enough.
+        // Clear the flag so subsequent updates revert to the normal 2-miss
+        // threshold (a second score.changed would re-set it if needed).
+        const scoreChangedPending = confirmedRetractions.delete(goalApiId);
+        const confirmedStale = scoreChangedPending ? missingNow : missingNow.filter((k) => previouslyMissing.has(k));
 
         if (confirmedStale.length > 0) {
           const { error: deleteErr } = await supabase
@@ -458,6 +477,7 @@ export async function syncLiveEvents() {
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
   const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
   const pendingRemovals = new Map(); // goalApiId -> event_keys missing on the immediately-preceding check, awaiting a second miss to confirm
+  const confirmedRetractions = new Set(); // goalApiIds where score.changed arrived -- next match_update's first miss triggers immediate deletion
   const counts = { updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: droppedAtStart };
   let reconnects = 0;
 
@@ -470,7 +490,7 @@ export async function syncLiveEvents() {
   while (Date.now() < deadline) {
     let reachedDeadline;
     try {
-      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, counts });
+      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, confirmedRetractions, counts });
     } catch (err) {
       console.error('Live events connection attempt failed:', err.message);
       reachedDeadline = false;
