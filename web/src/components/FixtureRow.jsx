@@ -66,7 +66,13 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           <Star size={18} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
         </button>
       ) : (
-        <span style={{ width: '30px', flex: '0 0 auto' }} aria-hidden="true" />
+        // margin: '-4px' matches the star button's own negative margin above
+        // (there to enlarge its tap target without widening its layout
+        // footprint) -- confirmed live: without it, this plain spacer took
+        // up a genuine 30px while the button's negative margin shrank its
+        // own effective footprint by 8px, so every column after this one
+        // sat 8px further right on a finished row than on a favoritable one.
+        <span style={{ width: '30px', margin: '-4px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
       {/* Fixed width, not minWidth -- confirmed live: the translated
           "finished" label (e.g. Spanish "Finalizado", 63.6px at this
