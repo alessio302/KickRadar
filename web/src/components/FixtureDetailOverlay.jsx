@@ -609,7 +609,14 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12.5px', padding: '6px 0' }}>
-      <span style={{ color: theme.textMuted, flexShrink: 0 }}>
+      {/* tabular-nums confirmed live: without it, proportional digit
+          widths (a "1" narrower than a "9", etc.) made this date's own
+          rendered width vary row to row, shifting the whole fixed-width
+          host/score/guest block that follows it left or right by a few
+          px depending on which digits a given date happened to contain --
+          the score column never actually lined up, despite every span in
+          that block already being a fixed width. */}
+      <span style={{ color: theme.textMuted, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
         {new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
       </span>
       {/* Left-aligned right after the date with a fixed gap, not pushed to
