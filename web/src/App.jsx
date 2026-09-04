@@ -277,7 +277,14 @@ export default function App() {
         display: 'flex',
         flexDirection: 'column',
         color: theme.text,
-        fontFamily: 'sans-serif',
+        // Inter, per the redesign exports' own @font-face rules -- loaded
+        // in index.html. Fallback stack matches the exports' own too
+        // (-apple-system/BlinkMacSystemFont/SF Pro Display/Helvetica/
+        // Arial/sans-serif), not a generic 'sans-serif' guess. Everywhere
+        // else in the app inherits this from the root instead of setting
+        // its own fontFamily (grep confirms only the "KickRadar" wordmark
+        // below overrides it, intentionally, with Orbitron).
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', Helvetica, Arial, sans-serif",
         maxWidth: '420px',
         margin: '0 auto',
       }}
