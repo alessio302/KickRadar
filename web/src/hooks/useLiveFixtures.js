@@ -18,9 +18,20 @@ export function useLiveFixtures() {
     const load = async () => {
       const [{ data: liveRows, error: fixturesErr }, { data: clubs, error: clubsErr }, { data: leagues, error: leaguesErr }] =
         await Promise.all([
+          // Same column list as useFixtures.js's own select -- confirmed
+          // live: leaving out kickoff_at/kickoff_confirmed here (an earlier
+          // version only selected the columns the carousel card itself
+          // renders) meant a fixture opened from this carousel reached
+          // FixtureDetailOverlay with both undefined, and its own
+          // formatKickoff() then rendered "Invalid Date" instead of the
+          // real kickoff time. Matching the full column list once here
+          // avoids the same class of bug for whatever field some other tab
+          // of that overlay reads next.
           supabase
             .from('fixtures')
-            .select('id, league_id, home_club_id, away_club_id, status, home_score, away_score, live_minute')
+            .select(
+              'id, league_id, matchday, home_club_id, away_club_id, kickoff_at, kickoff_confirmed, status, home_score, away_score, referee, live_minute, highlight_video_url'
+            )
             .eq('status', 'live'),
           supabase.from('clubs').select('id, name, short_name, crest_url'),
           supabase.from('leagues').select('id, slug'),
