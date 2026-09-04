@@ -52,14 +52,6 @@
         overscroll-behavior: none;
       }
 
-      /* League switcher: scrollbar-width: none (set inline, in
-         LeagueSwitcher.jsx) only covers Firefox -- Chrome/Safari need this
-         pseudo-element rule instead, which can't be expressed as a React
-         inline style. */
-      .league-scroll-row::-webkit-scrollbar {
-        display: none;
-      }
-
       /* Nothing in the app should be selectable/copyable -- no text input
          fields exist anywhere in the UI (confirmed: no <input>/<textarea>
          in web/src), so a blanket rule needs no per-field exception.
