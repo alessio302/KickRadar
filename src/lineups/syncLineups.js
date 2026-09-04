@@ -125,12 +125,33 @@ function groupByFormationRows(entries, formation) {
   return ROW_ORDER.map((pos) => sorted.filter((p) => p.position === pos)).filter((row) => row.length > 0);
 }
 
+// GOAL API's lineups response carries a `coach` field per side alongside
+// startingLineups/substitutes (see goalApiClient.js's getFixtureLineups
+// comment) -- previously read by nothing here, so it never reached the
+// `lineups` table or the frontend at all. Its exact shape is unconfirmed
+// (this project has no logged sample of a real response with a populated
+// coach field, and this sandbox has no network access to GOAL API to
+// check) -- normalized defensively to handle either a bare name string or
+// a player-shaped object (GOAL API uses {name, image, ...} for players
+// elsewhere, e.g. normalizePlayer() above), rather than assuming one and
+// breaking on the other. Worth confirming against a real `lineups.players`
+// row once this has synced live, and simplifying this if only one shape
+// ever actually shows up.
+function normalizeCoach(coach) {
+  if (!coach) return null;
+  if (typeof coach === 'string') return { name: coach, photo: null };
+  const name = coach.name || coach.coachName || coach.fullName || null;
+  if (!name) return null;
+  return { name, photo: coach.image || coach.photo || null };
+}
+
 function buildLineupTeam(section, formation) {
   if (!section) return null;
   return {
     formation: null, // set by the caller from homeFormation/awayFormation, shared per fixture not per section
     initialLineup: groupByFormationRows(section.startingLineups, formation),
     substitutes: (section.substitutes ?? []).map(normalizePlayer),
+    coach: normalizeCoach(section.coach),
   };
 }
 
@@ -340,7 +361,7 @@ export async function syncLineups() {
                 club_id: club.id,
                 confirmed: true,
                 formation: team.formation,
-                players: { initialLineup: team.initialLineup, substitutes: team.substitutes },
+                players: { initialLineup: team.initialLineup, substitutes: team.substitutes, coach: team.coach },
                 published_at: new Date().toISOString(),
               },
               { onConflict: 'fixture_id,club_id' }

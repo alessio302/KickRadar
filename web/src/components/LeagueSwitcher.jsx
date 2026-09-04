@@ -9,6 +9,12 @@ import { LEAGUES } from '../lib/leagues.js';
 // exactly today's five leagues on one row -- a 6th league would need this
 // reconsidered (narrower badges, or back to a scrolling row), not silently
 // keep shrinking forever.
+//
+// No text label under the badge -- per explicit feedback, the logos are
+// already legible enough to identify the league on their own, and dropping
+// the label saves vertical space. The league name still exists for anyone
+// who needs it as the button's title (hover tooltip) and the image's own
+// alt text (screen readers), just not rendered as visible text.
 const BADGE_SIZE = 56;
 // Inset from the tile edge on every side, on top of object-fit: contain --
 // not just cosmetic. Confirmed live: Bundesliga's and LaLiga's actual logo
@@ -74,9 +80,6 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
             style={{
               minWidth: 0,
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '6px',
               background: 'none',
               border: 'none',
               padding: 0,
@@ -100,21 +103,7 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 flexShrink: 0,
               }}
             >
-              <img src={l.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            </span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: active ? 700 : 600,
-                color: active ? theme.accent : theme.textMuted,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: '100%',
-                textAlign: 'center',
-              }}
-            >
-              {l.label}
+              <img src={l.logo} alt={l.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </span>
           </button>
         );

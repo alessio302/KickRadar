@@ -286,6 +286,18 @@ function LineupList({ theme, t, row, onSelectPlayer }) {
           </div>
         </>
       )}
+
+      {/* Placeholder treatment -- explicitly flagged for a real design
+          pass later, this just gets the data on screen. players.coach
+          comes from GOAL API's lineups response (see syncLineups.js's
+          normalizeCoach()); older rows synced before that existed simply
+          won't have it, same as any other lineup still missing data. */}
+      {players.coach?.name && (
+        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${theme.border}`, fontSize: '13px', color: theme.text }}>
+          <span style={{ color: theme.textMuted }}>{t.lineup.coach}: </span>
+          <span style={{ fontWeight: 700 }}>{players.coach.name}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -576,7 +588,7 @@ function FormCircle({ result }) {
 function FormRow({ theme, club, form }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-      <span style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+      <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
         {club?.short_name || club?.name}
       </span>
       <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
@@ -612,13 +624,13 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
           ellipsis as a fallback for the genuine long-tail case (e.g.
           "Borussia Mönchengladbach"). */}
       <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-        <span style={{ width: '96px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ width: '96px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {hostClub?.short_name || hostClub?.name}
         </span>
         <span style={{ width: '40px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>
           {meeting.home_score} : {meeting.away_score}
         </span>
-        <span style={{ width: '96px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ width: '96px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {guestClub?.short_name || guestClub?.name}
         </span>
       </div>
@@ -630,7 +642,7 @@ function StandingRow({ theme, t, club, entry }) {
   if (!entry) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '5px 0' }}>
-      <span style={{ fontWeight: 600 }}>{club?.short_name || club?.name}</span>
+      <span style={{ fontWeight: 700 }}>{club?.short_name || club?.name}</span>
       <span style={{ color: theme.textMuted }}>{t.stats.positionLabel(entry.position)}</span>
     </div>
   );

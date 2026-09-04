@@ -116,7 +116,7 @@ function FixturesTabContent({ theme, t, locale, clubId, leagueSlug }) {
           <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 0', borderBottom: `1px solid ${theme.border}` }}>
             <span style={{ width: '16px', flexShrink: 0, fontSize: '11px', fontWeight: 700, color: theme.textMuted }}>{isHome ? 'H' : 'A'}</span>
             <ClubJersey club={opponent} size={20} theme={theme} />
-            <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {opponent?.short_name || opponent?.name || '–'}
             </span>
             <span style={{ fontSize: '12.5px', color: theme.textMuted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
