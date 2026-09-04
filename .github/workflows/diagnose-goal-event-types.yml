@@ -1,0 +1,19 @@
+name: Diagnose goal/card event types (one-off)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/diagnoseGoalEventTypes.js
+        env:
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
