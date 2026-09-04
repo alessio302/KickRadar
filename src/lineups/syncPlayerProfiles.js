@@ -197,14 +197,35 @@ export async function syncPlayerProfiles() {
       console.error(`GOAL API squad fetch failed for ${club.name}:`, err.message);
       goalSquad = [];
     }
-    // First entry wins on a surname collision within one club (rare) --
-    // acceptable, that player just falls through to the gap-fill search
-    // below instead, same outcome as if GOAL API's own listing had missed
-    // them outright.
+    // Confirmed live (this session's investigation, real Inter squad data):
+    // a same-club surname collision -- Josep Martinez (GK) and Lautaro
+    // Martinez (FW) both on Inter's real GOAL API squad list -- is NOT
+    // rare or harmless. A previous version of this map kept "first entry
+    // wins" and left the loser's own key pointing at the WINNER's entry
+    // (not falling through to gap-fill as its own comment assumed, since
+    // the key itself still resolves to *something*): whichever of the two
+    // players' football-data.org squad rows got processed here picked up
+    // the OTHER player's photo, squad number, and position outright. Live
+    // confirmed: this is exactly how Josep Martinez's `players` row ended
+    // up with Lautaro Martinez's photo, "10" shirt number, and "Forward"
+    // position. Both players individually resolve correctly via GOAL
+    // API's own name search (confirmed live -- searching either full name
+    // returns exactly that player, no ambiguity), so a colliding surname
+    // is dropped from the free in-memory map entirely rather than kept
+    // under either player's key -- both collide-losers then fall through
+    // to the (already-correct) gap-fill search below instead of silently
+    // borrowing a teammate's identity.
     const goalByLastToken = new Map();
+    const collidedLastTokens = new Set();
     for (const gp of goalSquad) {
       const key = lastToken(gp.name);
-      if (!goalByLastToken.has(key)) goalByLastToken.set(key, gp);
+      if (collidedLastTokens.has(key)) continue;
+      if (goalByLastToken.has(key)) {
+        goalByLastToken.delete(key);
+        collidedLastTokens.add(key);
+        continue;
+      }
+      goalByLastToken.set(key, gp);
     }
 
     for (const fp of fdSquad) {
