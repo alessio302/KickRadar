@@ -1,50 +1,33 @@
-import { useEffect, useRef } from 'react';
 import { LEAGUES } from '../lib/leagues.js';
 
-// Horizontal-scrolling row of full-bleed logo badges with the league name
-// underneath (per the redesign exports and a FlashScore-style reference
-// the user pointed to), not a shrink-to-fit flex row: five leagues with
-// full names ("Premier League", "1. Bundesliga") already didn't fit
-// evenly, and every additional league would only have made each one
-// narrower still (see LEAGUE_SLUGS growing to 5, more planned). Scrolling
-// instead of shrinking means new leagues just extend the row -- the header
-// never gets more cramped. Bleeds to the screen edges via negative margin
-// matching the parent's 16px padding (see TransfersTab.jsx/
-// FixturesTab.jsx) so the row scrolls edge-to-edge like a native tab bar,
-// not just within the inset content column.
-//
-// A rounded square, not a circle: GOAL API's league logo assets are
-// themselves square icon-style badges (crest + wordmark centered on a
-// white tile), the same shape the FlashScore reference uses -- object-fit:
-// cover at the badge's own full size fills the tile edge to edge with no
-// visible ring of background around a small centered logo, which a circle
-// mask would have clipped into the tile's square corners for no reason.
-const BADGE_SIZE = 56;
+// Fixed 5-column grid, not a scrolling row -- per explicit feedback, all
+// five leagues need to sit fully in view with equal left/right margins
+// instead of overflowing the screen edge (the previous horizontal-scroll
+// version left the last badge/label cut off, which read as "everything is
+// shifted right"). grid-template-columns is LEAGUES.length-driven rather
+// than hardcoded to 5, but this is still a fixed layout tuned to fit
+// exactly today's five leagues on one row -- a 6th league would need this
+// reconsidered (narrower badges, or back to a scrolling row), not silently
+// keep shrinking forever.
+const BADGE_SIZE = 48;
 
+// Contain, not cover: GOAL API's league logo assets are NOT all the same
+// aspect ratio -- Bundesliga's and LaLiga's carry a wide wordmark alongside
+// the crest, unlike Serie A/Premier League/Ligue 1's more square marks.
+// object-fit: cover (tried first, per a FlashScore-style reference) forced
+// every logo into a square crop and sliced text off those two -- confirmed
+// live ("UNDESLIGA" missing its "B", LaLiga's "Santander" cut off).
+// contain guarantees the whole logo is always visible, at the cost of a
+// little letterboxing against the badge's own background on non-square
+// logos -- a visible whole logo beats a cropped one.
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
-  const activePillRef = useRef(null);
-
-  // Switching league by swiping the content (see useLeagueCarousel.js) can
-  // land on a league whose badge is scrolled out of view in this row --
-  // confirmed live: swiping to Ligue 1/LaLiga left their badges off-screen
-  // with nothing showing which league was now active. Tapping a badge
-  // already keeps it in view (it's already visible, that's how it got
-  // tapped), so this only ever needs to actually scroll after a swipe.
-  useEffect(() => {
-    activePillRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-  }, [league]);
-
   return (
     <div
-      className="league-scroll-row"
       style={{
-        display: 'flex',
-        gap: '14px',
-        overflowX: 'auto',
-        scrollbarWidth: 'none',
-        WebkitOverflowScrolling: 'touch',
-        margin: '0 -16px',
-        padding: '2px 16px 12px',
+        display: 'grid',
+        gridTemplateColumns: `repeat(${LEAGUES.length}, 1fr)`,
+        gap: '6px',
+        padding: '2px 0 12px',
       }}
     >
       {LEAGUES.map((l) => {
@@ -52,12 +35,10 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
         return (
           <button
             key={l.slug}
-            ref={active ? activePillRef : undefined}
             onClick={() => onSelectLeague(l.slug)}
             title={l.label}
             style={{
-              flex: '0 0 auto',
-              width: '66px',
+              minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -73,25 +54,28 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
               style={{
                 width: `${BADGE_SIZE}px`,
                 height: `${BADGE_SIZE}px`,
-                borderRadius: '16px',
+                borderRadius: '14px',
                 background: theme.surface,
                 border: `2px solid ${active ? theme.accent : theme.border}`,
                 boxSizing: 'border-box',
-                overflow: 'hidden',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              <img src={l.logo} alt="" width={BADGE_SIZE} height={BADGE_SIZE} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <img src={l.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </span>
             <span
               style={{
-                fontSize: '11.5px',
+                fontSize: '11px',
                 fontWeight: active ? 700 : 600,
                 color: active ? theme.accent : theme.textMuted,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                maxWidth: '66px',
+                maxWidth: '100%',
                 textAlign: 'center',
               }}
             >
