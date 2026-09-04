@@ -68,7 +68,15 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
       ) : (
         <span style={{ width: '30px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
-      <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, minWidth: '46px', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+      {/* Fixed width, not minWidth -- confirmed live: the translated
+          "finished" label (e.g. Spanish "Finalizado", 63.6px at this
+          font/weight) is wider than a clock time ("20:45", 33.3px) in
+          every one of the app's 5 languages, so minWidth alone let a
+          finished row's label overflow past a scheduled row's and shove
+          the club-crest column that follows out of alignment with every
+          other row. A true fixed width keeps that column identical
+          regardless of which status text a given row happens to show. */}
+      <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '66px', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
         {fixture.status === 'finished'
           ? t.fixtures.finished
           : fixture.status === 'live' && fixture.live_minute
