@@ -6,6 +6,21 @@ import ClubDetailOverlay from './ClubDetailOverlay.jsx';
 import { TopScorersTable } from './TopScorersTable.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useStandings } from '../hooks/useStandings.js';
+import { leagueBySlug, zoneForPosition } from '../lib/leagues.js';
+
+// Fixed, not theme-driven -- these identify a *competition* zone (Champions
+// League/Europa league/relegation), the same way FixtureRow.jsx's favorite
+// star stays a fixed gold regardless of theme or the user's chosen accent
+// colour. Tying them to theme.accent would make "you're in the Champions
+// League zone" mean something different depending on which accent colour
+// the user happens to have picked, and could collide with the accent
+// itself when a user's chosen accent is also blue-ish.
+const ZONE_COLOR = {
+  cl: '#3D8BFD',
+  europe: '#F5A623',
+  relegationPlayoff: '#FF8A3D',
+  relegation: '#E5484D',
+};
 
 // Fixed pixel widths (not flex) for every numeric column -- keeps every
 // row's numbers lined up in a column regardless of how many digits a
@@ -27,6 +42,31 @@ function NumCell({ children, bold, theme }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+// Only lists the zones this particular league actually has -- e.g. the
+// relegation play-off swatch only appears for Bundesliga/Ligue 1 (see
+// LEAGUES' relegationZones in lib/leagues.js), not the three leagues that
+// relegate 3 teams outright with no play-off.
+function ZoneLegend({ theme, t, league }) {
+  const cfg = leagueBySlug(league);
+  if (!cfg) return null;
+  const items = [
+    ['cl', t.standings.zoneChampionsLeague],
+    ['europe', t.standings.zoneEurope],
+    ...(cfg.relegationZones.playoff ? [['relegationPlayoff', t.standings.zoneRelegationPlayoff]] : []),
+    ['relegation', t.standings.zoneRelegation],
+  ];
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', padding: '12px 2px 2px' }}>
+      {items.map(([zone, label]) => (
+        <div key={zone} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '2px', flexShrink: 0, background: ZONE_COLOR[zone] }} />
+          <span style={{ fontSize: '10.5px', color: theme.textMuted }}>{label}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -53,6 +93,7 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
         <div style={{ overflowX: 'auto' }}>
           <div style={{ minWidth: '360px' }}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 8px', borderBottom: `1px solid ${theme.border}` }}>
+              <div style={{ width: '3px', flexShrink: 0, marginRight: '7px' }} />
               <div style={{ width: '20px', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }} />
               <NumCell theme={theme}>{t.standings.played}</NumCell>
@@ -65,6 +106,7 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
 
             {table.map((row) => {
               const club = clubsById.get(row.club_id);
+              const zone = zoneForPosition(league, row.position);
               return (
                 <button
                   key={row.club_id}
@@ -83,6 +125,10 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
                     cursor: 'pointer',
                   }}
                 >
+                  <span
+                    aria-hidden="true"
+                    style={{ width: '3px', height: '18px', flexShrink: 0, borderRadius: '2px', marginRight: '7px', background: zone ? ZONE_COLOR[zone] : 'transparent' }}
+                  />
                   <div style={{ width: '20px', flexShrink: 0, fontSize: '12px', color: theme.textMuted, fontVariantNumeric: 'tabular-nums' }}>
                     {row.position}
                   </div>
@@ -104,6 +150,7 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
           </div>
         </div>
       )}
+      {table.length > 0 && <ZoneLegend theme={theme} t={t} league={league} />}
     </div>
   );
 }
