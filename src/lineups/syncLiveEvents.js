@@ -403,11 +403,37 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       } else {
         const missingNow = existingLiveRows.map((r) => r.event_key).filter((k) => !currentKeys.has(k));
         const previouslyMissing = pendingRemovals.get(goalApiId) ?? new Set();
-        // score.changed already confirmed a retraction -- one miss is enough.
-        // Clear the flag so subsequent updates revert to the normal 2-miss
-        // threshold (a second score.changed would re-set it if needed).
+        // In-memory signal: score.changed arrived on this WS connection.
         const scoreChangedPending = confirmedRetractions.delete(goalApiId);
-        const confirmedStale = scoreChangedPending ? missingNow : missingNow.filter((k) => previouslyMissing.has(k));
+
+        // DB-backed signal: score.changed arrived at the webhook while this
+        // connection was absent (2-min gap between GitHub Actions runs, or a
+        // reconnect at that exact moment). Only check the DB when there are
+        // actually missing keys and the in-memory flag isn't already set --
+        // avoids an extra round-trip on every match_update for the common
+        // no-missing-events case.
+        let dbFlagPending = false;
+        if (!scoreChangedPending && missingNow.length > 0) {
+          const { data: fixtureFlag, error: flagErr } = await supabase
+            .from('fixtures')
+            .select('score_correction_pending')
+            .eq('id', info.fixtureId)
+            .single();
+          if (flagErr) {
+            console.error(`Failed to read score_correction_pending for fixture ${info.fixtureId}:`, flagErr.message);
+          } else if (fixtureFlag?.score_correction_pending) {
+            dbFlagPending = true;
+            const { error: clearErr } = await supabase
+              .from('fixtures')
+              .update({ score_correction_pending: false })
+              .eq('id', info.fixtureId);
+            if (clearErr) console.error(`Failed to clear score_correction_pending for fixture ${info.fixtureId}:`, clearErr.message);
+          }
+        }
+
+        const confirmedStale = (scoreChangedPending || dbFlagPending)
+          ? missingNow
+          : missingNow.filter((k) => previouslyMissing.has(k));
 
         if (confirmedStale.length > 0) {
           const { error: deleteErr } = await supabase
