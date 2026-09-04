@@ -206,21 +206,27 @@ export default function App() {
   // ACCENT_PALETTES entry (Einstellungen > Akzentfarbe, terracotta by
   // default) -- text/textMuted/danger are the only neutrals that stay
   // fixed regardless of which accent is picked, so copy/errors read the
-  // same everywhere while every surface takes on the chosen hue.
+  // same everywhere while every surface takes on the chosen hue. danger is
+  // a clean, unambiguous red rather than an orange-red -- confirmed live:
+  // the previous #FF6B5E/#B23A2E leaned close enough to terracotta's own
+  // orange that next to the violet/green accents it read as a leftover
+  // terracotta element by mistake (and would have next to terracotta's own
+  // accent too, just less obviously). A red with no orange in it stays
+  // visually distinct from all three accents at once.
   const accentPalette = (ACCENT_PALETTES[accentColor] ?? ACCENT_PALETTES.terracotta)[isDark ? 'dark' : 'light'];
   const theme = isDark
     ? {
         isDark: true,
         text: '#F2F3F5',
         textMuted: '#8A909B',
-        danger: '#FF6B5E',
+        danger: '#EF4444',
         ...accentPalette,
       }
     : {
         isDark: false,
         text: '#15181D',
         textMuted: '#6B7078',
-        danger: '#B23A2E',
+        danger: '#C0342B',
         ...accentPalette,
       };
   theme.headerGradient = `linear-gradient(160deg, ${theme.headerTint}, ${theme.bg})`;

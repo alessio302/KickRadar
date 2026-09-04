@@ -1,17 +1,25 @@
 import { useEffect, useRef } from 'react';
 import { LEAGUES } from '../lib/leagues.js';
 
-// Horizontal-scrolling row of circular logo badges with the league name
-// underneath (per the redesign exports), not a shrink-to-fit flex row:
-// five leagues with full names ("Premier League", "1. Bundesliga") already
-// didn't fit evenly, and every additional league would only have made each
-// one narrower still (see LEAGUE_SLUGS growing to 5, more planned).
-// Scrolling instead of shrinking means new leagues just extend the row --
-// the header never gets more cramped. Bleeds to the screen edges via
-// negative margin matching the parent's 16px padding (see
-// TransfersTab.jsx/FixturesTab.jsx) so the row scrolls edge-to-edge like a
-// native tab bar, not just within the inset content column.
-const BADGE_SIZE = 52;
+// Horizontal-scrolling row of full-bleed logo badges with the league name
+// underneath (per the redesign exports and a FlashScore-style reference
+// the user pointed to), not a shrink-to-fit flex row: five leagues with
+// full names ("Premier League", "1. Bundesliga") already didn't fit
+// evenly, and every additional league would only have made each one
+// narrower still (see LEAGUE_SLUGS growing to 5, more planned). Scrolling
+// instead of shrinking means new leagues just extend the row -- the header
+// never gets more cramped. Bleeds to the screen edges via negative margin
+// matching the parent's 16px padding (see TransfersTab.jsx/
+// FixturesTab.jsx) so the row scrolls edge-to-edge like a native tab bar,
+// not just within the inset content column.
+//
+// A rounded square, not a circle: GOAL API's league logo assets are
+// themselves square icon-style badges (crest + wordmark centered on a
+// white tile), the same shape the FlashScore reference uses -- object-fit:
+// cover at the badge's own full size fills the tile edge to edge with no
+// visible ring of background around a small centered logo, which a circle
+// mask would have clipped into the tile's square corners for no reason.
+const BADGE_SIZE = 56;
 
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
   const activePillRef = useRef(null);
@@ -65,17 +73,15 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
               style={{
                 width: `${BADGE_SIZE}px`,
                 height: `${BADGE_SIZE}px`,
-                borderRadius: '50%',
+                borderRadius: '16px',
                 background: theme.surface,
                 border: `2px solid ${active ? theme.accent : theme.border}`,
                 boxSizing: 'border-box',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                overflow: 'hidden',
                 flexShrink: 0,
               }}
             >
-              <img src={l.logo} alt="" width={28} height={28} style={{ objectFit: 'contain' }} />
+              <img src={l.logo} alt="" width={BADGE_SIZE} height={BADGE_SIZE} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </span>
             <span
               style={{
