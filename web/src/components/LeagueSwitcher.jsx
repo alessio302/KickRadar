@@ -20,6 +20,22 @@ const BADGE_SIZE = 48;
 // contain guarantees the whole logo is always visible, at the cost of a
 // little letterboxing against the badge's own background on non-square
 // logos -- a visible whole logo beats a cropped one.
+//
+// Fixed white badge background, not theme.surface: these are official
+// third-party league logos, most already opaque white or a fixed brand
+// colour (Bundesliga's is red) baked into the PNG itself, not artwork this
+// app owns the palette of. Tinting the tile with the app's own accent
+// fought that -- forced a dark violet/green sliver to show in any
+// letterboxed margin around a non-square logo, on top of the corner bug
+// below. A fixed white tile is what every one of these logos was actually
+// designed to sit on (also matches the FlashScore-style reference), and
+// reads as deliberate on both the light and dark theme.
+//
+// overflow: hidden is required here, not optional -- confirmed live: an
+// <img> is a plain rectangle and does not inherit its parent's
+// border-radius on its own, so without this the image's square corners
+// showed past the tile's rounded corners as small hard-edged slivers
+// instead of a clean rounded tile.
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
   return (
     <div
@@ -55,23 +71,16 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 width: `${BADGE_SIZE}px`,
                 height: `${BADGE_SIZE}px`,
                 borderRadius: '14px',
-                background: theme.surface,
+                background: '#FFFFFF',
                 border: `2px solid ${active ? theme.accent : theme.border}`,
                 boxSizing: 'border-box',
+                overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              {/* No padding here on top of object-fit: contain -- any gap
-                  still visible around a given league's logo (Bundesliga/
-                  LaLiga's wordmark is wider than tall) is whitespace baked
-                  into that source PNG itself or its own aspect ratio, not
-                  something this element is adding. Going further (cover,
-                  or cropping into the image) is what sliced text off those
-                  same two logos before -- see the object-fit comment
-                  above. */}
               <img src={l.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </span>
             <span
