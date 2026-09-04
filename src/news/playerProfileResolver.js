@@ -52,11 +52,30 @@ async function throttleGoalApi(fn) {
 // list and position vocabulary genuinely are identical between the two,
 // so those two pieces stay a single source of truth rather than a second
 // copy that could quietly drift from this one.
+//
+// Also covers football-data.org's own squad-endpoint position field
+// (syncPlayerProfiles.js's fp.position, a THIRD vocabulary distinct from
+// both of GOAL API's own above) -- confirmed live: it returns broad
+// category labels "Goalkeeper"/"Defence"/"Midfield"/"Offence", not
+// "Goalkeeper"/"Defender"/"Midfielder"/"Forward". Left unmapped, any
+// player syncPlayerProfiles.js hasn't yet resolved a GOAL API entry for
+// (common right after a transfer window, while MAX_GAP_FILLS_PER_RUN
+// gradually works through the backlog) got stored with the raw
+// football-data label -- which matches none of ClubDetailOverlay.jsx's
+// ROW_ORDER buckets, so that player silently disappeared from the squad
+// tab entirely instead of just missing a photo. Confirmed live against
+// real data: Lautaro Martinez ("Offence") and Marcus Thuram ("Offence",
+// stored as "Marcus Thuram-Ulien") both vanished from Inter's squad tab
+// this way, alongside ~1000 other players across every tracked club.
 export const POSITION_SINGULAR = {
   Goalkeepers: 'Goalkeeper',
   Defenders: 'Defender',
   Midfielders: 'Midfielder',
   Forwards: 'Forward',
+  Goalkeeper: 'Goalkeeper',
+  Defence: 'Defender',
+  Midfield: 'Midfielder',
+  Offence: 'Forward',
 };
 
 // Curated subset of GOAL API's player-profile stat fields -- confirmed
