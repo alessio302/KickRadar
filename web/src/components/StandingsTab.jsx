@@ -134,7 +134,7 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <ClubJersey club={club} size={18} theme={theme} />
-                    <span style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {club?.short_name || club?.name || '–'}
                     </span>
                   </div>

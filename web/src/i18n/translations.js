@@ -79,6 +79,7 @@ const de = {
     predicted: 'Voraussichtliche Aufstellung',
     noPlayers: 'Noch keine Spieler gemeldet.',
     substitutes: 'Ersatzbank',
+    coach: 'Trainer',
     positions: { Goalkeeper: 'Torwart', Defender: 'Verteidiger', Midfielder: 'Mittelfeld', Forward: 'Sturm' },
   },
   playerProfile: {
@@ -248,6 +249,7 @@ const en = {
     predicted: 'Predicted lineup',
     noPlayers: 'No players reported yet.',
     substitutes: 'Substitutes',
+    coach: 'Coach',
     positions: { Goalkeeper: 'Goalkeeper', Defender: 'Defender', Midfielder: 'Midfielder', Forward: 'Forward' },
   },
   playerProfile: {
@@ -417,6 +419,7 @@ const it = {
     predicted: 'Formazione probabile',
     noPlayers: 'Nessun giocatore ancora comunicato.',
     substitutes: 'Panchina',
+    coach: 'Allenatore',
     positions: { Goalkeeper: 'Portiere', Defender: 'Difensore', Midfielder: 'Centrocampista', Forward: 'Attaccante' },
   },
   playerProfile: {
@@ -586,6 +589,7 @@ const fr = {
     predicted: 'Composition probable',
     noPlayers: "Aucun joueur communiqué pour l'instant.",
     substitutes: 'Remplaçants',
+    coach: 'Entraîneur',
     positions: { Goalkeeper: 'Gardien', Defender: 'Défenseur', Midfielder: 'Milieu', Forward: 'Attaquant' },
   },
   playerProfile: {
@@ -755,6 +759,7 @@ const es = {
     predicted: 'Alineación probable',
     noPlayers: 'Aún no se han comunicado jugadores.',
     substitutes: 'Suplentes',
+    coach: 'Entrenador',
     positions: { Goalkeeper: 'Portero', Defender: 'Defensa', Midfielder: 'Centrocampista', Forward: 'Delantero' },
   },
   playerProfile: {
