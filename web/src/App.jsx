@@ -27,27 +27,79 @@ const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1', 'la-
 
 // User-selectable accent colour (Einstellungen > Akzentfarbe) -- terracotta
 // is the original brand colour and stays the default for existing users;
-// violet/green are opt-in. headerTint is the colour the app-header gradient
-// (see the header markup below) blends *from*, fading into theme.bg -- kept
-// deep in dark mode and pale in light mode so the header never needs its
-// own separate text-colour token: theme.text/theme.textMuted already
-// contrast correctly against theme.bg by construction, and both ends of
-// this gradient are close enough to theme.bg's own lightness for that
-// contrast to hold across the whole band. accent/accentText replace
-// theme's own accent/accentText below (danger and every neutral stay fixed
-// regardless of accent choice -- only the brand colour itself changes).
+// violet/green are opt-in. Per explicit feedback, the accent now tints the
+// *whole* surface stack (page background, cards, borders), not just the
+// header and small highlights -- bg/surface/surfaceRaised/border are all
+// part of the palette below, each a muted, low-saturation version of the
+// accent hue (dark and desaturated in dark mode, pale in light mode) so
+// text stays readable without needing its own per-accent colour. headerTint
+// is a richer, more saturated version of the same hue that the app-header
+// gradient (see the header markup below) blends *from*, fading into
+// theme.bg -- both ends close enough to theme.bg's own lightness that
+// theme.text/theme.textMuted (fixed neutrals, shared by every accent --
+// see the theme object below) contrast correctly across the whole band
+// without a separate header-only text colour. danger stays fixed too: it's
+// semantic (errors/relegation), not a brand colour.
 const ACCENT_PALETTES = {
   terracotta: {
-    dark: { accent: '#E2896B', accentText: '#3A140A', headerTint: '#3C2A20' },
-    light: { accent: '#954730', accentText: '#FFFFFF', headerTint: '#ECD9CD' },
+    dark: {
+      accent: '#E2896B',
+      accentText: '#3A140A',
+      bg: '#150F0C',
+      surface: '#1F1613',
+      surfaceRaised: '#2A1D18',
+      border: '#3D2A22',
+      headerTint: '#4A2E1E',
+    },
+    light: {
+      accent: '#954730',
+      accentText: '#FFFFFF',
+      bg: '#FBF3EE',
+      surface: '#F7E9E0',
+      surfaceRaised: '#F3E0D3',
+      border: '#E8D2C2',
+      headerTint: '#F0D3BE',
+    },
   },
   violet: {
-    dark: { accent: '#8D7BF9', accentText: '#1B1330', headerTint: '#332966' },
-    light: { accent: '#6A52E0', accentText: '#FFFFFF', headerTint: '#DDD4FB' },
+    dark: {
+      accent: '#8D7BF9',
+      accentText: '#1B1330',
+      bg: '#100C1F',
+      surface: '#1A1430',
+      surfaceRaised: '#241C40',
+      border: '#362A57',
+      headerTint: '#3A2D70',
+    },
+    light: {
+      accent: '#6A52E0',
+      accentText: '#FFFFFF',
+      bg: '#F1EEFC',
+      surface: '#E9E3FB',
+      surfaceRaised: '#DED5F8',
+      border: '#CFC3F2',
+      headerTint: '#D8CBFA',
+    },
   },
   green: {
-    dark: { accent: '#4CC38A', accentText: '#0B2A1C', headerTint: '#173A29' },
-    light: { accent: '#1E8E5A', accentText: '#FFFFFF', headerTint: '#D3F0E0' },
+    dark: {
+      accent: '#4CC38A',
+      accentText: '#0B2A1C',
+      bg: '#0A140F',
+      surface: '#12241A',
+      surfaceRaised: '#1A3226',
+      border: '#254738',
+      headerTint: '#1B4530',
+    },
+    light: {
+      accent: '#1E8E5A',
+      accentText: '#FFFFFF',
+      bg: '#EAF7EF',
+      surface: '#DFF3E6',
+      surfaceRaised: '#D2EDDC',
+      border: '#BFE3CE',
+      headerTint: '#C7ECD5',
+    },
   },
 };
 
@@ -149,19 +201,16 @@ export default function App() {
 
   // League dots and club badges keep their own colors for quick visual
   // recognition; selection/highlighting elsewhere runs through the accent
-  // color via underline/border + bold, not fill. accent/accentText/
-  // headerTint come from the user's chosen ACCENT_PALETTES entry
-  // (Einstellungen > Akzentfarbe, terracotta by default) rather than being
-  // fixed here -- every other neutral stays the same regardless of which
-  // accent is picked.
+  // color via underline/border + bold, not fill. bg/surface/surfaceRaised/
+  // border/accent/accentText/headerTint all come from the user's chosen
+  // ACCENT_PALETTES entry (Einstellungen > Akzentfarbe, terracotta by
+  // default) -- text/textMuted/danger are the only neutrals that stay
+  // fixed regardless of which accent is picked, so copy/errors read the
+  // same everywhere while every surface takes on the chosen hue.
   const accentPalette = (ACCENT_PALETTES[accentColor] ?? ACCENT_PALETTES.terracotta)[isDark ? 'dark' : 'light'];
   const theme = isDark
     ? {
         isDark: true,
-        bg: '#0B0D10',
-        surface: '#15181D',
-        surfaceRaised: '#1C2027',
-        border: '#282D35',
         text: '#F2F3F5',
         textMuted: '#8A909B',
         danger: '#FF6B5E',
@@ -169,10 +218,6 @@ export default function App() {
       }
     : {
         isDark: false,
-        bg: '#F5F5F2',
-        surface: '#FFFFFF',
-        surfaceRaised: '#FFFFFF',
-        border: '#E4E3DD',
         text: '#15181D',
         textMuted: '#6B7078',
         danger: '#B23A2E',
