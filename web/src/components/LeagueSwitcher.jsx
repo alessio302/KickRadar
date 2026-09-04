@@ -58,13 +58,20 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 background: theme.surface,
                 border: `2px solid ${active ? theme.accent : theme.border}`,
                 boxSizing: 'border-box',
-                padding: '4px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
+              {/* No padding here on top of object-fit: contain -- any gap
+                  still visible around a given league's logo (Bundesliga/
+                  LaLiga's wordmark is wider than tall) is whitespace baked
+                  into that source PNG itself or its own aspect ratio, not
+                  something this element is adding. Going further (cover,
+                  or cropping into the image) is what sliced text off those
+                  same two logos before -- see the object-fit comment
+                  above. */}
               <img src={l.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </span>
             <span
