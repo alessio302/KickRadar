@@ -63,6 +63,7 @@ const de = {
   fixtures: {
     currentMatchdayOnly: 'Nur aktueller Spieltag',
     currentMatchdayOnlyToggle: 'Nur aktuellen Spieltag anzeigen umschalten',
+    liveOnlyToggle: 'Nur laufende Spiele anzeigen umschalten',
     empty: 'Keine Spiele im Kalender.',
     matchday: (n) => `${n}. Spieltag`,
     live: 'LIVE',
@@ -233,6 +234,7 @@ const en = {
   fixtures: {
     currentMatchdayOnly: 'Current matchday only',
     currentMatchdayOnlyToggle: 'Toggle showing only the current matchday',
+    liveOnlyToggle: 'Toggle showing only live matches',
     empty: 'No games on the calendar.',
     matchday: (n) => `Matchday ${n}`,
     live: 'LIVE',
@@ -403,6 +405,7 @@ const it = {
   fixtures: {
     currentMatchdayOnly: 'Solo giornata attuale',
     currentMatchdayOnlyToggle: 'Attiva/disattiva solo giornata attuale',
+    liveOnlyToggle: 'Attiva/disattiva solo partite in corso',
     empty: 'Nessuna partita in calendario.',
     matchday: (n) => `${n}ª giornata`,
     live: 'LIVE',
@@ -573,6 +576,7 @@ const fr = {
   fixtures: {
     currentMatchdayOnly: 'Seulement la journée en cours',
     currentMatchdayOnlyToggle: 'Activer/désactiver journée en cours uniquement',
+    liveOnlyToggle: 'Activer/désactiver seulement les matchs en direct',
     empty: 'Aucun match au calendrier.',
     matchday: (n) => `${n}${n === 1 ? 're' : 'e'} journée`,
     live: 'LIVE',
@@ -743,6 +747,7 @@ const es = {
   fixtures: {
     currentMatchdayOnly: 'Solo jornada actual',
     currentMatchdayOnlyToggle: 'Alternar solo jornada actual',
+    liveOnlyToggle: 'Alternar solo partidos en directo',
     empty: 'No hay partidos en el calendario.',
     matchday: (n) => `Jornada ${n}`,
     live: 'EN VIVO',

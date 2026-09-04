@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
+import LiveCarousel from './LiveCarousel.jsx';
 import FixtureRow from './FixtureRow.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
@@ -53,6 +54,7 @@ function FixturesList({
   locale,
   league,
   currentMatchdayOnly,
+  liveOnly,
   favoriteIds,
   onToggleFavorite,
   onSelectFixture,
@@ -69,7 +71,14 @@ function FixturesList({
   const { matchdays, loading, refreshing, refetch } = useFixtures(league);
   const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
-  const visible = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
+  const matchdayFiltered = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
+  // Additive to the matchday filter above, not a replacement -- the "Live"
+  // button narrows whatever matchdayFiltered already decided down to just
+  // the games currently in progress, same additive relationship as two
+  // independent filters anywhere else in the app.
+  const visible = liveOnly
+    ? matchdayFiltered.map((g) => ({ ...g, games: g.games.filter((f) => f.status === 'live') })).filter((g) => g.games.length > 0)
+    : matchdayFiltered;
 
   // Opens the fixture a lineup or highlights push notification pointed at,
   // once its matchday has actually loaded -- initialFixtureId arrives from
@@ -168,13 +177,19 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   const { clubs } = useClubs(league);
   const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
-  const [selectedFixture, setSelectedFixture] = useState(null);
-  // Set only alongside selectedFixture, from the push-notification deep
-  // link's second onSelectFixture argument -- see FixturesList's own
-  // comment on why this can't just re-read the initialView prop later. A
-  // plain row tap calls onSelectFixture with one argument, leaving this
-  // null so the overlay falls back to its default lineups tab.
-  const [selectedView, setSelectedView] = useState(null);
+  const [liveOnly, setLiveOnly] = useState(false);
+  // Single object rather than separate fixture/view/league/club states --
+  // a fixture opened from the live carousel (see LiveCarousel.jsx) can
+  // belong to a DIFFERENT league than the one currently selected here, so
+  // the overlay's own league/homeClub/awayClub props have to travel
+  // together with the fixture that was actually tapped, not fall back to
+  // whichever league this tab happens to be showing. A plain list-row tap
+  // resolves them against this league's own clubsById below; a carousel
+  // tap uses that fixture's own already-embedded homeClub/awayClub/
+  // leagueSlug instead -- same overlay component either way, just
+  // resolved against the right league so its own Tabelle/Statistik tabs
+  // show that fixture's real league, not this tab's currently active one.
+  const [selected, setSelected] = useState(null);
   const locale = DATE_LOCALES[language];
 
   const handleToggleFavorite = async (fixture) => {
@@ -188,9 +203,31 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
 
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
 
+  const openFromList = (fixture, view) => {
+    setSelected({
+      fixture,
+      view: view ?? null,
+      league,
+      homeClub: clubsById.get(fixture.home_club_id),
+      awayClub: clubsById.get(fixture.away_club_id),
+    });
+  };
+
+  const openFromCarousel = (fixture) => {
+    setSelected({
+      fixture,
+      view: null,
+      league: fixture.leagueSlug,
+      homeClub: fixture.homeClub,
+      awayClub: fixture.awayClub,
+    });
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
+        <LiveCarousel theme={theme} t={t} onSelectFixture={openFromCarousel} />
+
         <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
         <div
@@ -231,6 +268,31 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
             />
           </button>
         </div>
+
+        <div style={{ padding: '10px 2px 4px' }}>
+          <button
+            onClick={() => setLiveOnly((v) => !v)}
+            aria-label={t.fixtures.liveOnlyToggle}
+            aria-pressed={liveOnly}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px 6px 10px',
+              borderRadius: '999px',
+              border: `1.5px solid ${liveOnly ? theme.accent : theme.border}`,
+              background: liveOnly ? `${theme.accent}1a` : 'transparent',
+              color: liveOnly ? theme.accent : theme.textMuted,
+              font: 'inherit',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
+            {t.fixtures.live}
+          </button>
+        </div>
       </div>
 
       <LeagueCarousel
@@ -244,16 +306,10 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
             locale={locale}
             league={slug}
             currentMatchdayOnly={currentMatchdayOnly}
+            liveOnly={liveOnly}
             favoriteIds={slug === league ? favoriteIds : undefined}
             onToggleFavorite={slug === league ? handleToggleFavorite : undefined}
-            onSelectFixture={
-              slug === league
-                ? (fixture, view) => {
-                    setSelectedFixture(fixture);
-                    setSelectedView(view ?? null);
-                  }
-                : undefined
-            }
+            onSelectFixture={slug === league ? openFromList : undefined}
             initialFixtureId={slug === league ? initialFixtureId : null}
             initialView={slug === league ? initialView : null}
             onConsumedInitialFixture={slug === league ? onConsumedInitialFixture : undefined}
@@ -261,20 +317,17 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
         )}
       />
 
-      {selectedFixture && (
+      {selected && (
         <FixtureDetailOverlay
           theme={theme}
           t={t}
           language={language}
-          league={league}
-          fixture={selectedFixture}
-          homeClub={clubsById.get(selectedFixture.home_club_id)}
-          awayClub={clubsById.get(selectedFixture.away_club_id)}
-          initialView={selectedView}
-          onClose={() => {
-            setSelectedFixture(null);
-            setSelectedView(null);
-          }}
+          league={selected.league}
+          fixture={selected.fixture}
+          homeClub={selected.homeClub}
+          awayClub={selected.awayClub}
+          initialView={selected.view}
+          onClose={() => setSelected(null)}
         />
       )}
     </div>
