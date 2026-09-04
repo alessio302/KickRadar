@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { Star, Plus } from 'lucide-react';
-import ClubBadge from './ClubBadge.jsx';
 import ClubJersey from './ClubJersey.jsx';
 
 // Confirmed via feedback: the little corner "x" (15px, overlapping the
@@ -83,7 +82,7 @@ function QuickFilterChip({ theme, club, isActive, onSelect, onLongPress }) {
         transition: pressing ? `transform ${LONG_PRESS_MS}ms ease, opacity ${LONG_PRESS_MS}ms ease` : 'transform 0.15s ease, opacity 0.15s ease',
       }}
     >
-      <ClubBadge club={club} size={22} theme={theme} />
+      <ClubJersey club={club} size={22} theme={theme} />
     </button>
   );
 }
@@ -126,7 +125,7 @@ export default function QuickFilters({
             color: activeFilterId === favoriteClub.id ? theme.accent : theme.text,
           }}
         >
-          <ClubBadge club={favoriteClub} size={20} theme={theme} />
+          <ClubJersey club={favoriteClub} size={20} theme={theme} />
           <Star size={11} fill="currentColor" />
         </button>
       )}
