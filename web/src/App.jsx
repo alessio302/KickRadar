@@ -25,6 +25,32 @@ function useDarkMode(mode) {
 
 const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1', 'la-liga'];
 
+// User-selectable accent colour (Einstellungen > Akzentfarbe) -- terracotta
+// is the original brand colour and stays the default for existing users;
+// violet/green are opt-in. headerTint is the colour the app-header gradient
+// (see the header markup below) blends *from*, fading into theme.bg -- kept
+// deep in dark mode and pale in light mode so the header never needs its
+// own separate text-colour token: theme.text/theme.textMuted already
+// contrast correctly against theme.bg by construction, and both ends of
+// this gradient are close enough to theme.bg's own lightness for that
+// contrast to hold across the whole band. accent/accentText replace
+// theme's own accent/accentText below (danger and every neutral stay fixed
+// regardless of accent choice -- only the brand colour itself changes).
+const ACCENT_PALETTES = {
+  terracotta: {
+    dark: { accent: '#E2896B', accentText: '#3A140A', headerTint: '#3C2A20' },
+    light: { accent: '#954730', accentText: '#FFFFFF', headerTint: '#ECD9CD' },
+  },
+  violet: {
+    dark: { accent: '#8D7BF9', accentText: '#1B1330', headerTint: '#332966' },
+    light: { accent: '#6A52E0', accentText: '#FFFFFF', headerTint: '#DDD4FB' },
+  },
+  green: {
+    dark: { accent: '#4CC38A', accentText: '#0B2A1C', headerTint: '#173A29' },
+    light: { accent: '#1E8E5A', accentText: '#FFFFFF', headerTint: '#D3F0E0' },
+  },
+};
+
 export default function App() {
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
@@ -75,6 +101,7 @@ export default function App() {
   const [favoriteClub, setFavoriteClub] = usePersistedState('kickradar.favoriteClub', null);
   const [quickFilters, setQuickFilters] = usePersistedState('kickradar.quickFilters', []);
   const [darkModeSetting, setDarkModeSetting] = usePersistedState('kickradar.theme', 'system');
+  const [accentColor, setAccentColor] = usePersistedState('kickradar.accentColor', 'terracotta');
   const { language, setLanguage, t } = useLanguage();
 
   const isDark = useDarkMode(darkModeSetting);
@@ -120,10 +147,14 @@ export default function App() {
     if (activeFilter?.id === clubId) setActiveFilter(null);
   };
 
-  // Terracotta as the single brand accent color (per the briefing).
   // League dots and club badges keep their own colors for quick visual
   // recognition; selection/highlighting elsewhere runs through the accent
-  // color via underline/border + bold, not fill.
+  // color via underline/border + bold, not fill. accent/accentText/
+  // headerTint come from the user's chosen ACCENT_PALETTES entry
+  // (Einstellungen > Akzentfarbe, terracotta by default) rather than being
+  // fixed here -- every other neutral stays the same regardless of which
+  // accent is picked.
+  const accentPalette = (ACCENT_PALETTES[accentColor] ?? ACCENT_PALETTES.terracotta)[isDark ? 'dark' : 'light'];
   const theme = isDark
     ? {
         isDark: true,
@@ -133,9 +164,8 @@ export default function App() {
         border: '#282D35',
         text: '#F2F3F5',
         textMuted: '#8A909B',
-        accent: '#E2896B',
-        accentText: '#3A140A',
         danger: '#FF6B5E',
+        ...accentPalette,
       }
     : {
         isDark: false,
@@ -145,10 +175,10 @@ export default function App() {
         border: '#E4E3DD',
         text: '#15181D',
         textMuted: '#6B7078',
-        accent: '#954730',
-        accentText: '#FFFFFF',
         danger: '#B23A2E',
+        ...accentPalette,
       };
+  theme.headerGradient = `linear-gradient(160deg, ${theme.headerTint}, ${theme.bg})`;
 
   // Confirmed live: iOS drew the status bar area as its own opaque white
   // bar regardless of the app's actual theme, since index.html's static
@@ -201,35 +231,51 @@ export default function App() {
         margin: '0 auto',
       }}
     >
+      {/* Per-screen title (Spiele/Tabelle/Einstellungen) rather than a
+          fixed "KickRadar" wordmark on every tab -- per redesign feedback,
+          each screen gets its own identity instead of one static app title
+          regardless of where you are. The Transfers tab is the exception:
+          as the app's default/home tab it keeps the wordmark, so the brand
+          still shows up somewhere. The gradient tints from the user's
+          chosen accent colour (theme.headerTint, see ACCENT_PALETTES
+          above) into theme.bg -- both ends close enough to theme.bg's own
+          lightness that theme.text/theme.textMuted stay readable across
+          the whole band without a separate header-only text colour. */}
       <div
         style={{
           flexShrink: 0,
-          borderBottom: `1px solid ${theme.border}`,
+          background: theme.headerGradient,
           padding: '18px 16px 14px',
           paddingTop: 'calc(18px + env(safe-area-inset-top))',
         }}
       >
-        <h1
-          style={{
-            fontFamily: "'Orbitron', sans-serif",
-            fontSize: '20px',
-            fontWeight: 800,
-            letterSpacing: '0.02em',
-            margin: 0,
-            textTransform: 'uppercase',
-            textAlign: 'center',
-          }}
-        >
-          KickRadar
-        </h1>
+        {tab === 'transfers' ? (
+          <h1
+            style={{
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '20px',
+              fontWeight: 800,
+              letterSpacing: '0.02em',
+              margin: 0,
+              textTransform: 'uppercase',
+              textAlign: 'center',
+            }}
+          >
+            KickRadar
+          </h1>
+        ) : (
+          <h1 style={{ fontSize: '21px', fontWeight: 700, margin: 0 }}>
+            {tab === 'spiele' ? t.nav.fixtures : tab === 'tabelle' ? t.nav.standings : t.nav.settings}
+          </h1>
+        )}
       </div>
 
       {/* Doesn't scroll itself: each tab manages its own internal split
           between a pinned sub-header (league switcher, quick filters,
           toggles -- confirmed live these should stay visible too, not
-          just the outer "KickRadar" title bar) and its own scrolling list.
-          minHeight: 0 is required here for that nested flex:1 scroll area
-          to size correctly instead of overflowing its flex parent. */}
+          just the outer title bar) and its own scrolling list. minHeight: 0
+          is required here for that nested flex:1 scroll area to size
+          correctly instead of overflowing its flex parent. */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {tab === 'transfers' && (
           <TransfersTab
@@ -277,6 +323,8 @@ export default function App() {
             onSetLanguage={setLanguage}
             darkModeSetting={darkModeSetting}
             onSetDarkModeSetting={setDarkModeSetting}
+            accentColor={accentColor}
+            onSetAccentColor={setAccentColor}
             favoriteClub={favoriteClub}
             onSetFavoriteClub={setFavoriteClub}
             quickFilters={quickFilters}

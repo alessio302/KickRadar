@@ -7,6 +7,12 @@ import { LANGUAGES } from '../i18n/languages.js';
 
 const SECTION_LABEL_STYLE = { fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px' };
 
+const ACCENT_OPTIONS = [
+  ['terracotta', (t) => t.settings.accentTerracotta],
+  ['violet', (t) => t.settings.accentViolet],
+  ['green', (t) => t.settings.accentGreen],
+];
+
 export default function SettingsTab({
   theme,
   t,
@@ -14,6 +20,8 @@ export default function SettingsTab({
   onSetLanguage,
   darkModeSetting,
   onSetDarkModeSetting,
+  accentColor,
+  onSetAccentColor,
   favoriteClub,
   onSetFavoriteClub,
   quickFilters,
@@ -61,6 +69,29 @@ export default function SettingsTab({
             }}
           >
             {label}
+          </button>
+        ))}
+      </div>
+
+      <p style={{ ...SECTION_LABEL_STYLE, color: theme.textMuted }}>{t.settings.accentColor}</p>
+      <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', marginBottom: '20px', border: `1px solid ${theme.border}` }}>
+        {ACCENT_OPTIONS.map(([val, getLabel]) => (
+          <button
+            key={val}
+            onClick={() => onSetAccentColor(val)}
+            style={{
+              flex: 1,
+              padding: '8px',
+              fontSize: '12px',
+              fontWeight: accentColor === val ? 700 : 600,
+              borderRadius: '7px',
+              border: 'none',
+              cursor: 'pointer',
+              background: accentColor === val ? theme.accent : 'transparent',
+              color: accentColor === val ? theme.accentText : theme.textMuted,
+            }}
+          >
+            {getLabel(t)}
           </button>
         ))}
       </div>
