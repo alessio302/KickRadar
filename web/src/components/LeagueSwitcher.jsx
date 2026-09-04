@@ -9,7 +9,22 @@ import { LEAGUES } from '../lib/leagues.js';
 // exactly today's five leagues on one row -- a 6th league would need this
 // reconsidered (narrower badges, or back to a scrolling row), not silently
 // keep shrinking forever.
-const BADGE_SIZE = 48;
+const BADGE_SIZE = 56;
+// Inset from the tile edge on every side, on top of object-fit: contain --
+// not just cosmetic. Confirmed live: Bundesliga's and LaLiga's actual logo
+// PNGs run their wordmark ("BUNDESLIGA", "Santander") close enough to
+// their own image edges that with zero padding, the tile's rounded corners
+// clipped the outermost letters at both bottom corners ("BUNDESLIGA" ->
+// "UNDESLIG"), and LaLiga's text sat flush against the tile border with no
+// breathing room ("Santander" read as cut off even where technically still
+// rendered). Reproduced both failure patterns in an isolated test (a
+// same-shape synthetic logo placed close to its own canvas edge) before
+// and after adding this padding to confirm it actually fixes them, since
+// this session's sandbox has no network access to load the real GOAL API
+// logo CDN directly. A well-margined logo (Serie A, Premier League, Ligue
+// 1) loses nothing from this padding; a tightly-cropped one gains the
+// margin it was missing.
+const BADGE_PADDING = 6;
 
 // Contain, not cover: GOAL API's league logo assets are NOT all the same
 // aspect ratio -- Bundesliga's and LaLiga's carry a wide wordmark alongside
@@ -35,7 +50,10 @@ const BADGE_SIZE = 48;
 // <img> is a plain rectangle and does not inherit its parent's
 // border-radius on its own, so without this the image's square corners
 // showed past the tile's rounded corners as small hard-edged slivers
-// instead of a clean rounded tile.
+// instead of a clean rounded tile. Radius is deliberately modest (10px on
+// a 56px tile, not a heavier squircle) so that combined with
+// BADGE_PADDING, the rounded corners only ever cut into the padding, never
+// into actual logo content.
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
   return (
     <div
@@ -70,11 +88,12 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
               style={{
                 width: `${BADGE_SIZE}px`,
                 height: `${BADGE_SIZE}px`,
-                borderRadius: '14px',
+                borderRadius: '10px',
                 background: '#FFFFFF',
                 border: `2px solid ${active ? theme.accent : theme.border}`,
                 boxSizing: 'border-box',
                 overflow: 'hidden',
+                padding: `${BADGE_PADDING}px`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
