@@ -239,13 +239,13 @@ function countLiveEvents(data) {
 // connection closes for any other reason (GOAL API bouncing it, a network
 // blip, an auth failure -- resolves reachedDeadline: false so the caller
 // reconnects instead of treating the whole run as done). byGoalApiId,
-// lastCounts and lastMinutes are the same Maps across every reconnect
-// attempt within one run (mutated in place, never recreated here), so a
-// fresh connection picks up exactly where a dropped one left off --
-// already-known matches, minutes and event counts don't need rediscovering,
-// and a reconnect's own auth_success re-subscribes to all of them in one
-// go, same as the very first connection did.
-async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, counts }) {
+// lastCounts, lastMinutes and pendingRemovals are the same Maps across
+// every reconnect attempt within one run (mutated in place, never
+// recreated here), so a fresh connection picks up exactly where a dropped
+// one left off -- already-known matches, minutes and event counts don't
+// need rediscovering, and a reconnect's own auth_success re-subscribes to
+// all of them in one go, same as the very first connection did.
+async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, counts }) {
   const { token } = await getWsToken();
 
   return new Promise((resolve, reject) => {
@@ -357,19 +357,26 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       const rows = buildLiveEventRows(info.fixtureId, info.homeClubId, info.awayClubId, data);
 
       // GOAL API's own payload can retract an event after this file already
-      // wrote it -- confirmed live the goals/cards/substitutions endpoints
-      // never carry a dedicated type for it, but a goal disallowed on VAR
-      // review (or, less commonly, a card rescinded) simply disappears from
-      // data.goalscorer/cards/substitutions on a later match_update. rows
-      // above is always the FULL current set (buildLiveEventRows rebuilds
-      // it from scratch every time, not incrementally), so anything already
-      // stored under this fixture's own 'live-' event_keys that ISN'T in
-      // that current set has fallen out and needs deleting -- upsert alone
-      // only ever adds/updates, it never removes a row on its own. Scoped
-      // to the 'live-' prefix specifically: syncLineups.js's own REST-
-      // sourced rows (goal:/card:/sub: prefixes) are a separate, later
-      // reconciliation (a wholesale delete-then-reinsert once the fixture
-      // is confirmed finished) and must never be touched from here.
+      // wrote it -- a goal disallowed on VAR review (or, less commonly, a
+      // card rescinded) simply disappears from data.goalscorer/cards/
+      // substitutions on a later match_update, with no dedicated type or
+      // other signal marking it as a retraction rather than a regular
+      // update. rows above is always the FULL current set (buildLiveEventRows
+      // rebuilds it from scratch every time, not incrementally), so in
+      // principle anything already stored under this fixture's own 'live-'
+      // event_keys that ISN'T in that current set has fallen out.
+      //
+      // Confirmed live this can't be trusted on a single observation,
+      // though: a first version of this deleted on the spot and it wiped
+      // out real goals mid-match -- GOAL API's own WS push can hand back a
+      // momentarily incomplete snapshot (e.g. right after this file's own
+      // reconnect logic re-subscribes), which looks identical to a
+      // retraction from here. Requiring the SAME key to be missing on two
+      // separate match_updates in a row (pendingRemovals, per goalApiId)
+      // absorbs exactly that: a one-off incomplete snapshot self-heals the
+      // moment the next update reports the goal again, before ever reaching
+      // the two-strikes threshold, while a genuine retraction stays missing
+      // on every subsequent update and gets deleted on the second one.
       const currentKeys = new Set(rows.map((r) => r.event_key));
       const { data: existingLiveRows, error: existingErr } = await supabase
         .from('match_events')
@@ -379,16 +386,26 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       if (existingErr) {
         console.error(`Failed to read existing live events for fixture ${info.fixtureId}:`, existingErr.message);
       } else {
-        const staleKeys = existingLiveRows.map((r) => r.event_key).filter((k) => !currentKeys.has(k));
-        if (staleKeys.length > 0) {
+        const missingNow = existingLiveRows.map((r) => r.event_key).filter((k) => !currentKeys.has(k));
+        const previouslyMissing = pendingRemovals.get(goalApiId) ?? new Set();
+        const confirmedStale = missingNow.filter((k) => previouslyMissing.has(k));
+
+        if (confirmedStale.length > 0) {
           const { error: deleteErr } = await supabase
             .from('match_events')
             .delete()
             .eq('fixture_id', info.fixtureId)
-            .in('event_key', staleKeys);
+            .in('event_key', confirmedStale);
           if (deleteErr) console.error(`Failed to delete retracted events for fixture ${info.fixtureId}:`, deleteErr.message);
-          else counts.rowsDeleted += staleKeys.length;
+          else counts.rowsDeleted += confirmedStale.length;
         }
+
+        // Baseline for the next check: exactly what's missing right now
+        // (whether newly-noticed or just-confirmed-and-deleted) -- a key
+        // that reappears in the meantime simply won't be in missingNow next
+        // time and drops out of this set on its own, no separate clearing
+        // needed.
+        pendingRemovals.set(goalApiId, new Set(missingNow));
       }
 
       if (rows.length === 0) return;
@@ -440,6 +457,7 @@ export async function syncLiveEvents() {
 
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
   const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
+  const pendingRemovals = new Map(); // goalApiId -> event_keys missing on the immediately-preceding check, awaiting a second miss to confirm
   const counts = { updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: droppedAtStart };
   let reconnects = 0;
 
@@ -452,7 +470,7 @@ export async function syncLiveEvents() {
   while (Date.now() < deadline) {
     let reachedDeadline;
     try {
-      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, counts });
+      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, counts });
     } catch (err) {
       console.error('Live events connection attempt failed:', err.message);
       reachedDeadline = false;
