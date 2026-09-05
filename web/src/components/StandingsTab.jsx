@@ -17,7 +17,8 @@ import { leagueBySlug, zoneForPosition } from '../lib/leagues.js';
 // itself when a user's chosen accent is also blue-ish.
 const ZONE_COLOR = {
   cl: '#3D8BFD',
-  europe: '#F5A623',
+  el: '#F5A623',
+  uecl: '#3DBA6E',
   relegationPlayoff: '#FF8A3D',
   relegation: '#E5484D',
 };
@@ -55,7 +56,8 @@ function ZoneLegend({ theme, t, league }) {
   if (!cfg) return null;
   const items = [
     ['cl', t.standings.zoneChampionsLeague],
-    ['europe', t.standings.zoneEurope],
+    ['el', t.standings.zoneEuropaLeague],
+    ['uecl', t.standings.zoneConferenceLeague],
     ...(cfg.relegationZones.playoff ? [['relegationPlayoff', t.standings.zoneRelegationPlayoff]] : []),
     ['relegation', t.standings.zoneRelegation],
   ];
