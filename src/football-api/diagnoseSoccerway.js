@@ -5,13 +5,13 @@
  * Test URL: https://www.soccerway.com/player/delli-carri-filippo/QiKjTfpa/transfers/
  */
 
-const https = require('https');
-const http = require('http');
+import https from 'https';
+import http from 'http';
 
 const TEST_URL = 'https://www.soccerway.com/player/delli-carri-filippo/QiKjTfpa/transfers/';
 const PROFILE_URL = 'https://www.soccerway.com/player/delli-carri-filippo/QiKjTfpa/';
 
-function fetch(url, options = {}) {
+function fetch(url) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
     const req = lib.get(url, {
@@ -23,18 +23,17 @@ function fetch(url, options = {}) {
         'Cache-Control': 'no-cache',
       },
       timeout: 15000,
-      ...options,
     }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data, url }));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out')); });
   });
 }
 
-function extractField(html, label, patterns) {
+function extractField(html, patterns) {
   for (const pattern of patterns) {
     const match = html.match(pattern);
     if (match) return match[1]?.trim() || null;
@@ -44,7 +43,6 @@ function extractField(html, label, patterns) {
 
 function extractTransfers(html) {
   const transfers = [];
-  // Look for transfer table rows
   const rowPattern = /<tr[^>]*class="[^"]*transfer[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   const cellPattern = /<td[^>]*>([\s\S]*?)<\/td>/gi;
   let rowMatch;
@@ -62,7 +60,8 @@ function extractTransfers(html) {
 
 async function diagnose() {
   console.log('=== Soccerway.com Player Profile Diagnosis ===\n');
-  console.log(`Test URL: ${TEST_URL}\n`);
+  console.log(`Profile URL: ${PROFILE_URL}`);
+  console.log(`Transfers URL: ${TEST_URL}\n`);
 
   // --- Step 1: Reachability ---
   console.log('--- Step 1: Reachability ---');
@@ -108,41 +107,41 @@ async function diagnose() {
   // --- Step 3: Data extraction ---
   console.log('\n--- Step 3: Data Extraction ---');
 
-  const name = extractField(html, 'Name', [
+  const name = extractField(html, [
     /<h1[^>]*class="[^"]*player[^"]*"[^>]*>([^<]+)<\/h1>/i,
     /<h1[^>]*>([^<]+)<\/h1>/i,
     /itemprop="name"[^>]*>([^<]+)</i,
   ]);
   console.log(`Name: ${name || 'NOT FOUND'}`);
 
-  const birthdate = extractField(html, 'Birthdate', [
+  const birthdate = extractField(html, [
     /itemprop="birthDate"[^>]*content="([^"]+)"/i,
     /Date of birth[^<]*<\/[^>]+>\s*<[^>]+>([^<]+)</i,
     /(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})/,
   ]);
   console.log(`Birthdate: ${birthdate || 'NOT FOUND'}`);
 
-  const nationality = extractField(html, 'Nationality', [
+  const nationality = extractField(html, [
     /itemprop="nationality"[^>]*>([^<]+)</i,
     /Nationality[^<]*<\/[^>]+>\s*<[^>]+>([^<]+)</i,
     /flag[^>]*title="([^"]+)"/i,
   ]);
   console.log(`Nationality: ${nationality || 'NOT FOUND'}`);
 
-  const position = extractField(html, 'Position', [
+  const position = extractField(html, [
     /itemprop="jobTitle"[^>]*>([^<]+)</i,
     /Position[^<]*<\/[^>]+>\s*<[^>]+>([^<]+)</i,
   ]);
   console.log(`Position: ${position || 'NOT FOUND'}`);
 
-  const photo = extractField(html, 'Photo', [
+  const photo = extractField(html, [
     /<img[^>]*class="[^"]*player[^"]*"[^>]*src="([^"]+)"/i,
     /itemprop="image"[^>]*src="([^"]+)"/i,
     /<img[^>]*src="([^"]*player[^"]*\.(jpg|png|webp))"/i,
   ]);
   console.log(`Photo URL: ${photo || 'NOT FOUND'}`);
 
-  const club = extractField(html, 'Current Club', [
+  const club = extractField(html, [
     /itemprop="memberOf"[^>]*>([^<]+)</i,
     /Current club[^<]*<\/[^>]+>\s*<[^>]+>([^<]+)</i,
   ]);
@@ -157,13 +156,12 @@ async function diagnose() {
       transfers.slice(0, 5).forEach((row, i) => console.log(`  [${i + 1}] ${JSON.stringify(row)}`));
     } else {
       console.log('No structured transfer data found in table rows.');
-      // Check if transfer data exists in other format
       const hasTransferSection = transferRes.body.toLowerCase().includes('transfer');
       console.log(`Transfer section present: ${hasTransferSection}`);
     }
   }
 
-  // --- Step 5: API / structured data check ---
+  // --- Step 5: Structured data check ---
   console.log('\n--- Step 5: Structured / Machine-Readable Data ---');
   const hasJsonLd = html.includes('application/ld+json');
   const hasMicrodata = html.includes('itemtype') && html.includes('schema.org');
