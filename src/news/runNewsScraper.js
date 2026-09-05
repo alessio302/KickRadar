@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
 import { classifyOfficial } from './classify.js';
-import { isTransferRelevant } from './relevance.js';
+import { isTransferRelevant, isWomensFootball } from './relevance.js';
 import { extractTransferInfo } from './extract.js';
 import { llmExtractTransferInfo } from './llmExtract.js';
 import { fetchArticleText } from './articleBody.js';
@@ -212,6 +212,10 @@ async function scrapeSource(supabase, league, dbLeague, allClubs, sourceKey) {
       skipped += 1;
       continue;
     }
+    if (isWomensFootball(text)) {
+      skipped += 1;
+      continue;
+    }
 
     // Extract from the actual article body, not just the headline (+ up to
     // 400 chars of RSS description for tuttomercatoweb/kicker -- marca,
@@ -234,6 +238,22 @@ async function scrapeSource(supabase, league, dbLeague, allClubs, sourceKey) {
     // together, clobbering the item's already-correct, already-scoped
     // single-entry summary with a garbled multi-entry blob.
     const articleText = item.skipBodyFetch ? null : await fetchArticleText(item.link);
+
+    // Second, later chance to catch a women's-team story: confirmed live,
+    // one slipped past the title+summary check above because the RSS
+    // description alone never said "Femminile" -- only the full article
+    // body did. Checked before the LLM call (not just before insertion) so
+    // a story caught here never costs a request either, same as the
+    // earlier check.
+    if (articleText && isWomensFootball(articleText)) {
+      const { error: markSeenErr } = await supabase
+        .from('seen_news_items')
+        .upsert({ source: sourceKey, external_id: externalId }, { onConflict: 'source,external_id' });
+      if (markSeenErr) console.error(`[${league.slug}] failed to record seen item:`, markSeenErr.message);
+      skipped += 1;
+      continue;
+    }
+
     const extractionItem = articleText ? { ...item, summary: articleText } : item;
 
     const { playerName, fromClub, toClub, isOfficial, aiSummary } = await extractInfo(extractionItem, allClubs, sourceKey);

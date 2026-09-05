@@ -76,3 +76,33 @@ export function isTransferRelevant(sourceKey, text) {
   const haystack = normalize(text);
   return keywords.some((keyword) => haystack.includes(normalize(keyword)));
 }
+
+// Every tracked league is men's football, but a source's own transfer
+// section routinely covers a club's women's team under the same feed --
+// confirmed live: tuttomercatoweb's Parma page mixed in "Femminile" transfer
+// stories, and one of them (Hawa Cissoko) produced a stray transfers row
+// whose destination club, an English side entirely outside our tracked
+// leagues, then collided with an unrelated La Liga club's short_name during
+// resolveClub() (see clubMatch.js's own comment on that). Filtering here,
+// language-independent (checked against every source, not a per-source
+// map like RELEVANCE_KEYWORDS), stops that whole class of story before it
+// ever reaches extraction/resolution, not just this one symptom of it.
+// Word-boundary matched, not plain substring -- confirmed while writing
+// this: a naive haystack.includes() check against "damen" (German for
+// "ladies", meant to catch "Frauen/Damen-Mannschaft") also lit up on the
+// perfectly ordinary Spanish word "funda-MEN-tal", which would have
+// silently dropped a large fraction of real transfer stories the moment
+// this shipped. Every one of these is a short, generic-looking token by
+// itself, so the same risk applies to all of them, not just this one.
+const WOMENS_FOOTBALL_KEYWORDS = [
+  'femminile', // Italian
+  'frauen', 'damen', // German
+  'women', 'ladies', // English
+  'feminine', 'feminin', // French (accents already stripped by normalize())
+  'femenino', 'femenina', // Spanish
+];
+
+export function isWomensFootball(text) {
+  const haystack = normalize(text);
+  return WOMENS_FOOTBALL_KEYWORDS.some((keyword) => new RegExp(`\\b${normalize(keyword)}\\b`, 'i').test(haystack));
+}

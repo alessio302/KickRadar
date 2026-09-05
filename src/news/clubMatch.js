@@ -13,12 +13,28 @@ function stripNumbers(text) {
   return text.replace(/\b\d+\b/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// A handful of short_name/alias entries are really just a generic
+// football club-type word, not a genuinely distinctive nickname --
+// confirmed live: Athletic Club de Bilbao's short_name "Athletic" matched
+// as a plain substring of "Charlton Athletic" (an English club entirely
+// outside our tracked leagues), wrongly resolving a Parma women's-team
+// player's move to Bilbao instead of leaving it unresolved. Substring
+// containment is exactly the right call for a real nickname ("Barcelona"
+// inside "FC Barcelona"), but a bare club-type word like this is also a
+// legitimate trailing token in plenty of unrelated clubs' full names --
+// these may only match a candidate exactly, never as a fragment of
+// something longer.
+const GENERIC_CLUB_WORDS = new Set(['athletic']);
+
 function namesMatch(candidate, candidateNoNum, normName) {
-  if (candidate === normName || candidate.includes(normName) || normName.includes(candidate)) {
+  if (candidate === normName) return true;
+  if (GENERIC_CLUB_WORDS.has(normName)) return false;
+  if (candidate.includes(normName) || normName.includes(candidate)) {
     return true;
   }
   const normNameNoNum = stripNumbers(normName);
   if (candidateNoNum.length < 3 || normNameNoNum.length < 3) return false;
+  if (GENERIC_CLUB_WORDS.has(normNameNoNum)) return false;
   return candidateNoNum === normNameNoNum || candidateNoNum.includes(normNameNoNum) || normNameNoNum.includes(candidateNoNum);
 }
 
