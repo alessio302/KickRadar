@@ -86,18 +86,24 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Confirmed live: the free tier caps gemini-3.5-flash-lite at 15
-// requests/minute. RMC Sport alone can have 60+ genuinely-new items on a
-// first run (steady-state hourly runs will see far fewer), and firing
-// them all back-to-back blew through the limit almost immediately --
-// every single call 429'd and silently fell back to the regex heuristic,
-// which looked like "the LLM extraction isn't working" but was really
-// "we never gave it a chance to run". Spacing calls to stay under the cap
-// (4.2s apart, a bit of margin over the exact 4s/request ceiling) fixes
-// that; the tradeoff is a big backlog takes minutes to clear -- fine for
-// a scheduled background job with a 10-minute job timeout, not fine for
-// anything latency-sensitive.
-const MIN_CALL_INTERVAL_MS = 4200;
+// Confirmed live: the free tier caps gemini-3.6-flash at 10
+// requests/minute (gemini-3.5-flash-lite, used here until this switch, was
+// 15/min but only 500 requests/DAY -- confirmed live via a real
+// RESOURCE_EXHAUSTED response, and confirmed to be the actually-binding
+// constraint: sampled production runs averaged ~61 items/run falling back
+// to the regex heuristic, with the daily cap already exhausted within
+// seconds of most jobs starting. gemini-3.6-flash's 1,500/day headroom is
+// worth the lower per-minute rate). RMC Sport alone can have 60+
+// genuinely-new items on a first run (steady-state hourly runs will see
+// far fewer), and firing them all back-to-back blew through the
+// per-minute limit almost immediately -- every single call 429'd and
+// silently fell back to the regex heuristic, which looked like "the LLM
+// extraction isn't working" but was really "we never gave it a chance to
+// run". Spacing calls to stay under the cap (6.5s apart, a bit of margin
+// over the exact 6s/request ceiling) fixes that; the tradeoff is a big
+// backlog takes minutes to clear -- fine for a scheduled background job
+// with a 10-minute job timeout, not fine for anything latency-sensitive.
+const MIN_CALL_INTERVAL_MS = 6500;
 let lastCallAt = 0;
 
 async function throttle() {
@@ -108,7 +114,7 @@ async function throttle() {
 
 export async function llmExtractTransferInfo(title, summary) {
   const ai = getClient();
-  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   await throttle();
   const response = await ai.models.generateContent({
