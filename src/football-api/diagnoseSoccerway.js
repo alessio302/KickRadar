@@ -87,15 +87,17 @@ async function diagnose() {
   // --- Step 2: Anti-bot detection ---
   console.log('\n--- Step 2: Anti-bot / Access Check ---');
   const html = profileRes.body;
-  const isCloudflare = html.includes('cloudflare') || html.includes('cf-browser-verification') || profileRes.status === 403 || profileRes.status === 429;
-  const isCaptcha = html.toLowerCase().includes('captcha') || html.toLowerCase().includes('recaptcha');
-  const isBlocked = html.toLowerCase().includes('access denied') || html.toLowerCase().includes('blocked');
+  const isCloudflare = html.includes('cf-browser-verification') || profileRes.status === 403 || profileRes.status === 429;
+  const isCaptcha = /<div[^>]*class="[^"]*g-recaptcha/i.test(html) || /data-sitekey=/i.test(html);
+  const isBlocked = /<title[^>]*>\s*(Access Denied|403 Forbidden|Blocked)\s*<\/title>/i.test(html);
   const hasContent = html.length > 5000;
+  const hasPlayerTitle = /<title[^>]*>[^<]*Stats[^<]*Soccerway/i.test(html) || /<title[^>]*>[^<]*Soccerway/i.test(html);
 
   console.log(`Cloudflare protection: ${isCloudflare}`);
-  console.log(`Captcha detected: ${isCaptcha}`);
+  console.log(`Captcha challenge: ${isCaptcha}`);
   console.log(`Access blocked: ${isBlocked}`);
   console.log(`Has substantial content: ${hasContent}`);
+  console.log(`Has player page title: ${hasPlayerTitle}`);
 
   if (isCloudflare || isCaptcha || isBlocked || !hasContent) {
     console.log('\n⛔ RESULT: Scraping appears to be BLOCKED or page is inaccessible.');
