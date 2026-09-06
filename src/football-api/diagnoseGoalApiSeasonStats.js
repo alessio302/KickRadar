@@ -80,6 +80,15 @@ async function diagnose() {
     await new Promise((r) => setTimeout(r, 1500));
   }
 
+  console.log('\n--- Step 4: Full players/{id}/statistics response ---');
+  try {
+    const { status, body } = await rawCall(`/players/${first.id}/statistics`);
+    console.log(`status=${status}`);
+    console.log(JSON.stringify(body, null, 2));
+  } catch (err) {
+    console.log(`FAILED: ${err.message}`);
+  }
+
   console.log('\n=== SUMMARY ===');
   console.log('If no season-scoped data appeared above, GOAL API confirmed has no way to fetch a specific past season for a player -- only whatever single snapshot it currently has on file.');
 }
