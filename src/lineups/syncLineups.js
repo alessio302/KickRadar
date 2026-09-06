@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
 import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
+import { getMatches } from '../football-api/client.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
@@ -148,6 +149,58 @@ function normalizeCoach(coach) {
   return { name, photo: entry.playerImage || null };
 }
 
+// Referee comes from football-data.org (fixtures.referee, originally
+// populated only by syncFixtures.js's own bulk-per-league call -- GOAL
+// API, this file's own provider for everything else, has no referee
+// concept at all). Piggybacking on this file's own near-kickoff/past-
+// window candidate set instead of waiting for fixtures-sync.yml's own
+// much coarser schedule: user-reported and confirmed live (2026-09-06)
+// that a referee assigned a few hours before kickoff could sit unsynced
+// until AFTER the match had already finished, since fixtures-sync only
+// ran a handful of times a day. This file already runs every 15 min and
+// already has exactly the right candidate set, so re-checking referee
+// here closes that gap to at most one run's delay instead of hours.
+async function syncRefereesForCandidates(supabase, candidates, leagueSlugById) {
+  const missing = candidates.filter((f) => !f.referee && f.external_fixture_id);
+  if (missing.length === 0) return 0;
+
+  const leagueSlugsNeeded = new Set(missing.map((f) => leagueSlugById.get(f.league_id)).filter(Boolean));
+  let fetched = 0;
+
+  for (const slug of leagueSlugsNeeded) {
+    const league = LEAGUES.find((l) => l.slug === slug);
+    if (!league) continue;
+
+    let matches;
+    try {
+      // Whole-season bulk call, same shape/endpoint syncFixtures.js already
+      // uses -- football-data.org has no single-match lookup by id in this
+      // client, and this call is cheap enough (free tier is rate-limited
+      // per-minute, not per-day) to just re-fetch the season and filter by
+      // our own external_fixture_id, with no GOAL-API-style club-name
+      // matching needed at all.
+      matches = await getMatches({ competitionId: league.externalCompetitionId });
+    } catch (err) {
+      console.error(`football-data.org referee fetch failed for ${slug}:`, err.message);
+      continue;
+    }
+
+    const refereeByExternalId = new Map(
+      matches.map((m) => [m.id, m.referees?.find((r) => r.type === 'REFEREE')?.name ?? m.referees?.[0]?.name ?? null])
+    );
+
+    for (const f of missing.filter((c) => leagueSlugById.get(c.league_id) === slug)) {
+      const referee = refereeByExternalId.get(f.external_fixture_id);
+      if (!referee) continue;
+      const { error } = await supabase.from('fixtures').update({ referee }).eq('id', f.id);
+      if (error) console.error(`Failed to update referee for fixture ${f.id}:`, error.message);
+      else fetched += 1;
+    }
+  }
+
+  return fetched;
+}
+
 function buildLineupTeam(section, formation) {
   if (!section) return null;
   return {
@@ -232,14 +285,14 @@ export async function syncLineups() {
 
   const { data: nearKickoff, error: nkErr } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at, referee, external_fixture_id')
     .gte('kickoff_at', windowStart)
     .lte('kickoff_at', windowEnd);
   if (nkErr) throw nkErr;
 
   const { data: finishedRecent, error: frErr } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at, referee, external_fixture_id')
     .eq('status', 'finished')
     .gte('kickoff_at', pastCutoff);
   if (frErr) throw frErr;
@@ -248,7 +301,13 @@ export async function syncLineups() {
   const fixturesById = new Map();
   for (const f of [...nearKickoff, ...finishedRecent]) fixturesById.set(f.id, f);
   const candidates = [...fixturesById.values()];
-  if (candidates.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
+  if (candidates.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0, refereesFetched: 0 };
+
+  const { data: dbLeagues, error: leaguesErr } = await supabase.from('leagues').select('id, slug');
+  if (leaguesErr) throw leaguesErr;
+  const leagueSlugById = new Map(dbLeagues.map((l) => [l.id, l.slug]));
+
+  const refereesFetched = await syncRefereesForCandidates(supabase, candidates, leagueSlugById);
 
   // Skip fixtures whose lineups are already fully confirmed for both
   // sides -- no point spending free-tier requests re-checking something
@@ -270,11 +329,7 @@ export async function syncLineups() {
   const eventsNeeded = (f) => f.status === 'finished' && !f.events_synced_at;
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
-  if (pending.length === 0) return { checked: candidates.length, confirmed: 0, eventsFetched: 0 };
-
-  const { data: dbLeagues, error: leaguesErr } = await supabase.from('leagues').select('id, slug');
-  if (leaguesErr) throw leaguesErr;
-  const leagueSlugById = new Map(dbLeagues.map((l) => [l.id, l.slug]));
+  if (pending.length === 0) return { checked: candidates.length, confirmed: 0, eventsFetched: 0, refereesFetched };
 
   const { data: allClubs, error: clubsErr } = await supabase.from('clubs').select('id, name, short_name, aliases, league_id');
   if (clubsErr) throw clubsErr;
@@ -445,6 +500,7 @@ export async function syncLineups() {
     checked,
     confirmed: confirmedCount,
     eventsFetched,
+    refereesFetched,
     newlyConfirmedFixtures: newlyConfirmedFixtures.length,
     pushResults,
   };
