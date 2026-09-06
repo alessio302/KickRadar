@@ -2,21 +2,16 @@ name: Fixtures sync
 
 on:
   schedule:
-    # Hourly, not the original 4x/day (per the briefing's "3-4 Abfragen pro
-    # Liga und Tag reichen"). User-reported (2026-09-06): referees weren't
-    # showing up even once a fixture's lineup was already confirmed.
-    # Confirmed live via a diagnostic (diagnoseMissingReferee.js, since
-    # removed): football-data.org's own referees[] for 4 same-day matches
-    # was still empty at the 09:11 UTC run, but fully populated by 12:57 --
-    # assigned somewhere in that ~4h pre-kickoff window. At 4x/day
-    # (05/11/17/23 UTC), the next scheduled run after 09:11 was 17:00 --
-    # AFTER all four matches (13:00 kickoff) had already finished, so the
-    # referee only ever appeared post-match even though the data had been
-    # available for hours before kickoff. Hourly shrinks that gap to under
-    # an hour in the worst case. football-data.org's free tier is
-    # rate-limited per-minute (10 req/min), not per-day, so this (5 leagues
-    # x 24 runs = 120 req/day, well spaced) costs nothing extra.
-    - cron: '5 * * * *'
+    # 4x/day, per the briefing ("3-4 Abfragen pro Liga und Tag reichen").
+    #
+    # Briefly bumped to hourly (2026-09-06) to chase a referee-freshness
+    # gap -- reverted back down now that syncLineups.js's own 15-min
+    # near-kickoff pass fetches referee directly (see that file's own
+    # syncRefereesForCandidates() comment), which closes the same gap far
+    # tighter than this whole-season job ever could. This job's own
+    # cadence only needs to matter for matchday/status/score drift that
+    # syncLiveScores.js's live-window polling doesn't already cover.
+    - cron: '0 5,11,17,23 * * *'
   workflow_dispatch: {}
 
 jobs:
