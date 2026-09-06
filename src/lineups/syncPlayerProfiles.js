@@ -112,6 +112,27 @@ function lastToken(name) {
   return parts[parts.length - 1];
 }
 
+// Bag-of-words key, insensitive to word order and hyphen-vs-space --
+// confirmed live (2026-09-06, a user report of blank/duplicate squad
+// entries across ~30 clubs): byNormalizedName's exact-string match misses
+// a real player whenever football-data.org's own name spelling for them
+// differs from however they were first resolved -- "Reis Vitor" (GOAL
+// API's own order) vs. football-data.org's "Vitor Reis", or "Kiernan
+// Dewsbury-Hall" vs. "Kiernan Dewsbury Hall" (hyphen vs. space). Every
+// case sampled was one of exactly these two differences, never an
+// actually-different name, so this never needs to fall back to gap-fill
+// or an insert at all -- it just needed a name-equality check that isn't
+// order/punctuation-sensitive. Scoped to the same club (not global) so
+// two genuinely different players who happen to share every token stay
+// distinct.
+function canonicalTokenKey(name) {
+  return normalize(name)
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+}
+
 // buildFieldsFromSquadEntry() can't just reuse playerProfileResolver.js's
 // own buildProfileFields() -- confirmed live a squad-endpoint entry and a
 // single-player-endpoint profile don't share a raw shape (this one has a
@@ -157,10 +178,30 @@ export async function syncPlayerProfiles() {
   // does -- just resolved from an in-memory Map instead of two SELECTs
   // per player, since this walks the entire squad list (~2000 players)
   // every run rather than one name at a time.
-  const { data: existingRows, error: existingErr } = await supabase.from('players').select('id, goal_api_id, normalized_name');
+  const { data: existingRows, error: existingErr } = await supabase
+    .from('players')
+    .select('id, goal_api_id, normalized_name, name, current_club_name');
   if (existingErr) throw existingErr;
   const byGoalApiId = new Map(existingRows.filter((r) => r.goal_api_id).map((r) => [r.goal_api_id, r.id]));
   const byNormalizedName = new Map(existingRows.map((r) => [r.normalized_name, r.id]));
+
+  // Same collision-drop safety as goalByLastToken below -- two distinct
+  // real players sharing every name token within one club would be
+  // exceptionally rare, but ambiguous is still left unresolved rather
+  // than guessed at, same principle as everywhere else in this file.
+  const byClubCanonical = new Map();
+  const clubCanonicalCollided = new Set();
+  for (const r of existingRows) {
+    if (!r.current_club_name) continue;
+    const key = `${r.current_club_name}|${canonicalTokenKey(r.name)}`;
+    if (clubCanonicalCollided.has(key)) continue;
+    if (byClubCanonical.has(key)) {
+      byClubCanonical.delete(key);
+      clubCanonicalCollided.add(key);
+      continue;
+    }
+    byClubCanonical.set(key, r.id);
+  }
 
   let checked = 0;
   let updated = 0;
@@ -268,8 +309,22 @@ export async function syncPlayerProfiles() {
         const goalApiId = resolvedFields?.goal_api_id ?? goalEntry?.id ?? null;
 
         const normalizedName = normalize(fp.name);
-        const targetId = (goalApiId && byGoalApiId.get(goalApiId)) ?? byNormalizedName.get(normalizedName) ?? null;
-        const row = { goal_api_id: goalApiId, stats_refreshed_at: new Date().toISOString(), ...fields };
+        const canonicalKey = `${club.name}|${canonicalTokenKey(fp.name)}`;
+        const targetId =
+          (goalApiId && byGoalApiId.get(goalApiId)) ?? byNormalizedName.get(normalizedName) ?? byClubCanonical.get(canonicalKey) ?? null;
+        // goal_api_id is only ever set here when this run actually resolved
+        // one -- confirmed live this was previously unconditional
+        // (`goal_api_id: goalApiId`), which meant a single failed
+        // resolution (a transient GOAL API hiccup, or the international-
+        // break national-team-fallback this file's own top comment
+        // describes) permanently wiped an already-correct goal_api_id off
+        // an existing row on the very next run, even though the row's
+        // photo/number/etc. were left untouched and still looked fine --
+        // silently breaking get-player-profile's own by-goal_api_id lookup
+        // for that player from then on. Omitting the key when unresolved
+        // leaves whatever the row already had alone instead.
+        const row = { stats_refreshed_at: new Date().toISOString(), ...fields };
+        if (goalApiId) row.goal_api_id = goalApiId;
 
         if (targetId) {
           const { error } = await supabase.from('players').update(row).eq('id', targetId);
@@ -302,6 +357,7 @@ export async function syncPlayerProfiles() {
               updated += 1;
               if (goalApiId) byGoalApiId.set(goalApiId, existing.id);
               byNormalizedName.set(normalizedName, existing.id);
+              byClubCanonical.set(canonicalKey, existing.id);
             } else {
               throw error;
             }
@@ -309,6 +365,7 @@ export async function syncPlayerProfiles() {
             inserted += 1;
             if (goalApiId) byGoalApiId.set(goalApiId, insertedRow.id);
             byNormalizedName.set(normalizedName, insertedRow.id);
+            byClubCanonical.set(canonicalKey, insertedRow.id);
           }
         }
       } catch (err) {
