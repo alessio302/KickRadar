@@ -8,30 +8,26 @@ import { useRef, useState } from 'react';
 // one component.
 const DISMISS_THRESHOLD_PX = 100;
 
-// player.stats is a snapshot from whenever this player was first resolved
-// (src/news/playerProfileResolver.js), not refreshed later -- same
-// accepted tradeoff the old transfermarkt_url cache already had. Only
-// shows the fields that are actually present; GOAL API's own coverage
-// leaves many stat fields null depending on the player/competition.
-//
-// Grouped into tabs by football content (summary/attack/defense/
-// discipline), same underline-tab pattern FixtureDetailOverlay.jsx
-// already uses for Aufstellungen/Spielinfo/Statistiken -- a flat list of
-// 14 numbers read as a wall once passing and defensive stats joined the
-// original 7, the same way that overlay's own event list needed lineups
-// split out once it grew.
-const STAT_GROUPS = [
-  { key: 'overview', labelKey: 'tabOverview', fields: ['matchPlayed', 'minutes', 'rating'] },
-  // Goalkeeper-only fields (null for every outfield player, see
-  // playerProfileResolver.js's STAT_FIELDS) -- placed right after
-  // overview so it's the first tab a keeper's profile actually lands on,
-  // ahead of attack/defense groups that are mostly empty for a keeper
-  // anyway.
-  { key: 'goalkeeping', labelKey: 'tabGoalkeeping', fields: ['saves', 'insideBoxSaves', 'goalsConceded'] },
-  { key: 'attack', labelKey: 'tabAttack', fields: ['goals', 'assists', 'shotsTotal', 'passes', 'keyPasses', 'dribbleSucc'] },
-  { key: 'defense', labelKey: 'tabDefense', fields: ['tackles', 'interceptions', 'duelsWon'] },
-  { key: 'discipline', labelKey: 'tabDiscipline', fields: ['yellowCards', 'redCards'] },
-];
+// player.season_goals/assists/yellow_cards/red_cards come from
+// syncPlayerSeasonStats.js's own match_events aggregation, not GOAL API's
+// player.stats snapshot -- that snapshot carries no season identifier at
+// all (see formatStatsDate's own comment below) and used to show a wall of
+// stat categories with no way to tell whether any of them belonged to the
+// current season. Only these four survive here on purpose: every scoring/
+// carding match_event is tied to a fixture_id, and fixtures are only ever
+// synced for the current season, so these counts are provably
+// current-season, exact, not an estimate. Every other GOAL-API-only
+// category (minutes, rating, shots, passes, tackles, ...) has no
+// season-clean source at all and was removed rather than shown next to
+// reliable numbers with no way for someone looking at the profile to tell
+// the two apart.
+const STAT_FIELDS = ['season_goals', 'season_assists', 'season_yellow_cards', 'season_red_cards'];
+const STAT_LABEL_KEYS = {
+  season_goals: 'goals',
+  season_assists: 'assists',
+  season_yellow_cards: 'yellowCards',
+  season_red_cards: 'redCards',
+};
 
 function calculateAge(birthdate) {
   if (!birthdate) return null;
@@ -41,26 +37,11 @@ function calculateAge(birthdate) {
   return Math.floor(ageMs / (365.25 * 24 * 60 * 60 * 1000));
 }
 
-// GOAL API's player profile carries no season identifier at all (confirmed
-// live, including checking its statistics[] field -- empty for every
-// player sampled) -- these stat fields are just whatever GOAL API most
-// recently had on file, which for an inactive player (long-term injury,
-// no minutes since) can silently be many months stale with nothing in the
-// response to reveal that. A guessed "Saison 2026/27" label used to be
-// shown here regardless -- confirmed live wrong for a player who hadn't
-// played since before the season even started.
-//
-// player.goal_api_updated_at (GOAL API's own `updatedAt`) is the real
-// freshness signal, NOT player.stats_refreshed_at -- confirmed live those
-// two disagree: stats_refreshed_at is stamped to now() by
-// refreshPlayerProfiles.js on every successful poll regardless of whether
-// GOAL API actually recomputed anything, so a first attempt at this fix
-// showed "Stand: <today>" for a player whose underlying numbers hadn't
-// moved since two months earlier. No fallback to stats_refreshed_at here
-// on purpose -- showing our own poll time as a freshness date is exactly
-// the bug just described, so a player without goal_api_updated_at (not
-// yet backfilled, or GOAL API omitted it) shows no date at all rather
-// than a misleading one.
+// player.season_stats_updated_at is syncPlayerSeasonStats.js's own
+// aggregation timestamp -- when this ran last, not when the underlying
+// numbers last changed, but unlike GOAL API's undated snapshot this is at
+// least honest about being current-season data (the aggregation only ever
+// reads from fixtures/match_events, which never contain a past season).
 function formatStatsDate(iso, locale) {
   return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -89,29 +70,13 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
 
   const age = calculateAge(player.birthdate);
   const positionLabel = player.position ? t.lineup.positions[player.position] || player.position : null;
-  const stats = player.stats || {};
 
-  // Confirmed live (Alessio Romagnoli, a defender): goalsConceded isn't
-  // exclusively a goalkeeper stat in GOAL API's data the way STAT_FIELDS'
-  // own comment assumed (saves/insideBoxSaves stay genuinely GK-only, but
-  // goalsConceded showed up non-null, "0", for an outfield defender too) --
-  // showing a "Torwart" tab with "0 Gegentore" on a center-back's profile
-  // read as a data bug even though the number itself wasn't wrong. Gating
-  // the whole goalkeeping group on the player's actual position, not just
-  // on whether the field happens to be non-null, is the fix -- every other
-  // group stays field-presence-based since STAT_FIELDS' outfield/GK split
-  // is otherwise reliable (confirmed live: saves/insideBoxSaves are null
-  // for every non-goalkeeper sampled).
-  const groups = STAT_GROUPS.filter((group) => group.key !== 'goalkeeping' || player.position === 'Goalkeeper')
-    .map((group) => ({ ...group, rows: group.fields.filter((key) => stats[key] != null) }))
-    .filter((group) => group.rows.length > 0);
-  const hasStats = groups.length > 0;
-  // A lone populated group (a sparse profile, e.g. only overview numbers on
-  // file) shows its grid directly -- a one-tab bar would just be a label
-  // with nothing to switch to.
-  const showTabs = groups.length > 1;
-  const [statTab, setStatTab] = useState(groups[0]?.key);
-  const activeGroup = groups.find((g) => g.key === statTab) ?? groups[0];
+  // null (not 0) means syncPlayerSeasonStats.js couldn't attribute this
+  // stat to the player at all (not yet synced, or a same-club surname
+  // collision it deliberately left unresolved -- see that file's own
+  // comment) -- an explicit 0 is a verified fact and stays shown.
+  const statRows = STAT_FIELDS.filter((key) => player[key] != null);
+  const hasStats = statRows.length > 0;
 
   return (
     <div
@@ -134,10 +99,9 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
           maxWidth: '420px',
           // Fixed, not maxHeight -- confirmed live (FixtureDetailOverlay.jsx
           // had the exact same complaint first) that a content-driven height
-          // visibly resizes the sheet on every tab switch, since Übersicht's
-          // 3 stats and Angriff's 6 don't fill the same space. Fixed height
-          // keeps every tab landing in the same place regardless of how many
-          // rows it has.
+          // visibly resizes the sheet depending on how many of the (0-4)
+          // season stats a given player actually has. Fixed height keeps
+          // every profile opening at the same size regardless.
           height: '82vh',
           borderTopLeftRadius: '16px',
           borderTopRightRadius: '16px',
@@ -204,32 +168,10 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px', borderTop: `1px solid ${theme.border}` }}>
-          {!loading && hasStats && player.goal_api_updated_at && (
+          {!loading && hasStats && player.season_stats_updated_at && (
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: theme.textMuted, margin: '0 0 10px' }}>
-              {t.playerProfile.statsAsOf(formatStatsDate(player.goal_api_updated_at, locale))}
+              {t.playerProfile.statsAsOf(formatStatsDate(player.season_stats_updated_at, locale))}
             </p>
-          )}
-          {!loading && showTabs && (
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', borderBottom: `1px solid ${theme.border}` }}>
-              {groups.map((group) => (
-                <button
-                  key={group.key}
-                  onClick={() => setStatTab(group.key)}
-                  style={{
-                    padding: '2px 2px 8px',
-                    fontSize: '13px',
-                    fontWeight: activeGroup.key === group.key ? 700 : 600,
-                    border: 'none',
-                    borderBottom: activeGroup.key === group.key ? `2px solid ${theme.accent}` : '2px solid transparent',
-                    background: 'transparent',
-                    color: activeGroup.key === group.key ? theme.text : theme.textMuted,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t.playerProfile[group.labelKey]}
-                </button>
-              ))}
-            </div>
           )}
           {loading ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>
@@ -237,10 +179,10 @@ export default function PlayerProfileOverlay({ theme, t, player, locale, onClose
             <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.playerProfile.noStats}</p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {activeGroup.rows.map((key) => (
+              {statRows.map((key) => (
                 <div key={key} style={{ background: theme.surfaceRaised, border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '10px 12px' }}>
-                  <p style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 2px' }}>{stats[key]}</p>
-                  <p style={{ fontSize: '11px', color: theme.textMuted, margin: 0 }}>{t.playerProfile[key]}</p>
+                  <p style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 2px' }}>{player[key]}</p>
+                  <p style={{ fontSize: '11px', color: theme.textMuted, margin: 0 }}>{t.playerProfile[STAT_LABEL_KEYS[key]]}</p>
                 </div>
               ))}
             </div>

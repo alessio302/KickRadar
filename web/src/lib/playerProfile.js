@@ -24,7 +24,7 @@ const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-play
 // still owns that live GOAL API lookup + write (needs the service-role
 // key and GOAL_API_KEY, neither of which belongs in the browser).
 const PLAYER_ROW_FIELDS =
-  'name, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, stats, goal_api_updated_at';
+  'name, photo_url, birthdate, position, current_club_name, current_club_badge, nationality_name, nationality_badge, squad_number, injured, season_goals, season_assists, season_yellow_cards, season_red_cards, season_stats_updated_at';
 
 // Module-level, not component state -- survives across every overlay this
 // player gets opened from for the rest of the page's lifetime (a full
