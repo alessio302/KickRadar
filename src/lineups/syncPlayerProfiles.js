@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
+import { fetchAllRows } from '../db/fetchAllRows.js';
 import { getTeamSquad, searchPlayers, getPlayer } from './goalApiClient.js';
 import { normalize } from '../util/normalize.js';
 import { POSITION_SINGULAR, STAT_FIELDS, extractStats, pickBestMatch, buildProfileFields } from '../news/playerProfileResolver.js';
@@ -178,10 +179,18 @@ export async function syncPlayerProfiles() {
   // does -- just resolved from an in-memory Map instead of two SELECTs
   // per player, since this walks the entire squad list (~2000 players)
   // every run rather than one name at a time.
-  const { data: existingRows, error: existingErr } = await supabase
-    .from('players')
-    .select('id, goal_api_id, normalized_name, name, current_club_name');
-  if (existingErr) throw existingErr;
+  //
+  // fetchAllRows(), not a plain .select() -- confirmed live (2026-09-06)
+  // that a plain unpaginated select here was silently capped at
+  // PostgREST's default 1000-row response limit while `players` had
+  // already grown to 3769 rows, so every one of these lookup maps was
+  // built from barely a quarter of the table. That's what let the
+  // canonical-token fallback below look correct in isolation while still
+  // recreating the exact duplicate rows it was meant to stop -- the
+  // already-existing good row for most players simply wasn't in
+  // `existingRows` at all, on any of the three lookup maps, not just the
+  // new one.
+  const existingRows = await fetchAllRows(supabase, 'players', 'id, goal_api_id, normalized_name, name, current_club_name');
   const byGoalApiId = new Map(existingRows.filter((r) => r.goal_api_id).map((r) => [r.goal_api_id, r.id]));
   const byNormalizedName = new Map(existingRows.map((r) => [r.normalized_name, r.id]));
 

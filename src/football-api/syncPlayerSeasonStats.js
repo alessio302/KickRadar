@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
+import { fetchAllRows } from '../db/fetchAllRows.js';
 import { LEAGUES } from '../config/leagues.js';
 import { normalize } from '../util/normalize.js';
 
@@ -57,11 +58,14 @@ export async function syncPlayerSeasonStatsForLeague(supabase, league) {
   const fixtureIds = fixtures.map((f) => f.id);
   if (fixtureIds.length === 0) return { candidates: 0, updated: 0 };
 
-  const { data: events, error: eventsErr } = await supabase
-    .from('match_events')
-    .select('type, player, assist, club_id')
-    .in('fixture_id', fixtureIds);
-  if (eventsErr) throw eventsErr;
+  // fetchAllRows(), not a plain .select() -- a full season easily passes
+  // PostgREST's default 1000-row response cap per league (confirmed live
+  // 2026-09-06 elsewhere in this codebase: an unpaginated `players` fetch
+  // silently returned barely a quarter of that table once it grew past
+  // 1000 rows, no error, just fewer rows). Early-season event counts here
+  // are still under 1000 per league, but a 38-round season won't stay
+  // there.
+  const events = await fetchAllRows(supabase, 'match_events', 'type, player, assist, club_id', (q) => q.in('fixture_id', fixtureIds));
 
   const eventsByClub = new Map();
   for (const e of events) {
@@ -70,11 +74,7 @@ export async function syncPlayerSeasonStatsForLeague(supabase, league) {
   }
 
   const clubNames = clubs.map((c) => c.name);
-  const { data: players, error: playersErr } = await supabase
-    .from('players')
-    .select('id, name, current_club_name')
-    .in('current_club_name', clubNames);
-  if (playersErr) throw playersErr;
+  const players = await fetchAllRows(supabase, 'players', 'id, name, current_club_name', (q) => q.in('current_club_name', clubNames));
 
   const playersByClubName = new Map();
   for (const p of players) {
