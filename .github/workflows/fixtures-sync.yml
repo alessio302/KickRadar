@@ -4,13 +4,12 @@ on:
   schedule:
     # 4x/day, per the briefing ("3-4 Abfragen pro Liga und Tag reichen").
     #
-    # Briefly bumped to hourly (2026-09-06) to chase a referee-freshness
-    # gap -- reverted back down now that syncLineups.js's own 15-min
-    # near-kickoff pass fetches referee directly (see that file's own
-    # syncRefereesForCandidates() comment), which closes the same gap far
-    # tighter than this whole-season job ever could. This job's own
-    # cadence only needs to matter for matchday/status/score drift that
-    # syncLiveScores.js's live-window polling doesn't already cover.
+    # Referee freshness (briefly chased here at an hourly cadence, then via
+    # a dedicated call in syncLineups.js, 2026-09-06) is now piggybacked
+    # onto syncLiveScores.js's own already-frequent per-league polling (see
+    # that file's own pollOnce() comment) at zero extra football-data.org
+    # requests -- this job's own cadence only needs to matter for matchday/
+    # status/score drift outside syncLiveScores.js's live-window polling.
     - cron: '0 5,11,17,23 * * *'
   workflow_dispatch: {}
 

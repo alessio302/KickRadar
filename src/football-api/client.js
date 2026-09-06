@@ -12,12 +12,12 @@ const BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://api.football-dat
 // budget -- this client had NO retry at all, unlike goalApiClient.js's own
 // 429/502 backoff, so any transient hit on football-data.org's shared
 // 10-req/min budget (several jobs draw from the same key: syncFixtures.js,
-// syncLineups.js's own referee fetch, standings-sync, this file's own
-// per-fixture head-to-head calls) crashed the whole run instead of just
-// costing a short wait. football-data.org's limit resets every 60s (unlike
-// GOAL API's own 15-min sliding window), so one retry after a real pause
-// is enough -- reads the server's own Retry-After when present, falls back
-// to a flat 60s otherwise.
+// syncLiveScores.js's own frequent per-league polling, standings-sync, this
+// file's own per-fixture head-to-head calls) crashed the whole run instead
+// of just costing a short wait. football-data.org's limit resets every 60s
+// (unlike GOAL API's own 15-min sliding window), so one retry after a real
+// pause is enough -- reads the server's own Retry-After when present, falls
+// back to a flat 60s otherwise.
 const RETRY_ATTEMPTS = 1;
 const DEFAULT_RETRY_WAIT_MS = 60000;
 
