@@ -99,6 +99,24 @@ async function pollOnce(supabase) {
 
   for (const m of matches) {
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') stillLive = true;
+
+    // Piggybacks referee onto this same already-fetched response instead of
+    // a separate call anywhere else -- confirmed live (2026-09-06) this app
+    // had grown a dedicated referee fetch in syncLineups.js's own 15-min
+    // loop, calling this exact same per-competition endpoint a second time
+    // for data this poll already has for free. This function already
+    // fetches every one of today's matches (any status) for every league
+    // at least once per invocation regardless of whether anything's live,
+    // so a scheduled fixture's referee lands here the moment football-
+    // data.org assigns it, at zero extra request cost. .is('referee', null)
+    // skips the write once it's already set, rather than re-writing the
+    // same value on every poll.
+    const referee = m.referees?.find((r) => r.type === 'REFEREE')?.name ?? m.referees?.[0]?.name ?? null;
+    if (referee) {
+      const { error: refereeErr } = await supabase.from('fixtures').update({ referee }).eq('external_fixture_id', m.id).is('referee', null);
+      if (refereeErr) console.error(`Failed to update referee for match ${m.id}:`, refereeErr.message);
+    }
+
     if (m.status !== 'IN_PLAY' && m.status !== 'PAUSED' && m.status !== 'FINISHED') continue;
 
     const newStatus = STATUS_MAP[m.status] || 'live';
