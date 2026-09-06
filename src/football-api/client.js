@@ -7,6 +7,20 @@
 // leagues, per the briefing's named fallback option.
 const BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://api.football-data.org/v4';
 
+// Confirmed live (2026-09-06): head-to-head-sync.yml failing outright with
+// a 429 on its very first request, well within its own 30-calls-at-6.5s
+// budget -- this client had NO retry at all, unlike goalApiClient.js's own
+// 429/502 backoff, so any transient hit on football-data.org's shared
+// 10-req/min budget (several jobs draw from the same key: syncFixtures.js,
+// syncLineups.js's own referee fetch, standings-sync, this file's own
+// per-fixture head-to-head calls) crashed the whole run instead of just
+// costing a short wait. football-data.org's limit resets every 60s (unlike
+// GOAL API's own 15-min sliding window), so one retry after a real pause
+// is enough -- reads the server's own Retry-After when present, falls back
+// to a flat 60s otherwise.
+const RETRY_ATTEMPTS = 1;
+const DEFAULT_RETRY_WAIT_MS = 60000;
+
 async function call(path, params = {}) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) {
@@ -18,16 +32,24 @@ async function call(path, params = {}) {
     if (value !== undefined && value !== null) url.searchParams.set(key, value);
   }
 
-  const res = await fetch(url, {
-    headers: { 'X-Auth-Token': apiKey },
-  });
+  for (let attempt = 0; attempt <= RETRY_ATTEMPTS; attempt++) {
+    const res = await fetch(url, {
+      headers: { 'X-Auth-Token': apiKey },
+    });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`football-data.org request failed: ${res.status} ${res.statusText} ${body}`);
+    if (res.ok) return res.json();
+
+    const isRetryable = res.status === 429;
+    if (!isRetryable || attempt === RETRY_ATTEMPTS) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`football-data.org request failed: ${res.status} ${res.statusText} ${body}`);
+    }
+
+    const retryAfterSec = Number(res.headers.get('retry-after'));
+    const wait = Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec * 1000 : DEFAULT_RETRY_WAIT_MS;
+    console.warn(`football-data.org rate limit on ${path}, retrying after ${wait}ms`);
+    await sleep(wait);
   }
-
-  return res.json();
 }
 
 // Returns the current season's teams for a competition (football-data.org
