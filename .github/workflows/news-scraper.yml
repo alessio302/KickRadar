@@ -2,29 +2,21 @@ name: News scraper
 
 on:
   schedule:
-    # Every 30 min, not 15 -- per user's own call: at 15 min, a lot of runs
-    # simply find nothing new. Gemini calls scale with how many genuinely
-    # new items exist, not with how often this runs, so the shorter
-    # interval wasn't costing extra API calls, just extra empty runs.
+    # SEASONAL THROTTLE (2026-09-06, per user request): the summer window
+    # closed ~Sept 1 and the next one (winter, opens Jan 1) is months out --
+    # transfer news volume drops to near zero in between, so the normal
+    # 30-min cadence was mostly empty runs burning GitHub Actions minutes
+    # for nothing. Dropped to once a week for this dead period; a scheduled
+    # reminder (self-fired into this Claude session, ~a few weeks before
+    # the Jan 1 window) prompts switching this back to the line below.
+    # Monday 03:00 UTC -- arbitrary low-traffic slot, doesn't collide with
+    # any other workflow's own offset.
     #
-    # Offset to :04/:34, not the round :00/:30 marks -- confirmed live:
-    # this workflow, live-scores.yml and lineups-sync.yml all sharing the
-    # literal "*/15 * * * *" pattern meant three scheduled runs queuing at
-    # the exact same instant, every 15 minutes, all day. GitHub Actions'
-    # scheduler is documented best-effort and deprioritizes exactly this
-    # kind of same-tick contention -- confirmed via actual run history:
-    # average gap ended up ~70 min instead of 15, with individual gaps up
-    # to 5+ hours. Staggering the workflows' minutes apart is the standard
-    # mitigation for this, and still applies at 30 min: :04/:34 doesn't
-    # collide with live-scores' :09/:24/:39/:54 or lineups-sync's
-    # :14/:29/:44/:59. For an HTML-scraped source with a bounded "latest N"
-    # list (marca.js, footmercato.js), a long enough gap during a busy news
-    # day can still let a genuinely new item scroll off the list before any
-    # run ever sees it -- worth knowing this raises that risk somewhat
-    # versus 15 min, though real-world gaps were already averaging ~70 min
-    # even at the old nominal 15-min setting, so 30 min mostly matches
-    # observed reality rather than meaningfully widening it.
-    - cron: '4,34 * * * *'
+    # Normal in-window cadence (restore verbatim when re-enabling):
+    #   - cron: '4,34 * * * *'
+    # That comment's own reasoning (why 30 not 15 min, why :04/:34 not
+    # :00/:30) still applies unchanged once restored.
+    - cron: '0 3 * * 1'
   workflow_dispatch: {}
 
 jobs:
