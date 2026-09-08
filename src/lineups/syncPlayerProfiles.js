@@ -95,7 +95,7 @@ async function throttledGapFillCall(fn) {
 async function gapFillProfile(playerName, candidateClubNames) {
   try {
     const results = await throttledGapFillCall(() => searchPlayers(playerName));
-    const match = pickBestMatch(results, candidateClubNames);
+    const match = pickBestMatch(results, candidateClubNames, playerName);
     if (!match) return null;
 
     const profile = await throttledGapFillCall(() => getPlayer(match.id));
