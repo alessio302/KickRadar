@@ -49,9 +49,14 @@ function loginPage(showError) {
     box-sizing: border-box; border: 1px solid #3D2A22; }
   h1 { font-size: 17px; margin: 0 0 4px; text-align: center; }
   p.sub { font-size: 13px; color: #8A909B; text-align: center; margin: 0 0 20px; }
-  input { width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; border: 1px solid #3D2A22;
-    background: #150F0C; color: #F2F3F5; font-size: 15px; margin-bottom: 14px; }
-  button { width: 100%; padding: 11px; border-radius: 10px; border: none; background: #E2896B; color: #3A140A;
+  input { width: 100%; box-sizing: border-box; padding: 11px 44px 11px 14px; border-radius: 10px; border: 1px solid #3D2A22;
+    background: #150F0C; color: #F2F3F5; font-size: 15px; }
+  .pw-field { position: relative; margin-bottom: 14px; }
+  .pw-toggle { position: absolute; top: 0; right: 0; bottom: 0; width: 40px; padding: 0; margin: 0;
+    background: transparent; border: none; display: flex; align-items: center; justify-content: center;
+    color: #8A909B; cursor: pointer; }
+  .pw-toggle svg { width: 19px; height: 19px; }
+  button[type="submit"] { width: 100%; padding: 11px; border-radius: 10px; border: none; background: #E2896B; color: #3A140A;
     font-weight: 700; font-size: 15px; cursor: pointer; }
   p.error { color: #EF4444; font-size: 13px; text-align: center; margin: -6px 0 14px; }
 </style>
@@ -61,9 +66,27 @@ function loginPage(showError) {
     <h1>KickRadar</h1>
     <p class="sub">Privater Test-Build</p>
     ${showError ? '<p class="error">Falsches Passwort.</p>' : ''}
-    <input type="password" name="password" placeholder="Passwort" autofocus required />
+    <div class="pw-field">
+      <input type="password" id="pw" name="password" placeholder="Passwort" autofocus required />
+      <button type="button" class="pw-toggle" id="pwToggle" aria-label="Passwort anzeigen">
+        <svg id="pwIconShow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg id="pwIconHide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-3.2 2.87A9.12 9.12 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 4.22-5.94"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+      </button>
+    </div>
     <button type="submit">Öffnen</button>
   </form>
+  <script>
+    document.getElementById('pwToggle').addEventListener('click', function () {
+      var pw = document.getElementById('pw');
+      var show = document.getElementById('pwIconShow');
+      var hide = document.getElementById('pwIconHide');
+      var toShow = pw.type === 'password';
+      pw.type = toShow ? 'text' : 'password';
+      show.style.display = toShow ? 'none' : 'block';
+      hide.style.display = toShow ? 'block' : 'none';
+      this.setAttribute('aria-label', toShow ? 'Passwort verbergen' : 'Passwort anzeigen');
+    });
+  </script>
 </body>
 </html>`;
 }
