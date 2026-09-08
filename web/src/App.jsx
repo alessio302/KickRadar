@@ -260,7 +260,31 @@ export default function App() {
     <div
       style={{
         background: theme.bg,
-        height: '100dvh',
+        // User-reported (screenshot, iPhone, installed Home Screen PWA):
+        // a large solid-black gap appeared below the bottom nav, not the
+        // app's own background colour -- much bigger than the "known dvh-
+        // vs-actual-visual-viewport rounding gap" this file's own pre-
+        // existing effect above already anticipated (the one that syncs
+        // html/body's background to theme.bg specifically to hide that
+        // gap's *color*, on the assumption it'd stay pixel-small). Black,
+        // not the app's own bg, means whatever's showing through isn't
+        // html/body at all -- most likely WKWebView's own native layer
+        // beneath the page, which CSS/JS can't reach or recolor.
+        // 100dvh's real-world unreliability specifically in an iOS
+        // *standalone* PWA is a known WebKit quirk (no dynamic browser
+        // chrome to react to there, unlike a normal Safari tab, yet the
+        // reported value can still land short of the true visible
+        // viewport) -- aggravated further here by this file's own status-
+        // bar-style effect below flipping the status bar opaque
+        // ('default')/translucent ('black-translucent') at runtime based
+        // on the resolved theme, changing how much of the screen WebKit
+        // actually gives the page after 100dvh was first computed. 100svh
+        // (small viewport height) is the standard fix for this class of
+        // bug: it's defined to never exceed the true minimum visible
+        // viewport, so the app shell undershoots the screen by at most a
+        // few px instead of risking a native-layer gap of unpredictable
+        // size showing through underneath.
+        height: '100svh',
         display: 'flex',
         flexDirection: 'column',
         color: theme.text,
