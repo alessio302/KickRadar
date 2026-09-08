@@ -32,14 +32,8 @@ const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1', 'la-
 // header and small highlights -- bg/surface/surfaceRaised/border are all
 // part of the palette below, each a muted, low-saturation version of the
 // accent hue (dark and desaturated in dark mode, pale in light mode) so
-// text stays readable without needing its own per-accent colour. headerTint
-// is a richer, more saturated version of the same hue that the app-header
-// gradient (see the header markup below) blends *from*, fading into
-// theme.bg -- both ends close enough to theme.bg's own lightness that
-// theme.text/theme.textMuted (fixed neutrals, shared by every accent --
-// see the theme object below) contrast correctly across the whole band
-// without a separate header-only text colour. danger stays fixed too: it's
-// semantic (errors/relegation), not a brand colour.
+// text stays readable without needing its own per-accent colour. danger
+// stays fixed too: it's semantic (errors/relegation), not a brand colour.
 const ACCENT_PALETTES = {
   terracotta: {
     dark: {
@@ -49,7 +43,6 @@ const ACCENT_PALETTES = {
       surface: '#1F1613',
       surfaceRaised: '#2A1D18',
       border: '#3D2A22',
-      headerTint: '#4A2E1E',
     },
     light: {
       accent: '#954730',
@@ -58,7 +51,6 @@ const ACCENT_PALETTES = {
       surface: '#F7E9E0',
       surfaceRaised: '#F3E0D3',
       border: '#E8D2C2',
-      headerTint: '#F0D3BE',
     },
   },
   violet: {
@@ -69,7 +61,6 @@ const ACCENT_PALETTES = {
       surface: '#1A1430',
       surfaceRaised: '#241C40',
       border: '#362A57',
-      headerTint: '#3A2D70',
     },
     light: {
       accent: '#6A52E0',
@@ -78,7 +69,6 @@ const ACCENT_PALETTES = {
       surface: '#E9E3FB',
       surfaceRaised: '#DED5F8',
       border: '#CFC3F2',
-      headerTint: '#D8CBFA',
     },
   },
   green: {
@@ -89,7 +79,6 @@ const ACCENT_PALETTES = {
       surface: '#12241A',
       surfaceRaised: '#1A3226',
       border: '#254738',
-      headerTint: '#1B4530',
     },
     light: {
       accent: '#1E8E5A',
@@ -98,7 +87,6 @@ const ACCENT_PALETTES = {
       surface: '#DFF3E6',
       surfaceRaised: '#D2EDDC',
       border: '#BFE3CE',
-      headerTint: '#C7ECD5',
     },
   },
 };
@@ -202,17 +190,17 @@ export default function App() {
   // League dots and club badges keep their own colors for quick visual
   // recognition; selection/highlighting elsewhere runs through the accent
   // color via underline/border + bold, not fill. bg/surface/surfaceRaised/
-  // border/accent/accentText/headerTint all come from the user's chosen
-  // ACCENT_PALETTES entry (Einstellungen > Akzentfarbe, terracotta by
-  // default) -- text/textMuted/danger are the only neutrals that stay
-  // fixed regardless of which accent is picked, so copy/errors read the
-  // same everywhere while every surface takes on the chosen hue. danger is
-  // a clean, unambiguous red rather than an orange-red -- confirmed live:
-  // the previous #FF6B5E/#B23A2E leaned close enough to terracotta's own
-  // orange that next to the violet/green accents it read as a leftover
-  // terracotta element by mistake (and would have next to terracotta's own
-  // accent too, just less obviously). A red with no orange in it stays
-  // visually distinct from all three accents at once.
+  // border/accent/accentText all come from the user's chosen ACCENT_PALETTES
+  // entry (Einstellungen > Akzentfarbe, terracotta by default) --
+  // text/textMuted/danger are the only neutrals that stay fixed regardless
+  // of which accent is picked, so copy/errors read the same everywhere
+  // while every surface takes on the chosen hue. danger is a clean,
+  // unambiguous red rather than an orange-red -- confirmed live: the
+  // previous #FF6B5E/#B23A2E leaned close enough to terracotta's own orange
+  // that next to the violet/green accents it read as a leftover terracotta
+  // element by mistake (and would have next to terracotta's own accent too,
+  // just less obviously). A red with no orange in it stays visually
+  // distinct from all three accents at once.
   const accentPalette = (ACCENT_PALETTES[accentColor] ?? ACCENT_PALETTES.terracotta)[isDark ? 'dark' : 'light'];
   const theme = isDark
     ? {
@@ -229,7 +217,6 @@ export default function App() {
         danger: '#C0342B',
         ...accentPalette,
       };
-  theme.headerGradient = `linear-gradient(160deg, ${theme.headerTint}, ${theme.bg})`;
 
   // Confirmed live: iOS drew the status bar area as its own opaque white
   // bar regardless of the app's actual theme, since index.html's static
@@ -257,18 +244,18 @@ export default function App() {
   }, [isDark, theme.bg]);
 
   // App-shell layout: the page itself never scrolls (html/body/#root are
-  // pinned to 100% height, see index.html), only the content area between
-  // header and bottom nav does (flex: 1, overflowY: auto below). Confirmed
-  // live: position: fixed with hand-tuned padding to compensate wasn't
-  // reliable either -- the header still disappeared on scroll. This is the
-  // standard "app shell" layout instead: header and nav are just normal
-  // flex children with fixed (shrink-proof) height, so there's nothing for
-  // scroll position to affect them at all, no padding math needed to keep
-  // content from sliding under them, and no viewport-resize interaction to
-  // account for. env(safe-area-inset-*): header sits under the notch/
-  // Dynamic Island and the nav under the home indicator otherwise
-  // (viewport-fit=cover in index.html opts into content extending under
-  // both).
+  // pinned to 100% height, see index.html), only the content area above
+  // the bottom nav does (flex: 1, overflowY: auto below). Confirmed live:
+  // position: fixed with hand-tuned padding to compensate wasn't reliable
+  // either -- a fixed bar still disappeared on scroll. This is the
+  // standard "app shell" layout instead: the bottom nav is a normal flex
+  // child with fixed (shrink-proof) height, so there's nothing for scroll
+  // position to affect it at all, no padding math needed to keep content
+  // from sliding under it, and no viewport-resize interaction to account
+  // for. env(safe-area-inset-*): the outer container's paddingTop clears
+  // the notch/Dynamic Island, and the nav clears the home indicator
+  // otherwise (viewport-fit=cover in index.html opts into content
+  // extending under both).
   return (
     <div
       style={{
@@ -281,53 +268,18 @@ export default function App() {
         // in index.html. Fallback stack matches the exports' own too
         // (-apple-system/BlinkMacSystemFont/SF Pro Display/Helvetica/
         // Arial/sans-serif), not a generic 'sans-serif' guess. Everywhere
-        // else in the app inherits this from the root instead of setting
-        // its own fontFamily (grep confirms only the "KickRadar" wordmark
-        // below overrides it, intentionally, with Orbitron).
+        // else in the app inherits this from the root.
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', Helvetica, Arial, sans-serif",
         maxWidth: '420px',
         margin: '0 auto',
+        // No app-level title bar (per-screen name / "KickRadar" wordmark
+        // removed to reclaim vertical space -- each tab's own sub-header
+        // is now the first visible element). The safe-area reservation
+        // that used to live on that title bar's paddingTop moves here so
+        // content still clears the notch/Dynamic Island on iOS.
+        paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      {/* Per-screen title (Spiele/Tabelle/Einstellungen) rather than a
-          fixed "KickRadar" wordmark on every tab -- per redesign feedback,
-          each screen gets its own identity instead of one static app title
-          regardless of where you are. The Transfers tab is the exception:
-          as the app's default/home tab it keeps the wordmark, so the brand
-          still shows up somewhere. The gradient tints from the user's
-          chosen accent colour (theme.headerTint, see ACCENT_PALETTES
-          above) into theme.bg -- both ends close enough to theme.bg's own
-          lightness that theme.text/theme.textMuted stay readable across
-          the whole band without a separate header-only text colour. */}
-      <div
-        style={{
-          flexShrink: 0,
-          background: theme.headerGradient,
-          padding: '18px 16px 14px',
-          paddingTop: 'calc(18px + env(safe-area-inset-top))',
-        }}
-      >
-        {tab === 'transfers' ? (
-          <h1
-            style={{
-              fontFamily: "'Orbitron', sans-serif",
-              fontSize: '20px',
-              fontWeight: 800,
-              letterSpacing: '0.02em',
-              margin: 0,
-              textTransform: 'uppercase',
-              textAlign: 'center',
-            }}
-          >
-            KickRadar
-          </h1>
-        ) : (
-          <h1 style={{ fontSize: '21px', fontWeight: 700, margin: 0 }}>
-            {tab === 'spiele' ? t.nav.fixtures : tab === 'tabelle' ? t.nav.standings : t.nav.settings}
-          </h1>
-        )}
-      </div>
-
       {/* Doesn't scroll itself: each tab manages its own internal split
           between a pinned sub-header (league switcher, quick filters,
           toggles -- confirmed live these should stay visible too, not
