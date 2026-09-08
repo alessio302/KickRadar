@@ -144,14 +144,38 @@ function extractClubAndNationality(profile) {
 // GOAL API's player search is global (~1000 leagues, same collision risk
 // as league name search -- see config/leagues.js) -- a bare name search
 // for something like "Silva" can return several unrelated real players.
-// Only trusts a result when it's the sole hit, or when exactly one hit's
+// Only trusts a result when it's the sole hit, when exactly one hit's full
+// name exactly matches what was searched for, or when exactly one hit's
 // current club matches one of the clubs this transfer story already
 // resolved (from_club/to_club) -- multiple ambiguous matches are left
 // unresolved rather than guessed at, same principle
 // runNewsScraper.js's lookupSquadMembership() already applies.
-export function pickBestMatch(results, candidateClubNames) {
+//
+// Confirmed live (2026-09-08, syncPlayerProfiles.js's own ~44%-of-players
+// gap-fill failure rate): GOAL API's `team` field on a search result can
+// show a player's NATIONAL team instead of their real club with no
+// relation at all to an actual international break on the calendar --
+// reproduced on a Champions League matchday for three current Bayern
+// players (Laimer/Olise/Stanišić), each showing Austria/France/Croatia as
+// `team` while set to play Bayern's next European tie days later. The
+// club-based scoring below silently rejected all three, even though each
+// was the exact, uniquely-named top hit. Checked first, before the club
+// fallback: two different real top-flight players sharing an identical
+// full name is far rarer than sharing just a surname, and the caller
+// already knows independently (football-data.org's own squad list here,
+// a transfer story's own byline in the news-scraper path) that this exact
+// name belongs on this club, making a correct team-field cross-check
+// merely a nice-to-have, not something a match should be rejected for
+// lacking.
+export function pickBestMatch(results, candidateClubNames, searchedName) {
   if (results.length === 0) return null;
   if (results.length === 1) return results[0];
+
+  if (searchedName) {
+    const target = normalize(searchedName);
+    const exact = results.filter((r) => normalize(r.name || '') === target);
+    if (exact.length === 1) return exact[0];
+  }
 
   const candidates = candidateClubNames.filter(Boolean).map(normalize);
   const scored = results.filter((r) => {
@@ -197,7 +221,7 @@ export function buildProfileFields(profile) {
 export async function resolveGoalApiProfile(playerName, candidateClubNames) {
   try {
     const results = await throttleGoalApi(() => searchPlayers(playerName));
-    const match = pickBestMatch(results, candidateClubNames);
+    const match = pickBestMatch(results, candidateClubNames, playerName);
     if (!match) return null;
 
     const profile = await throttleGoalApi(() => getPlayer(match.id));
