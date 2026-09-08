@@ -161,6 +161,8 @@ const de = {
     legal: 'Rechtliches',
     imprint: 'Impressum',
     privacyPolicy: 'Datenschutz',
+    dataSource: 'Datenquellen',
+    dataSourceAttribution: 'Football data provided by the Football-Data.org API. Weitere Daten: GOAL API.',
   },
   quickFilters: {
     addAria: 'Quick-Filter hinzufügen',
@@ -315,6 +317,8 @@ const en = {
     legal: 'Legal',
     imprint: 'Imprint',
     privacyPolicy: 'Privacy Policy',
+    dataSource: 'Data sources',
+    dataSourceAttribution: 'Football data provided by the Football-Data.org API. Additional data: GOAL API.',
   },
   quickFilters: {
     addAria: 'Add quick filter',
@@ -469,6 +473,8 @@ const it = {
     legal: 'Note legali',
     imprint: 'Impressum',
     privacyPolicy: 'Privacy',
+    dataSource: 'Fonti dei dati',
+    dataSourceAttribution: 'Football data provided by the Football-Data.org API. Altri dati: GOAL API.',
   },
   quickFilters: {
     addAria: 'Aggiungi filtro rapido',
@@ -623,6 +629,8 @@ const fr = {
     legal: 'Informations légales',
     imprint: 'Mentions légales',
     privacyPolicy: 'Confidentialité',
+    dataSource: 'Sources de données',
+    dataSourceAttribution: 'Football data provided by the Football-Data.org API. Autres données : GOAL API.',
   },
   quickFilters: {
     addAria: 'Ajouter un filtre rapide',
@@ -777,6 +785,8 @@ const es = {
     legal: 'Aspectos legales',
     imprint: 'Aviso legal',
     privacyPolicy: 'Privacidad',
+    dataSource: 'Fuentes de datos',
+    dataSourceAttribution: 'Football data provided by the Football-Data.org API. Otros datos: GOAL API.',
   },
   quickFilters: {
     addAria: 'Añadir filtro rápido',

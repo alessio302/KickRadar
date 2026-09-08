@@ -323,6 +323,9 @@ export default function SettingsTab({
         <a href="/impressum.html" style={{ fontSize: '13px', color: theme.textMuted }}>{t.settings.imprint}</a>
         <a href="/datenschutz.html" style={{ fontSize: '13px', color: theme.textMuted }}>{t.settings.privacyPolicy}</a>
       </div>
+
+      <p style={{ ...SECTION_LABEL_STYLE, color: theme.textMuted }}>{t.settings.dataSource}</p>
+      <p style={{ fontSize: '12px', color: theme.textMuted, margin: 0 }}>{t.settings.dataSourceAttribution}</p>
     </div>
   );
 }
