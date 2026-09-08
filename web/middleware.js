@@ -68,8 +68,29 @@ function loginPage(showError) {
 </html>`;
 }
 
+// Requests the installed PWA's own machinery makes on its own, with no
+// user around to type a password: the service worker's background
+// update check (a plain fetch of its own script -- browsers treat a
+// redirected response to that fetch as an update failure and silently
+// stop checking forever) and the static/precached JS/CSS/icons/manifest
+// it and the app shell reference. These carry no page content of their
+// own to protect -- gating them only breaks updates for people who
+// already got in once. Actual navigations (`/`, deep links, etc.) still
+// hit the branches below and stay gated.
+const BYPASS_EXACT = new Set(['/sw.js', '/registerSW.js', '/manifest.webmanifest']);
+const BYPASS_EXT = /\.(js|mjs|css|json|webmanifest|png|jpg|jpeg|svg|gif|ico|woff2?|ttf)$/i;
+
+function isBypassed(pathname) {
+  return BYPASS_EXACT.has(pathname) || BYPASS_EXT.test(pathname);
+}
+
 export default async function middleware(req) {
   const url = new URL(req.url);
+
+  if (isBypassed(url.pathname)) {
+    return undefined;
+  }
+
   const expected = await signature();
   const authed = isAuthed(req, expected);
 
