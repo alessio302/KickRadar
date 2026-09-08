@@ -1,6 +1,8 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES } from '../config/leagues.js';
 import { getMatches, sleep, STATUS_MAP } from './client.js';
+import { sendPushToFixtureFavoriters } from '../push/sendPush.js';
+import { buildFixtureStatusPayloads } from '../push/fixtureNotifier.js';
 
 // Confirmed live (Bayern-Stuttgart, 2026-08-28): the global, multi-
 // competition /matches endpoint (getMatchesForDate) silently returned 0
@@ -81,19 +83,80 @@ async function hasFixtureStartingSoon(supabase) {
   return (count ?? 0) > 0;
 }
 
+// Kickoff/full-time push for whoever favorited this fixture -- piggybacked
+// on this loop's own status write rather than a separate poller, since this
+// is exactly the place that already knows the moment football-data.org
+// reports the transition. Only two milestones map here; the 30/15-minute
+// pre-kickoff reminders are a separate, always-on poller (see
+// sendFixtureReminders.js) since they need to fire well before this loop
+// even wakes up (see UPCOMING_WINDOW_MS above -- this only starts polling
+// within 10 minutes of kickoff, too late for a 30-minute reminder).
+//
+// fixture_reminders_sent's primary key (fixture_id, milestone) is the only
+// thing preventing a duplicate push here, not the newStatus check --
+// 'live' stays true on every single poll tick for a match's whole duration
+// (~45+ ticks at 2min/poll), so the insert-as-claim below is what makes
+// only the first tick actually send anything, same pattern as
+// matchEventNotifier.js's notified_match_events.
+const MILESTONE_BY_STATUS = { live: 'kickoff', finished: 'finished' };
+
+async function notifyFixtureStatusChange(supabase, clubById, fixtureRow, leagueSlug, newStatus, homeScore, awayScore) {
+  const milestone = MILESTONE_BY_STATUS[newStatus];
+  if (!milestone) return;
+
+  const { count, error: favErr } = await supabase
+    .from('favorite_fixtures')
+    .select('id', { count: 'exact', head: true })
+    .eq('fixture_id', fixtureRow.id);
+  if (favErr) {
+    console.error(`Failed to check favorites for fixture ${fixtureRow.id}:`, favErr.message);
+    return;
+  }
+  if (!count) return; // no work at all for a fixture nobody favorited
+
+  const { error: claimErr } = await supabase.from('fixture_reminders_sent').insert({ fixture_id: fixtureRow.id, milestone });
+  if (claimErr) {
+    if (claimErr.code !== '23505') console.error(`Failed to claim ${milestone} for fixture ${fixtureRow.id}:`, claimErr.message);
+    return;
+  }
+
+  const homeClub = clubById.get(fixtureRow.home_club_id);
+  const awayClub = clubById.get(fixtureRow.away_club_id);
+  if (!homeClub || !awayClub || !leagueSlug) return;
+
+  const payloads = buildFixtureStatusPayloads({
+    milestone,
+    homeClub,
+    awayClub,
+    leagueSlug,
+    fixtureId: fixtureRow.id,
+    homeScore,
+    awayScore,
+  });
+  try {
+    await sendPushToFixtureFavoriters(fixtureRow.id, payloads);
+  } catch (err) {
+    console.error(`Failed to push ${milestone} for fixture ${fixtureRow.id}:`, err.message);
+  }
+}
+
 // Deliberately not scoped to status=LIVE -- a match that just finished
 // would silently drop out of that filter on the very next poll, leaving
 // its final score/status un-written until the next 4x-daily fixtures-sync
 // run (hours later) instead of within this same ~75s cycle. Fetching each
 // league's full match list once and updating every live-or-finished row in
 // it catches that transition for free, no cross-poll state needed.
-async function pollOnce(supabase) {
+async function pollOnce(supabase, clubById) {
   const date = toDateString(new Date());
   const matches = [];
   for (const league of LEAGUES) {
     try {
       const leagueMatches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: date, dateTo: date });
-      matches.push(...leagueMatches);
+      // Tagged with this league's own slug now, before the per-league
+      // arrays get flattened into one below -- notifyFixtureStatusChange()
+      // needs it for the push payload's deep-link URL, and there's no other
+      // way to recover which league a given match came from afterwards.
+      matches.push(...leagueMatches.map((m) => ({ ...m, _leagueSlug: league.slug })));
     } catch (err) {
       // A single league's request failing (rate limit, transient network
       // error) shouldn't cost the whole poll -- the other 4 leagues' data
@@ -130,20 +193,28 @@ async function pollOnce(supabase) {
     if (m.status !== 'IN_PLAY' && m.status !== 'PAUSED' && m.status !== 'FINISHED') continue;
 
     const newStatus = STATUS_MAP[m.status] || 'live';
-    const { error } = await supabase
+    const homeScore = m.score?.fullTime?.home ?? null;
+    const awayScore = m.score?.fullTime?.away ?? null;
+    const { data: updatedRows, error } = await supabase
       .from('fixtures')
       .update({
         status: newStatus,
-        home_score: m.score?.fullTime?.home ?? null,
-        away_score: m.score?.fullTime?.away ?? null,
+        home_score: homeScore,
+        away_score: awayScore,
         updated_at: new Date().toISOString(),
       })
-      .eq('external_fixture_id', m.id);
+      .eq('external_fixture_id', m.id)
+      .select('id, home_club_id, away_club_id');
     if (error) {
       console.error(`Failed to update live score for match ${m.id}:`, error.message);
       continue;
     }
     updated += 1;
+
+    const fixtureRow = updatedRows?.[0];
+    if (fixtureRow) {
+      await notifyFixtureStatusChange(supabase, clubById, fixtureRow, m._leagueSlug, newStatus, homeScore, awayScore);
+    }
 
     // Not cleared here on newStatus === 'finished' -- confirmed live this
     // was tried and immediately conflicted with the highlight-video push
@@ -161,12 +232,20 @@ async function pollOnce(supabase) {
 
 export async function syncLiveScores() {
   const supabase = getSupabaseClient();
+
+  // Loaded once per invocation, not per poll tick -- club identity/crest
+  // don't change mid-run, and this loop can tick dozens of times across a
+  // long live window.
+  const { data: clubs, error: clubsErr } = await supabase.from('clubs').select('id, name, crest_url');
+  if (clubsErr) throw clubsErr;
+  const clubById = new Map(clubs.map((c) => [c.id, c]));
+
   const deadline = Date.now() + JOB_BUDGET_MS;
   let polls = 0;
   let totalUpdated = 0;
 
   while (Date.now() < deadline) {
-    const { updated, stillLive } = await pollOnce(supabase);
+    const { updated, stillLive } = await pollOnce(supabase, clubById);
     polls += 1;
     totalUpdated += updated;
 

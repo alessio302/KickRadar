@@ -38,6 +38,13 @@
 // card/substitution announcements), not idiomatic phrasing that needs the
 // same real-usage verification lineupTitle/rumor above needed -- these are
 // the plain vocabulary words themselves.
+//
+// fixtureReminder/matchStarted/matchFinished: same "plain broadcast
+// vocabulary, not an idiom to verify" case as matchEvent -- kickoff/full-
+// time terminology is about as standardized as football language gets in
+// each of these five languages (Anstoß/Anpfiff/Abpfiff; kick-off/full-
+// time; fischio d'inizio/fischio finale; coup d'envoi/fin du match; pitido
+// inicial/pitido final).
 export const PUSH_STRINGS = {
   de: {
     official: 'Offiziell',
@@ -51,6 +58,9 @@ export const PUSH_STRINGS = {
       substitution: { icon: '🔄', title: 'Wechsel' },
     },
     highlights: { title: '🎥 Highlights verfügbar' },
+    fixtureReminder: { icon: '⏱️', title: (mins) => `Anstoß in ${mins} Minuten` },
+    matchStarted: { icon: '🟢', title: 'Anpfiff!' },
+    matchFinished: { icon: '🏁', title: 'Abpfiff' },
   },
   en: {
     official: 'Official',
@@ -64,6 +74,9 @@ export const PUSH_STRINGS = {
       substitution: { icon: '🔄', title: 'Substitution' },
     },
     highlights: { title: '🎥 Highlights available' },
+    fixtureReminder: { icon: '⏱️', title: (mins) => `Kick-off in ${mins} minutes` },
+    matchStarted: { icon: '🟢', title: 'Kick-off!' },
+    matchFinished: { icon: '🏁', title: 'Full-time' },
   },
   it: {
     official: 'Ufficiale',
@@ -77,6 +90,9 @@ export const PUSH_STRINGS = {
       substitution: { icon: '🔄', title: 'Cambio' },
     },
     highlights: { title: '🎥 Highlights disponibili' },
+    fixtureReminder: { icon: '⏱️', title: (mins) => `Fischio d'inizio tra ${mins} minuti` },
+    matchStarted: { icon: '🟢', title: "Fischio d'inizio!" },
+    matchFinished: { icon: '🏁', title: 'Fischio finale' },
   },
   fr: {
     official: 'Officiel',
@@ -90,6 +106,9 @@ export const PUSH_STRINGS = {
       substitution: { icon: '🔄', title: 'Changement' },
     },
     highlights: { title: '🎥 Highlights disponibles' },
+    fixtureReminder: { icon: '⏱️', title: (mins) => `Coup d'envoi dans ${mins} minutes` },
+    matchStarted: { icon: '🟢', title: "Coup d'envoi !" },
+    matchFinished: { icon: '🏁', title: 'Fin du match' },
   },
   es: {
     official: 'Oficial',
@@ -103,6 +122,9 @@ export const PUSH_STRINGS = {
       substitution: { icon: '🔄', title: 'Cambio' },
     },
     highlights: { title: '🎥 Highlights disponibles' },
+    fixtureReminder: { icon: '⏱️', title: (mins) => `Pitido inicial en ${mins} minutos` },
+    matchStarted: { icon: '🟢', title: '¡Pitido inicial!' },
+    matchFinished: { icon: '🏁', title: 'Pitido final' },
   },
 };
 
