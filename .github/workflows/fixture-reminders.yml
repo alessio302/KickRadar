@@ -1,0 +1,35 @@
+name: Fixture kickoff reminders
+
+# Every 5 minutes, offset from other workflows' :00/:15/:30/:45-based marks
+# to avoid GitHub Actions' scheduler throttling multiple jobs sharing the
+# same literal cron pattern (see news-scraper.yml's own comment on this).
+# Needs to run more often than any of the other 15-min-cadence jobs since
+# it's the only thing responsible for the 30/15-minute-before-kickoff
+# pushes -- syncLiveScores.js only starts polling within 10 minutes of
+# kickoff, too late for a 30-minute reminder.
+on:
+  schedule:
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: fixture-reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/push/sendFixtureReminders.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
