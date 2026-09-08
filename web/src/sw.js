@@ -1,6 +1,23 @@
 import { precacheAndRoute } from 'workbox-precaching';
 
-precacheAndRoute(self.__WB_MANIFEST);
+// directoryIndex/cleanURLs default to mapping a navigation to "/" onto the
+// precached index.html entry, served cache-first with no network request at
+// all. That's incompatible with middleware.js's login gate: this SW's very
+// first install after the gate shipped fetched "/" from the network while
+// unauthenticated, got redirected to /login, and (since a redirected 200 is
+// still just a 200 to fetch()) cached that login page AS index.html --
+// permanently, since Workbox only re-fetches a precache entry when its
+// content hash changes, not on every load. Every later visit, even after
+// entering the correct password, re-served that same frozen login page
+// before the corrected request could ever reach the server. Disabling both
+// options here stops "/" from resolving to the precache at all, so every
+// navigation always hits the network (and therefore the gate) fresh. The
+// hashed static assets (JS/CSS/icons) are requested by their literal
+// filenames and stay precached/fast regardless.
+precacheAndRoute(self.__WB_MANIFEST, {
+  directoryIndex: null,
+  cleanURLs: false,
+});
 
 // Missing until now, and likely why the last several deploys never
 // actually reached the device under test: this is a fully custom service
