@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import StandingsTab from './components/StandingsTab.jsx';
@@ -8,6 +8,82 @@ import Toast from './components/Toast.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 import { adjacentLeague } from './lib/leagues.js';
+
+// Temporary diagnostic (removed once the black-gap-under-the-nav report is
+// actually understood) -- three failed remote-guess rounds (border-box,
+// padding relocation, dvh->svh) with zero visible change on the reporter's
+// real device mean this needs real numbers from that device instead of a
+// fourth guess. Reports the actual viewport/element measurements as
+// visible on-screen text (no devtools/Mac needed) and, separately, a
+// bright fixed-position strip pinned to the true bottom of the viewport --
+// if that strip visibly reaches into the reported black area, the area is
+// part of the reachable page (a coverage/sizing bug in our own shell); if
+// a gap remains below the strip too, the black area is outside what any
+// web content on this page can reach at all (a native OS/WebView layer).
+function DebugOverlay({ shellRef }) {
+  const [info, setInfo] = useState(null);
+
+  useEffect(() => {
+    const measure = () => {
+      const rect = shellRef.current?.getBoundingClientRect();
+      setInfo({
+        innerHeight: window.innerHeight,
+        vvHeight: window.visualViewport?.height ?? null,
+        vvOffsetTop: window.visualViewport?.offsetTop ?? null,
+        docClientHeight: document.documentElement.clientHeight,
+        shellTop: rect?.top ?? null,
+        shellHeight: rect?.height ?? null,
+        shellBottom: rect?.bottom ?? null,
+        standalone: typeof navigator !== 'undefined' ? navigator.standalone ?? null : null,
+        dpr: window.devicePixelRatio,
+        screenHeight: window.screen?.height ?? null,
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, [shellRef]);
+
+  if (!info) return null;
+  return (
+    <>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 99999,
+          background: 'rgba(0,0,0,0.85)',
+          color: '#0F0',
+          fontSize: '10px',
+          fontFamily: 'monospace',
+          padding: '4px 6px',
+          whiteSpace: 'pre-wrap',
+          pointerEvents: 'none',
+        }}
+      >
+        {`innerH:${info.innerHeight} vvH:${info.vvHeight} vvTop:${info.vvOffsetTop} docClientH:${info.docClientHeight}\nshellTop:${info.shellTop} shellH:${info.shellHeight} shellBottom:${info.shellBottom}\nstandalone:${info.standalone} dpr:${info.dpr} screenH:${info.screenHeight}`}
+      </div>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '40px',
+          background: 'red',
+          zIndex: 99999,
+          pointerEvents: 'none',
+        }}
+      />
+    </>
+  );
+}
 
 function useDarkMode(mode) {
   const [systemDark, setSystemDark] = useState(
@@ -92,6 +168,7 @@ const ACCENT_PALETTES = {
 };
 
 export default function App() {
+  const shellRef = useRef(null);
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
   const [initialFixtureId, setInitialFixtureId] = useState(null);
@@ -258,6 +335,7 @@ export default function App() {
   // extending under both).
   return (
     <div
+      ref={shellRef}
       style={{
         background: theme.bg,
         // User-reported (screenshot, iPhone, installed Home Screen PWA):
@@ -382,6 +460,7 @@ export default function App() {
         <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
+      <DebugOverlay shellRef={shellRef} />
     </div>
   );
 }
