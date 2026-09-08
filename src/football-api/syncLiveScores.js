@@ -15,16 +15,26 @@ import { getMatches, sleep, STATUS_MAP } from './client.js';
 // syncFixtures.js's own loop) -- more requests per poll, but still
 // comfortably inside the free tier's 10 req/min cap.
 //
+// Backstop, not primary, since 2026-09-08: the goal-api-webhook Edge
+// Function already flips fixtures.status scheduled->live->finished and
+// writes home_score/away_score the moment GOAL API pushes match.started/
+// goal.scored/score.changed/match.finished -- confirmed live via 409 real
+// webhook deliveries sitting unused in webhook_debug_log before that
+// handler existed. This loop still exists for whatever the webhook misses
+// (a dropped delivery, GOAL API's own outage) and for referee (still only
+// available from football-data.org, piggybacked below), so 2 minutes
+// between polls is plenty to self-heal without the webhook's help, at a
+// quarter of the previous request volume during a live window.
+//
 // Free tier: 10 req/min, shared across every football-data.org caller in
 // the repo -- head-to-head-sync.js in particular already runs itself at
 // ~9.2 req/min whenever it's active (4x/day, short windows), so an overlap
 // with that job can still push the shared account-wide total over the cap
-// even with this file's own rate kept modest. 30s between polls keeps
-// pollOnce's own sustained rate to roughly 8 req/min; pollOnce() below is
+// even with this file's own rate kept modest. pollOnce() below is
 // resilient to a single league's request failing (a 429 from exactly that
 // kind of overlap, or any transient error) so a rate-limit hit skips just
 // that league for one cycle instead of aborting the whole 13-minute loop.
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 120_000;
 
 // Bounded below the workflow's own 15-min job timeout so the process exits
 // cleanly on its own before GitHub Actions would kill it mid-request, and
