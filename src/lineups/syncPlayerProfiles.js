@@ -92,20 +92,21 @@ async function throttledGapFillCall(fn) {
 // Same two-step search-then-fetch resolveGoalApiProfile() does, reusing
 // its own pickBestMatch()/buildProfileFields() so the actual matching and
 // field-shaping logic has one source -- only the pacing differs.
+//
+// Deliberately doesn't catch its own errors (unlike resolveGoalApiProfile,
+// which is a leaf call with nothing of its own to react to a failure) --
+// the caller's circuit breaker below needs to tell a real API failure
+// apart from a clean "no match", and swallowing the distinction here would
+// defeat that.
 async function gapFillProfile(playerName, candidateClubNames) {
-  try {
-    const results = await throttledGapFillCall(() => searchPlayers(playerName));
-    const match = pickBestMatch(results, candidateClubNames, playerName);
-    if (!match) return null;
+  const results = await throttledGapFillCall(() => searchPlayers(playerName));
+  const match = pickBestMatch(results, candidateClubNames, playerName);
+  if (!match) return null;
 
-    const profile = await throttledGapFillCall(() => getPlayer(match.id));
-    if (!profile) return null;
+  const profile = await throttledGapFillCall(() => getPlayer(match.id));
+  if (!profile) return null;
 
-    return buildProfileFields(profile);
-  } catch (err) {
-    console.error(`Gap-fill resolution failed for "${playerName}":`, err.message);
-    return null;
-  }
+  return buildProfileFields(profile);
 }
 
 function lastToken(name) {
@@ -219,13 +220,26 @@ export async function syncPlayerProfiles() {
   let gapFilled = 0;
   let gapUnresolved = 0;
   let gapFillBudgetLeft = MAX_GAP_FILLS_PER_RUN;
-  // A run of failures this long means GOAL API's rate-limit window is
+  // A run of *real errors* this long means GOAL API's rate-limit window is
   // genuinely contended right now (see MAX_GAP_FILLS_PER_RUN's own
   // comment) -- confirmed live, once that's true, every further attempt
   // just eats another 8-60s of goalApiClient.js's own backoff for the
   // same result. Zeroing the budget here stops burning run time on gap
   // fills that won't succeed anyway; the remaining clubs still get their
   // free in-memory matches, just no more live searches this run.
+  //
+  // Deliberately only counts thrown errors, not a clean "no match found"
+  // -- confirmed live (2026-09-08): before pickBestMatch()'s exact-name-
+  // match fix, gap-fill's success rate was 0% (a whole run: gapFilled 0,
+  // gapUnresolved 1165) purely from clean rejections (GOAL API's search
+  // returning the right player under the wrong -- national-team-fallback
+  // -- club), no errors at all. Counting those toward this breaker meant
+  // it tripped almost immediately on the very first club with several
+  // such players, zeroing gap-fill for every other club in the run for
+  // the rest of its 6h cycle, not just the one club actually having
+  // trouble. A real contended-window failure still trips it exactly as
+  // before; a run of legitimate misses (a reserve player GOAL API simply
+  // doesn't carry) no longer silently starves every later club's chance.
   const MAX_CONSECUTIVE_GAP_FILL_FAILURES = 5;
   let consecutiveGapFillFailures = 0;
 
@@ -285,17 +299,27 @@ export async function syncPlayerProfiles() {
         let resolvedFields = null;
 
         if (!goalEntry) {
+          let gapFillErrored = false;
           if (gapFillBudgetLeft > 0) {
             gapFillBudgetLeft -= 1;
-            resolvedFields = await gapFillProfile(fp.name, [club.name]);
+            try {
+              resolvedFields = await gapFillProfile(fp.name, [club.name]);
+            } catch (err) {
+              gapFillErrored = true;
+              console.error(`Gap-fill resolution failed for "${fp.name}":`, err.message);
+            }
           }
           if (resolvedFields) {
             gapFilled += 1;
             consecutiveGapFillFailures = 0;
           } else {
             gapUnresolved += 1;
-            consecutiveGapFillFailures += 1;
-            if (consecutiveGapFillFailures >= MAX_CONSECUTIVE_GAP_FILL_FAILURES) gapFillBudgetLeft = 0;
+            if (gapFillErrored) {
+              consecutiveGapFillFailures += 1;
+              if (consecutiveGapFillFailures >= MAX_CONSECUTIVE_GAP_FILL_FAILURES) gapFillBudgetLeft = 0;
+            } else {
+              consecutiveGapFillFailures = 0;
+            }
           }
         }
 
