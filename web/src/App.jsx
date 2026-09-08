@@ -272,24 +272,6 @@ export default function App() {
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', Helvetica, Arial, sans-serif",
         maxWidth: '420px',
         margin: '0 auto',
-        // No app-level title bar (per-screen name / "KickRadar" wordmark
-        // removed to reclaim vertical space -- each tab's own sub-header
-        // is now the first visible element). The safe-area reservation
-        // that used to live on that title bar's paddingTop moves here so
-        // content still clears the notch/Dynamic Island on iOS.
-        //
-        // Confirmed live on an actual iPhone (2026-09-08): this container's
-        // height:100dvh is content-box (no box-sizing reset anywhere in the
-        // app), so adding paddingTop here without border-box made the real
-        // rendered height 100dvh + the safe-area inset -- overflowing the
-        // viewport by exactly the notch height and clipping the bottom nav
-        // bar off the bottom of the screen. A desktop headless-browser
-        // screenshot missed this entirely: env(safe-area-inset-*) resolves
-        // to 0 with no notch to simulate, so the overflow only ever shows
-        // on real hardware. border-box keeps the padding inside the fixed
-        // 100dvh instead of adding to it.
-        boxSizing: 'border-box',
-        paddingTop: 'env(safe-area-inset-top)',
       }}
     >
       {/* Doesn't scroll itself: each tab manages its own internal split
@@ -297,8 +279,25 @@ export default function App() {
           toggles -- confirmed live these should stay visible too, not
           just the outer title bar) and its own scrolling list. minHeight: 0
           is required here for that nested flex:1 scroll area to size
-          correctly instead of overflowing its flex parent. */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          correctly instead of overflowing its flex parent.
+
+          paddingTop clears the notch/Dynamic Island now that there's no
+          app-level title bar to carry that safe-area reservation. Applied
+          here rather than on the outer height:100dvh container above --
+          confirmed live on an actual iPhone (2026-09-08) that adding it to
+          an element with an *explicit* height (100dvh, content-box, no
+          box-sizing reset anywhere in this app) makes the real rendered
+          height 100dvh + the safe-area inset, overflowing the viewport by
+          exactly the notch height and clipping the bottom nav off-screen.
+          This div has no explicit height at all -- flex:1 only -- so the
+          flex algorithm sizes its outer box to exactly fill the remaining
+          space regardless of its own padding, the same safe pattern the
+          old title-bar div (a plain flex sibling, not the flex container
+          itself) used. A desktop headless-browser screenshot missed the
+          original bug entirely: env(safe-area-inset-*) resolves to 0 with
+          no notch to simulate, so the overflow only ever showed on real
+          hardware. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', paddingTop: 'env(safe-area-inset-top)' }}>
         {tab === 'transfers' && (
           <TransfersTab
             theme={theme}
