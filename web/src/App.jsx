@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import StandingsTab from './components/StandingsTab.jsx';
@@ -8,82 +8,6 @@ import Toast from './components/Toast.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 import { adjacentLeague } from './lib/leagues.js';
-
-// Temporary diagnostic (removed once the black-gap-under-the-nav report is
-// actually understood) -- three failed remote-guess rounds (border-box,
-// padding relocation, dvh->svh) with zero visible change on the reporter's
-// real device mean this needs real numbers from that device instead of a
-// fourth guess. Reports the actual viewport/element measurements as
-// visible on-screen text (no devtools/Mac needed) and, separately, a
-// bright fixed-position strip pinned to the true bottom of the viewport --
-// if that strip visibly reaches into the reported black area, the area is
-// part of the reachable page (a coverage/sizing bug in our own shell); if
-// a gap remains below the strip too, the black area is outside what any
-// web content on this page can reach at all (a native OS/WebView layer).
-function DebugOverlay({ shellRef }) {
-  const [info, setInfo] = useState(null);
-
-  useEffect(() => {
-    const measure = () => {
-      const rect = shellRef.current?.getBoundingClientRect();
-      setInfo({
-        innerHeight: window.innerHeight,
-        vvHeight: window.visualViewport?.height ?? null,
-        vvOffsetTop: window.visualViewport?.offsetTop ?? null,
-        docClientHeight: document.documentElement.clientHeight,
-        shellTop: rect?.top ?? null,
-        shellHeight: rect?.height ?? null,
-        shellBottom: rect?.bottom ?? null,
-        standalone: typeof navigator !== 'undefined' ? navigator.standalone ?? null : null,
-        dpr: window.devicePixelRatio,
-        screenHeight: window.screen?.height ?? null,
-      });
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    window.visualViewport?.addEventListener('resize', measure);
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.visualViewport?.removeEventListener('resize', measure);
-    };
-  }, [shellRef]);
-
-  if (!info) return null;
-  return (
-    <>
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 99999,
-          background: 'rgba(0,0,0,0.85)',
-          color: '#0F0',
-          fontSize: '10px',
-          fontFamily: 'monospace',
-          padding: '4px 6px',
-          whiteSpace: 'pre-wrap',
-          pointerEvents: 'none',
-        }}
-      >
-        {`innerH:${info.innerHeight} vvH:${info.vvHeight} vvTop:${info.vvOffsetTop} docClientH:${info.docClientHeight}\nshellTop:${info.shellTop} shellH:${info.shellHeight} shellBottom:${info.shellBottom}\nstandalone:${info.standalone} dpr:${info.dpr} screenH:${info.screenHeight}`}
-      </div>
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '40px',
-          background: 'red',
-          zIndex: 99999,
-          pointerEvents: 'none',
-        }}
-      />
-    </>
-  );
-}
 
 function useDarkMode(mode) {
   const [systemDark, setSystemDark] = useState(
@@ -168,7 +92,6 @@ const ACCENT_PALETTES = {
 };
 
 export default function App() {
-  const shellRef = useRef(null);
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
   const [initialFixtureId, setInitialFixtureId] = useState(null);
@@ -335,33 +258,28 @@ export default function App() {
   // extending under both).
   return (
     <div
-      ref={shellRef}
       style={{
         background: theme.bg,
-        // User-reported (screenshot, iPhone, installed Home Screen PWA):
-        // a large solid-black gap appeared below the bottom nav, not the
-        // app's own background colour -- much bigger than the "known dvh-
-        // vs-actual-visual-viewport rounding gap" this file's own pre-
-        // existing effect above already anticipated (the one that syncs
-        // html/body's background to theme.bg specifically to hide that
-        // gap's *color*, on the assumption it'd stay pixel-small). Black,
-        // not the app's own bg, means whatever's showing through isn't
-        // html/body at all -- most likely WKWebView's own native layer
-        // beneath the page, which CSS/JS can't reach or recolor.
-        // 100dvh's real-world unreliability specifically in an iOS
-        // *standalone* PWA is a known WebKit quirk (no dynamic browser
-        // chrome to react to there, unlike a normal Safari tab, yet the
-        // reported value can still land short of the true visible
-        // viewport) -- aggravated further here by this file's own status-
-        // bar-style effect below flipping the status bar opaque
-        // ('default')/translucent ('black-translucent') at runtime based
-        // on the resolved theme, changing how much of the screen WebKit
-        // actually gives the page after 100dvh was first computed. 100svh
-        // (small viewport height) is the standard fix for this class of
-        // bug: it's defined to never exceed the true minimum visible
-        // viewport, so the app shell undershoots the screen by at most a
-        // few px instead of risking a native-layer gap of unpredictable
-        // size showing through underneath.
+        // User-reported (screenshot, iPhone, both a Safari tab and an
+        // installed Home Screen PWA): a gap below the bottom nav showing
+        // this file's own pre-existing html/body-background-sync colour
+        // rather than nothing. Confirmed live via a temporary on-screen
+        // diagnostic (getBoundingClientRect on this very div, since
+        // removed) that this div's own rendered height already matches
+        // window.innerHeight/visualViewport.height exactly, with zero
+        // discrepancy, in both contexts -- so this is not a sizing bug in
+        // this shell at all. Also confirmed live that even a
+        // position:fixed;bottom:0 element (nothing to do with this div's
+        // own layout) still didn't reach the true bottom of the physical
+        // screen: window.screen.height was measurably taller than
+        // visualViewport.height by a fixed amount in both cases. That
+        // remainder is outside what any web content on the page can
+        // address at all in this rendering context -- confirmed not a
+        // 100dvh-specific artifact either, since switching to 100svh (kept
+        // below anyway, as the more conservative unit) made zero visible
+        // difference. The one thing actually within reach is making sure
+        // that unreachable sliver's colour always matches the resolved
+        // theme, which the html/body sync effect above already does.
         height: '100svh',
         display: 'flex',
         flexDirection: 'column',
@@ -460,7 +378,6 @@ export default function App() {
         <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
-      <DebugOverlay shellRef={shellRef} />
     </div>
   );
 }
