@@ -277,6 +277,18 @@ export default function App() {
         // is now the first visible element). The safe-area reservation
         // that used to live on that title bar's paddingTop moves here so
         // content still clears the notch/Dynamic Island on iOS.
+        //
+        // Confirmed live on an actual iPhone (2026-09-08): this container's
+        // height:100dvh is content-box (no box-sizing reset anywhere in the
+        // app), so adding paddingTop here without border-box made the real
+        // rendered height 100dvh + the safe-area inset -- overflowing the
+        // viewport by exactly the notch height and clipping the bottom nav
+        // bar off the bottom of the screen. A desktop headless-browser
+        // screenshot missed this entirely: env(safe-area-inset-*) resolves
+        // to 0 with no notch to simulate, so the overflow only ever shows
+        // on real hardware. border-box keeps the padding inside the fixed
+        // 100dvh instead of adding to it.
+        boxSizing: 'border-box',
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
