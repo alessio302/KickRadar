@@ -28,10 +28,21 @@ function hexToRgba(hex, alpha) {
 // iOS platform reservation outside what any web content can address,
 // independent of this app's own CSS) concluded that strip isn't going
 // away. Embracing it as outer margin instead of fighting it: the pill
-// floats inset from all three outer edges, with its own translucent,
+// floats inset from the two side edges, with its own translucent,
 // blurred background reading as "elevated" above whatever shows through
 // beneath/around it, rather than looking like a bar that stops short of
 // the edge by mistake.
+//
+// User-reported (side-by-side screenshot against an older build): the
+// visible area below the nav grew noticeably once this shipped. Root
+// cause was this file, not the platform reservation it was built to
+// live with -- the old flush, edge-to-edge bar had no bottom margin of
+// its own at all, so the (small, unavoidable) platform strip was all
+// that ever showed beneath it. Adding a decorative bottom margin here
+// on top of that stacked an avoidable gap onto an unavoidable one.
+// Bottom inset is back to exactly env(safe-area-inset-bottom) -- no
+// added padding -- so the pill again reaches as far down as the old bar
+// did; only the sides and corners stay "floating".
 //
 // Deliberately NOT position: fixed -- this file's own git history already
 // tried that for a floating bar and reverted it: it intermittently
@@ -44,7 +55,7 @@ export default function BottomNav({ tab, onSelectTab, theme, t }) {
   return (
     <div
       style={{
-        padding: '0 12px calc(12px + env(safe-area-inset-bottom))',
+        padding: '0 12px env(safe-area-inset-bottom)',
       }}
     >
       <div
