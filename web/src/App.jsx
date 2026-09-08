@@ -294,30 +294,26 @@ export default function App() {
         margin: '0 auto',
       }}
     >
+      {/* Empty spacer restoring roughly the old title bar's footprint --
+          per explicit request, after the investigation into the strip of
+          unreachable space at the bottom of the screen concluded the nav's
+          distance from the *true* physical edge can't be changed (a
+          measured iOS platform reservation, independent of this app's own
+          layout). Adding height back up here doesn't change that distance,
+          but does rebalance the overall composition the way it looked
+          before the title bar was removed, which is the actual thing being
+          asked for. paddingTop carries the safe-area-inset-top reservation
+          (a plain flex sibling with its own padding, not the flex
+          container itself -- see the height:100svh div above's own
+          comment for why that distinction matters). */}
+      <div style={{ flexShrink: 0, minHeight: '26px', padding: '18px 16px 14px', paddingTop: 'calc(18px + env(safe-area-inset-top))' }} />
       {/* Doesn't scroll itself: each tab manages its own internal split
           between a pinned sub-header (league switcher, quick filters,
           toggles -- confirmed live these should stay visible too, not
           just the outer title bar) and its own scrolling list. minHeight: 0
           is required here for that nested flex:1 scroll area to size
-          correctly instead of overflowing its flex parent.
-
-          paddingTop clears the notch/Dynamic Island now that there's no
-          app-level title bar to carry that safe-area reservation. Applied
-          here rather than on the outer height:100dvh container above --
-          confirmed live on an actual iPhone (2026-09-08) that adding it to
-          an element with an *explicit* height (100dvh, content-box, no
-          box-sizing reset anywhere in this app) makes the real rendered
-          height 100dvh + the safe-area inset, overflowing the viewport by
-          exactly the notch height and clipping the bottom nav off-screen.
-          This div has no explicit height at all -- flex:1 only -- so the
-          flex algorithm sizes its outer box to exactly fill the remaining
-          space regardless of its own padding, the same safe pattern the
-          old title-bar div (a plain flex sibling, not the flex container
-          itself) used. A desktop headless-browser screenshot missed the
-          original bug entirely: env(safe-area-inset-*) resolves to 0 with
-          no notch to simulate, so the overflow only ever showed on real
-          hardware. */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', paddingTop: 'env(safe-area-inset-top)' }}>
+          correctly instead of overflowing its flex parent. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {tab === 'transfers' && (
           <TransfersTab
             theme={theme}
