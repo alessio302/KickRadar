@@ -267,20 +267,18 @@ export default function App() {
         // diagnostic (getBoundingClientRect on this very div, since
         // removed) that this div's own rendered height already matches
         // window.innerHeight/visualViewport.height exactly, with zero
-        // discrepancy, in both contexts -- so this is not a sizing bug in
-        // this shell at all. Also confirmed live that even a
-        // position:fixed;bottom:0 element (nothing to do with this div's
-        // own layout) still didn't reach the true bottom of the physical
-        // screen: window.screen.height was measurably taller than
-        // visualViewport.height by a fixed amount in both cases. That
-        // remainder is outside what any web content on the page can
-        // address at all in this rendering context -- confirmed not a
-        // 100dvh-specific artifact either, since switching to 100svh (kept
-        // below anyway, as the more conservative unit) made zero visible
-        // difference. The one thing actually within reach is making sure
-        // that unreachable sliver's colour always matches the resolved
-        // theme, which the html/body sync effect above already does.
-        height: '100svh',
+        // discrepancy -- not a sizing bug in this shell. A
+        // position:fixed;bottom:0 test element still didn't reach the true
+        // bottom of the physical screen either: window.screen.height
+        // measurably exceeded visualViewport.height by a fixed amount,
+        // outside what any web content on the page can address at all in
+        // this rendering context. Swapping this height to 100svh, tested
+        // on its own against a version with no top spacer, made no visible
+        // difference at the time -- reverted back to 100dvh (the unit the
+        // app used the entire time this exact layout was last confirmed
+        // working) rather than keep an untested-in-combination unit change
+        // sitting alongside the restored top spacer below.
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         color: theme.text,
