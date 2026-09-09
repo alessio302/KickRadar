@@ -32,6 +32,17 @@
 // home_score/away_score/live_minute (unlike the 5 domestic leagues, where
 // that connection deliberately never touches those columns -- see its own
 // top comment for why the split is the other way round for Europe).
+//
+// home_team_short_name/away_team_short_name (sql/055) are populated here
+// for UCL from football-data.org's own shortName field, confirmed live
+// 2026-09-09 -- display-only, EuropaTab's fixture row falls back to the
+// long name when null. NOT yet populated for EL/UECL: GOAL API's own
+// fixture object hasn't been checked for an equivalent field -- this
+// account's GOAL API daily budget was already over 1000/1000 the day this
+// was investigated, so that check is still open (see if GOAL API's fixture
+// shape has something like teamHomeShort/homeTeamShortName once budget
+// allows a real call to check, same "confirmed live" bar as the UCL side
+// above -- don't guess a field name here without one).
 
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
@@ -66,6 +77,16 @@ async function syncUCL(supabase, comp, leagueId) {
       away_club_id: null,
       home_team_name: m.homeTeam?.name ?? null,
       away_team_name: m.awayTeam?.name ?? null,
+      // Display-only -- confirmed live football-data.org's matches endpoint
+      // embeds the same shortName/tla shape its teams endpoint does ("Real
+      // Madrid CF" -> "Real Madrid", "Manchester City FC" -> "Man City").
+      // Kept separate from home_team_name/away_team_name above rather than
+      // replacing them: those still feed namesLooselyMatch() against GOAL
+      // API's own naming (syncLiveEvents.js/syncEuropeanLineups.js/the
+      // webhook), and a short form isn't guaranteed to still be a substring
+      // match there ("Man City" isn't a substring of "Manchester City").
+      home_team_short_name: m.homeTeam?.shortName ?? null,
+      away_team_short_name: m.awayTeam?.shortName ?? null,
       home_team_badge: m.homeTeam?.crest ?? null,
       away_team_badge: m.awayTeam?.crest ?? null,
       kickoff_at: m.utcDate,

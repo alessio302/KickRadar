@@ -21,7 +21,7 @@ async function loadGrouped() {
 
   const { data: fixtures, error: fixErr } = await supabase
     .from('fixtures')
-    .select('id, league_id, matchday, home_team_name, away_team_name, home_team_badge, away_team_badge, kickoff_at, kickoff_confirmed, status, home_score, away_score, live_minute, referee, venue')
+    .select('id, league_id, matchday, home_team_name, away_team_name, home_team_short_name, away_team_short_name, home_team_badge, away_team_badge, kickoff_at, kickoff_confirmed, status, home_score, away_score, live_minute, referee, venue')
     .in('league_id', leagueIds)
     .gte('kickoff_at', cutoff)
     .order('kickoff_at', { ascending: true });

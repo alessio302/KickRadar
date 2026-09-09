@@ -148,7 +148,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
         <span style={{ fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {fixture.home_team_name || '—'}
+          {fixture.home_team_short_name || fixture.home_team_name || '—'}
         </span>
         <TeamBadge url={fixture.home_team_badge} name={fixture.home_team_name} theme={theme} />
       </div>
@@ -156,7 +156,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
         <TeamBadge url={fixture.away_team_badge} name={fixture.away_team_name} theme={theme} />
         <span style={{ fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {fixture.away_team_name || '—'}
+          {fixture.away_team_short_name || fixture.away_team_name || '—'}
         </span>
       </div>
     </div>
