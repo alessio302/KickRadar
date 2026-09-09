@@ -46,6 +46,8 @@ async function syncUCL(supabase, comp, leagueId) {
       away_club_id: null,
       home_team_name: m.homeTeam?.name ?? null,
       away_team_name: m.awayTeam?.name ?? null,
+      home_team_badge: m.homeTeam?.crest ?? null,
+      away_team_badge: m.awayTeam?.crest ?? null,
       kickoff_at: m.utcDate,
       kickoff_confirmed: m.status !== 'SCHEDULED',
       status: regressing ? existing.status : fetchedStatus,
@@ -157,11 +159,10 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
     }
     if (!apiFixtures || apiFixtures.length === 0) continue;
 
-    // Log the first fixture's full shape once per run so field names can be
-    // verified from the workflow logs. Intentionally left in (not debug-only)
-    // since the GOAL API shape was first confirmed live here.
+    // Log the first fixture's shape and the league logo URL once per run.
     if (!loggedShape) {
-      console.log(`  [shape] first fixture for ${comp.slug} on ${dateStr}:`, JSON.stringify(apiFixtures[0], null, 2));
+      const f0 = apiFixtures[0];
+      console.log(`  [league-logo] ${comp.slug}:`, f0.league?.logo ?? f0.leagueLogo ?? 'n/a');
       loggedShape = true;
     }
 
@@ -191,8 +192,10 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
         matchday: extractMatchday(f),
         home_club_id: null,
         away_club_id: null,
-        home_team_name: f.homeTeam?.name ?? f.home?.name ?? null,
-        away_team_name: f.awayTeam?.name ?? f.away?.name ?? null,
+        home_team_name: f.homeTeam?.name ?? f.homeTeamName ?? null,
+        away_team_name: f.awayTeam?.name ?? f.awayTeamName ?? null,
+        home_team_badge: f.homeTeam?.badge ?? f.teamHomeBadge ?? null,
+        away_team_badge: f.awayTeam?.badge ?? f.teamAwayBadge ?? null,
         kickoff_at: kickoffIso,
         kickoff_confirmed: hasRealTime,
         status: regressing ? existing.status : fetchedStatus,

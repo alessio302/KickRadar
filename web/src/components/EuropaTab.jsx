@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useEuropaFixtures } from '../hooks/useEuropaFixtures.js';
 import { UEFA_COMPETITIONS } from '../lib/leagues.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
+import MatchScore from './MatchScore.jsx';
 
 function formatDate(iso, locale) {
   return new Date(iso).toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' });
@@ -10,15 +11,45 @@ function formatTime(iso, locale) {
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
+function TeamBadge({ url, name, size = 20, theme }) {
+  const [failed, setFailed] = useState(false);
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        title={name}
+        width={size}
+        height={size}
+        style={{ objectFit: 'contain', flex: '0 0 auto' }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '999px',
+        background: theme.surfaceRaised,
+        border: `1px solid ${theme.border}`,
+        boxSizing: 'border-box',
+        flex: '0 0 auto',
+      }}
+    />
+  );
+}
+
 function EuropaFixtureRow({ fixture, theme, t, locale }) {
   const isLive = fixture.status === 'live';
   const isFinished = fixture.status === 'finished';
 
   let timeLabel;
-  if (isFinished) {
-    timeLabel = `${fixture.home_score ?? '–'} : ${fixture.away_score ?? '–'}`;
-  } else if (isLive && fixture.live_minute) {
+  if (isLive && fixture.live_minute) {
     timeLabel = fixture.live_minute === 'HT' ? 'HT' : `${fixture.live_minute}'`;
+  } else if (isFinished) {
+    timeLabel = t.fixtures.finished;
   } else if (fixture.kickoff_confirmed === false) {
     timeLabel = t.fixtures.kickoffTbd;
   } else {
@@ -34,50 +65,62 @@ function EuropaFixtureRow({ fixture, theme, t, locale }) {
         borderRadius: '12px',
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
+        gap: '8px',
       }}
     >
+      {/* Status / kickoff time */}
       <span
         style={{
-          fontSize: '12px',
+          fontSize: '13px',
           fontWeight: 700,
-          color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent,
-          width: '52px',
+          color: isLive ? theme.danger : theme.accent,
+          width: '66px',
           flex: '0 0 auto',
           whiteSpace: 'nowrap',
         }}
       >
         {timeLabel}
       </span>
-      <span
-        style={{
-          fontSize: '13px',
-          fontWeight: 600,
-          flex: 1,
-          textAlign: 'right',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {fixture.home_team_name || '—'}
-      </span>
-      <span style={{ fontSize: '11px', color: theme.textMuted, flex: '0 0 auto' }}>
-        {t.common.vs}
-      </span>
-      <span
-        style={{
-          fontSize: '13px',
-          fontWeight: 600,
-          flex: 1,
-          textAlign: 'left',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {fixture.away_team_name || '—'}
-      </span>
+
+      {/* Home badge + name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
+        <span
+          style={{
+            fontSize: '13px',
+            fontWeight: 700,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {fixture.home_team_name || '—'}
+        </span>
+        <TeamBadge url={fixture.home_team_badge} name={fixture.home_team_name} theme={theme} />
+      </div>
+
+      {/* Score / vs */}
+      <MatchScore
+        fixture={fixture}
+        t={t}
+        theme={theme}
+        style={{ fontSize: '11px', color: theme.textMuted, flex: '0 0 auto' }}
+      />
+
+      {/* Away badge + name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+        <TeamBadge url={fixture.away_team_badge} name={fixture.away_team_name} theme={theme} />
+        <span
+          style={{
+            fontSize: '13px',
+            fontWeight: 700,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {fixture.away_team_name || '—'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -85,13 +128,13 @@ function EuropaFixtureRow({ fixture, theme, t, locale }) {
 export default function EuropaTab({ theme, t, language }) {
   const { data, loading } = useEuropaFixtures();
   const locale = DATE_LOCALES[language];
+  const [liveOnly, setLiveOnly] = useState(false);
 
-  // Group each competition's fixtures by date label (same pattern as
-  // FixturesTab.jsx's FixturesList).
   const grouped = useMemo(() => {
     const result = {};
     for (const comp of UEFA_COMPETITIONS) {
-      const fixtures = data[comp.slug] ?? [];
+      let fixtures = data[comp.slug] ?? [];
+      if (liveOnly) fixtures = fixtures.filter((f) => f.status === 'live');
       const byDate = {};
       for (const f of fixtures) {
         const key = formatDate(f.kickoff_at, locale);
@@ -100,7 +143,12 @@ export default function EuropaTab({ theme, t, language }) {
       result[comp.slug] = byDate;
     }
     return result;
-  }, [data, locale]);
+  }, [data, locale, liveOnly]);
+
+  const hasLive = useMemo(
+    () => UEFA_COMPETITIONS.some((c) => (data[c.slug] ?? []).some((f) => f.status === 'live')),
+    [data]
+  );
 
   return (
     <div
@@ -112,6 +160,42 @@ export default function EuropaTab({ theme, t, language }) {
         padding: '12px 16px 14px',
       }}
     >
+      {/* Live filter */}
+      {!loading && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          <button
+            onClick={() => setLiveOnly((v) => !v)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '5px 12px',
+              borderRadius: '20px',
+              border: `1px solid ${liveOnly ? theme.danger : theme.border}`,
+              background: liveOnly ? theme.danger : 'transparent',
+              color: liveOnly ? '#fff' : hasLive ? theme.danger : theme.textMuted,
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {hasLive && !liveOnly && (
+              <span
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: theme.danger,
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {t.fixtures.live}
+          </button>
+        </div>
+      )}
+
       {loading && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
           {t.common.loading}
@@ -122,6 +206,7 @@ export default function EuropaTab({ theme, t, language }) {
         UEFA_COMPETITIONS.map((comp) => {
           const byDate = grouped[comp.slug] ?? {};
           const dateEntries = Object.entries(byDate);
+          if (liveOnly && dateEntries.length === 0) return null;
           return (
             <div key={comp.slug} style={{ marginBottom: '28px' }}>
               {/* Competition header */}

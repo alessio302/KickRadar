@@ -30,7 +30,7 @@ export function useEuropaFixtures() {
 
       const { data: fixtures, error: fixErr } = await supabase
         .from('fixtures')
-        .select('id, league_id, matchday, home_team_name, away_team_name, kickoff_at, kickoff_confirmed, status, home_score, away_score, live_minute')
+        .select('id, league_id, matchday, home_team_name, away_team_name, home_team_badge, away_team_badge, kickoff_at, kickoff_confirmed, status, home_score, away_score, live_minute')
         .in('league_id', leagueIds)
         .gte('kickoff_at', cutoff)
         .order('kickoff_at', { ascending: true });
