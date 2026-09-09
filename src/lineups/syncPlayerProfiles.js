@@ -58,7 +58,7 @@ async function getFootballDataSquad(externalTeamId) {
 // never reaching the rest of the alphabet. Lowered so covering every club
 // at least once wins over exhaustively filling gaps in whichever club
 // happens to come first -- the remaining gaps close gradually across
-// several 6h runs instead of one run trying to close them all at once.
+// several daily runs instead of one run trying to close them all at once.
 const MAX_GAP_FILLS_PER_RUN = 30;
 
 // Confirmed live: a first version of this reused playerProfileResolver.js's
@@ -236,7 +236,7 @@ export async function syncPlayerProfiles() {
   // -- club), no errors at all. Counting those toward this breaker meant
   // it tripped almost immediately on the very first club with several
   // such players, zeroing gap-fill for every other club in the run for
-  // the rest of its 6h cycle, not just the one club actually having
+  // the rest of that day's run, not just the one club actually having
   // trouble. A real contended-window failure still trips it exactly as
   // before; a run of legitimate misses (a reserve player GOAL API simply
   // doesn't carry) no longer silently starves every later club's chance.

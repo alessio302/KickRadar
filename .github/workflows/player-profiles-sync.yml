@@ -2,12 +2,21 @@ name: Player profiles sync
 
 on:
   schedule:
-    # Every 6h -- decouples matchday freshness from whether/when a user
-    # happens to tap a given player (see syncPlayerProfiles.js's own
-    # comment). ~96 GOAL API calls per run (one per tracked club) plus a
-    # capped number of gap-fill searches (MAX_GAP_FILLS_PER_RUN), well
-    # within the shared 1000/day budget even at this cadence.
-    - cron: '25 */6 * * *'
+    # Once daily, not every 6h -- confirmed live (2026-09-09, this
+    # project's own goal_api_usage table) that "well within the shared
+    # 1000/day budget" below was wrong: this run's own cost is up to 156
+    # GOAL API calls (96 clubs' squad fetches, unconditional and with no
+    # per-club staleness check, plus up to MAX_GAP_FILLS_PER_RUN x 2
+    # gap-fill calls) x 4 runs/day = up to 624/day, on a fixed clock with
+    # no connection to whether any tracked league actually has a match in
+    # progress -- confirmed the dominant, day-independent cost against
+    # actual daily totals (several days over the 1000/day cap entirely,
+    # a quiet non-matchday still at 872 by mid-afternoon). Squad rosters
+    # and injury/stat snapshots don't need same-day-multiple-times
+    # freshness; once daily still refreshes every tracked club's data at
+    # least once every 24h, at a quarter of the previous cost (up to
+    # ~156/day instead of ~624/day).
+    - cron: '25 5 * * *'
   workflow_dispatch: {}
 
 jobs:

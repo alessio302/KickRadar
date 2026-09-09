@@ -177,7 +177,13 @@ export async function syncLineups() {
   const eventsNeeded = (f) => f.status === 'finished' && !f.events_synced_at;
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
-  if (pending.length === 0) return { checked: candidates.length, confirmed: 0, eventsFetched: 0 };
+  // checked: 0, not candidates.length -- candidates is the raw DB query
+  // result before the lineupNeeded/eventsNeeded filter, none of which cost
+  // a GOAL API call by itself. Reporting it here as "checked" previously
+  // made a run that made ZERO GOAL API calls print a nonzero number,
+  // masking exactly the kind of already-idle run this file's own
+  // early-return exists to represent accurately.
+  if (pending.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
   const { data: dbLeagues, error: leaguesErr } = await supabase.from('leagues').select('id, slug');
   if (leaguesErr) throw leaguesErr;

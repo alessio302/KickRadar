@@ -121,7 +121,15 @@ export async function syncEuropeanLineups() {
   };
 
   const pending = candidates.filter(lineupNeeded);
-  if (pending.length === 0) return { checked: candidates.length, confirmed: 0 };
+  // checked: 0, not candidates.length -- see syncLineups.js's own comment
+  // on the identical line: candidates is the raw DB query result before
+  // the lineupNeeded filter, none of which costs a GOAL API call by
+  // itself. Confirmed live (2026-09-09): a run with zero live/near-kickoff
+  // European fixtures logged "checked: 42" while making zero GOAL API
+  // calls, which looked like real request volume during a diagnosis of
+  // this account's daily usage and cost real investigation time to rule
+  // out.
+  if (pending.length === 0) return { checked: 0, confirmed: 0 };
 
   // Group by (competition, date) -- one getLeagueFixtures() call covers
   // every pending fixture for that competition on that date, same
