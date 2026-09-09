@@ -36,7 +36,15 @@
 // home_team_short_name/away_team_short_name (sql/055) are populated here
 // for UCL from football-data.org's own shortName field, confirmed live
 // 2026-09-09 -- display-only, EuropaTab's fixture row falls back to the
-// long name when null. NOT yet populated for EL/UECL: GOAL API's own
+// long name when null. Routed through syncClubs.js's own
+// SHORT_NAME_OVERRIDES first (keyed by the same football-data.org team id):
+// confirmed live a UCL club that's ALSO in one of the 5 tracked domestic
+// leagues (Atlético Madrid, Barcelona, ...) otherwise showed its raw
+// colloquial API shortName ("Atleti", "Barça") in EuropaTab while the
+// Spiele tab showed the deliberately-corrected domestic clubs.short_name
+// for the exact same club -- same inconsistency SHORT_NAME_OVERRIDES was
+// already built to fix, just not applied here yet. NOT yet populated for
+// EL/UECL: GOAL API's own
 // fixture object hasn't been checked for an equivalent field -- this
 // account's GOAL API daily budget was already over 1000/1000 the day this
 // was investigated, so that check is still open (see if GOAL API's fixture
@@ -48,6 +56,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 import { getMatches, sleep, STATUS_MAP } from './client.js';
 import { getLeagueFixtures } from '../lineups/goalApiClient.js';
+import { SHORT_NAME_OVERRIDES } from './syncClubs.js';
 
 // Same guard as syncFixtures.js -- never move a fixture backwards through
 // finished > live > scheduled even if a stale API response tries to.
@@ -85,8 +94,8 @@ async function syncUCL(supabase, comp, leagueId) {
       // API's own naming (syncLiveEvents.js/syncEuropeanLineups.js/the
       // webhook), and a short form isn't guaranteed to still be a substring
       // match there ("Man City" isn't a substring of "Manchester City").
-      home_team_short_name: m.homeTeam?.shortName ?? null,
-      away_team_short_name: m.awayTeam?.shortName ?? null,
+      home_team_short_name: SHORT_NAME_OVERRIDES[m.homeTeam?.id] || m.homeTeam?.shortName || null,
+      away_team_short_name: SHORT_NAME_OVERRIDES[m.awayTeam?.id] || m.awayTeam?.shortName || null,
       home_team_badge: m.homeTeam?.crest ?? null,
       away_team_badge: m.awayTeam?.crest ?? null,
       kickoff_at: m.utcDate,
