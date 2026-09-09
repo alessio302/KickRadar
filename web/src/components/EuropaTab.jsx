@@ -14,11 +14,6 @@ function formatTime(iso, locale) {
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
-// crests.football-data.org/CL.png is a dark mark -- invert in dark mode
-// so it stays visible against the white tile background (same pattern as
-// ClubJersey.jsx's INVERT_IN_DARK_MODE for Juventus).
-const INVERT_LOGO_DARK = new Set(['champions-league']);
-
 function CompetitionSelector({ selected, theme, onSelect }) {
   return (
     <div
@@ -31,7 +26,6 @@ function CompetitionSelector({ selected, theme, onSelect }) {
     >
       {UEFA_COMPETITIONS.map((comp) => {
         const active = selected === comp.slug;
-        const invert = theme.isDark && INVERT_LOGO_DARK.has(comp.slug);
         return (
           <button
             key={comp.slug}
@@ -67,12 +61,7 @@ function CompetitionSelector({ selected, theme, onSelect }) {
               <img
                 src={comp.logo}
                 alt={comp.label}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  filter: invert ? 'invert(1)' : 'none',
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             </span>
           </button>
