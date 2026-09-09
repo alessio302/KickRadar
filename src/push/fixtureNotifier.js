@@ -6,10 +6,10 @@ import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from './pushI18n.js';
 // its existing status-write loop). Shared so the wording/shape lives in
 // exactly one place rather than drifting between the two callers.
 //
-// icon is the home club's crest only -- Web Push (especially iOS Safari's
-// implementation) supports a single small notification icon, not two
-// club logos side by side, so this picks one rather than generating a
-// composite image just for this.
+// No crest icon (per explicit request) -- left as the default app icon,
+// same as every other push category. Web Push only supports one small
+// icon anyway, not two club logos side by side, so this was always going
+// to be one-sided at best.
 export function buildFixtureStatusPayloads({ milestone, minutesBefore, homeClub, awayClub, leagueSlug, fixtureId, homeScore, awayScore }) {
   const byLanguage = {};
   for (const lang of SUPPORTED_PUSH_LANGUAGES) {
@@ -29,7 +29,6 @@ export function buildFixtureStatusPayloads({ milestone, minutesBefore, homeClub,
     byLanguage[lang] = {
       title,
       body,
-      icon: homeClub.crest_url || undefined,
       url: `/?league=${leagueSlug}&fixture=${fixtureId}`,
     };
   }

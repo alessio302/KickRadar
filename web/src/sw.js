@@ -46,11 +46,7 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'KickRadar';
   const options = {
     body: data.body || '',
-    // data.icon: a club crest URL for fixture status pushes (kickoff
-    // reminders, kickoff, full-time) -- see src/push/fixtureNotifier.js.
-    // Falls back to the app icon for every other push category, which
-    // never sets this field.
-    icon: data.icon || '/icon-192.png',
+    icon: '/icon-192.png',
     badge: '/icon-192.png',
     data: { url: data.url || '/' },
   };
