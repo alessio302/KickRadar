@@ -41,6 +41,42 @@ function TeamBadge({ url, name, size = 20, theme }) {
   );
 }
 
+function CompetitionBadge({ comp }) {
+  const [failed, setFailed] = useState(false);
+  if (comp.logo && !failed) {
+    return (
+      <img
+        src={comp.logo}
+        alt={comp.label}
+        width={28}
+        height={28}
+        style={{ objectFit: 'contain', flex: '0 0 auto' }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '28px',
+        height: '28px',
+        borderRadius: '50%',
+        background: comp.color,
+        fontSize: '10px',
+        fontWeight: 800,
+        color: '#fff',
+        flexShrink: 0,
+        letterSpacing: '-0.02em',
+      }}
+    >
+      {comp.shortName}
+    </span>
+  );
+}
+
 function EuropaFixtureRow({ fixture, theme, t, locale }) {
   const isLive = fixture.status === 'live';
   const isFinished = fixture.status === 'finished';
@@ -220,24 +256,7 @@ export default function EuropaTab({ theme, t, language }) {
                   borderBottom: `2px solid ${comp.color}`,
                 }}
               >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: comp.color,
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    color: '#fff',
-                    flexShrink: 0,
-                    letterSpacing: '-0.02em',
-                  }}
-                >
-                  {comp.shortName}
-                </span>
+                <CompetitionBadge comp={comp} />
                 <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>{comp.label}</h2>
               </div>
 

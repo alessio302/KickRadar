@@ -27,7 +27,6 @@ const STATUS_RANK = { scheduled: 0, postponed: 0, cancelled: 0, live: 1, finishe
 async function syncUCL(supabase, comp, leagueId) {
   const matches = await getMatches({ competitionId: comp.externalCompetitionId });
   if (matches.length === 0) return 0;
-  console.log(`  [league-logo] champions-league:`, matches[0]?.competition?.emblem ?? 'n/a');
 
   const { data: existingRows, error: existingErr } = await supabase
     .from('fixtures')
@@ -148,7 +147,6 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
   }
 
   let inserted = 0;
-  let loggedShape = false;
 
   for (const dateStr of dates) {
     let apiFixtures;
@@ -159,13 +157,6 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
       continue;
     }
     if (!apiFixtures || apiFixtures.length === 0) continue;
-
-    // Log the first fixture's shape and the league logo URL once per run.
-    if (!loggedShape) {
-      const f0 = apiFixtures[0];
-      console.log(`  [league-logo] ${comp.slug}:`, f0.league?.logo ?? f0.leagueLogo ?? 'n/a');
-      loggedShape = true;
-    }
 
     // Fetch existing rows for this (league, date) window to apply the
     // STATUS_RANK anti-regression guard.

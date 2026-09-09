@@ -108,21 +108,21 @@ export const UEFA_COMPETITIONS = [
     label: 'Champions League',
     shortName: 'UCL',
     color: '#3D8BFD',
-    logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/bf/UEFA_Champions_League_logo_2.svg/200px-UEFA_Champions_League_logo_2.svg.png',
+    logo: 'https://crests.football-data.org/CL.png',
   },
   {
     slug: 'europa-league',
     label: 'Europa League',
     shortName: 'UEL',
     color: '#F5A623',
-    logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a5/UEFA_Europa_League_logo_%282021%E2%80%93present%29.svg/200px-UEFA_Europa_League_logo_%282021%E2%80%93present%29.svg.png',
+    logo: 'https://media.goal-api.com/badges/logo_leagues/4_uefa-europa-league.png',
   },
   {
     slug: 'conference-league',
     label: 'Conference League',
     shortName: 'UECL',
     color: '#3DBA6E',
-    logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a7/UEFA_Europa_Conference_League_logo.svg/200px-UEFA_Europa_Conference_League_logo.svg.png',
+    logo: 'https://media.goal-api.com/badges/logo_leagues/683_uefa-conference-league.png',
   },
 ];
 
