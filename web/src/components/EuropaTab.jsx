@@ -207,119 +207,137 @@ export default function EuropaTab({ theme, t, language }) {
   const dateEntries = Object.entries(grouped);
 
   return (
-    <div
-      ref={scrollRef}
-      style={{
-        height: '100%',
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        overscrollBehaviorY: 'none',
-        padding: '12px 16px 14px',
-      }}
-    >
-      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
-      <CompetitionSelector selected={selectedComp} theme={theme} onSelect={setSelectedComp} />
+    // Same app-shell split as FixturesTab.jsx: a pinned, non-scrolling
+    // header (selector + filters) as a flexShrink:0 sibling, then a
+    // separate flex:1/minHeight:0 box that actually scrolls. Previously
+    // this whole tab -- selector, filters, AND the fixture list -- was one
+    // single scrolling div, with the fixture-detail overlay rendered as
+    // its last child. That put the overlay's `position: fixed` backdrop
+    // inside a WebkitOverflowScrolling:'touch' ancestor -- confirmed live
+    // (screenshot) this makes iOS Safari treat "fixed" as scoped to that
+    // scrolling box instead of the true viewport (a known iOS momentum-
+    // scroll quirk), so the sheet rendered clipped under the status bar
+    // and never covered the bottom nav. Rendering the overlay as a sibling
+    // OUTSIDE the scrolling box, like FixtureDetailOverlay already is in
+    // FixturesTab, avoids that ancestor entirely.
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>
+        <CompetitionSelector selected={selectedComp} theme={theme} onSelect={setSelectedComp} />
 
-      {/* Filter bar -- matches FixturesTab layout exactly */}
+        {/* Filter bar -- matches FixturesTab layout exactly */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 2px',
+            borderTop: `1px solid ${theme.border}`,
+            borderBottom: `1px solid ${theme.border}`,
+          }}
+        >
+          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.fixtures.currentMatchdayOnly}</span>
+          <button
+            onClick={() => setCurrentMatchdayOnly((v) => !v)}
+            aria-label={t.fixtures.currentMatchdayOnlyToggle}
+            style={{
+              width: '40px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              cursor: 'pointer',
+              background: currentMatchdayOnly ? theme.accent : theme.border,
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: theme.surface,
+                position: 'absolute',
+                top: '3px',
+                left: currentMatchdayOnly ? '21px' : '3px',
+                transition: 'left 0.15s',
+              }}
+            />
+          </button>
+        </div>
+
+        <div style={{ padding: '10px 2px 4px' }}>
+          <button
+            onClick={() => setLiveOnly((v) => !v)}
+            aria-label={t.fixtures.liveOnlyToggle}
+            aria-pressed={liveOnly}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px 6px 10px',
+              borderRadius: '999px',
+              border: `1.5px solid ${liveOnly ? theme.accent : theme.border}`,
+              background: liveOnly ? `${theme.accent}1a` : 'transparent',
+              color: liveOnly ? theme.accent : theme.textMuted,
+              font: 'inherit',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
+            {t.fixtures.live}
+          </button>
+        </div>
+      </div>
+
       <div
+        ref={scrollRef}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 2px',
-          borderTop: `1px solid ${theme.border}`,
-          borderBottom: `1px solid ${theme.border}`,
-          marginBottom: '12px',
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorY: 'none',
+          padding: '0 16px 14px',
         }}
       >
-        <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.fixtures.currentMatchdayOnly}</span>
-        <button
-          onClick={() => setCurrentMatchdayOnly((v) => !v)}
-          aria-label={t.fixtures.currentMatchdayOnlyToggle}
-          style={{
-            width: '40px',
-            height: '22px',
-            borderRadius: '999px',
-            border: 'none',
-            cursor: 'pointer',
-            background: currentMatchdayOnly ? theme.accent : theme.border,
-            position: 'relative',
-          }}
-        >
-          <div
-            style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              background: theme.surface,
-              position: 'absolute',
-              top: '3px',
-              left: currentMatchdayOnly ? '21px' : '3px',
-              transition: 'left 0.15s',
-            }}
-          />
-        </button>
-      </div>
+        <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
 
-      <div style={{ padding: '0 2px 12px' }}>
-        <button
-          onClick={() => setLiveOnly((v) => !v)}
-          aria-label={t.fixtures.liveOnlyToggle}
-          aria-pressed={liveOnly}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px 6px 10px',
-            borderRadius: '999px',
-            border: `1.5px solid ${liveOnly ? theme.accent : theme.border}`,
-            background: liveOnly ? `${theme.accent}1a` : 'transparent',
-            color: liveOnly ? theme.accent : theme.textMuted,
-            font: 'inherit',
-            fontSize: '12.5px',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
-          {t.fixtures.live}
-        </button>
-      </div>
+        {loading && (
+          <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
+            {t.common.loading}
+          </p>
+        )}
 
-      {loading && (
-        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
-          {t.common.loading}
-        </p>
-      )}
+        {!loading && dateEntries.length === 0 && (
+          <p style={{ fontSize: '13px', color: theme.textMuted, paddingLeft: '4px' }}>
+            {t.fixtures.empty}
+          </p>
+        )}
 
-      {!loading && dateEntries.length === 0 && (
-        <p style={{ fontSize: '13px', color: theme.textMuted, paddingLeft: '4px' }}>
-          {t.fixtures.empty}
-        </p>
-      )}
-
-      {!loading &&
-        dateEntries.map(([date, dayFixtures]) => (
-          <div key={date} style={{ marginBottom: '12px' }}>
-            <p
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: theme.textMuted,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                margin: '0 0 6px',
-              }}
-            >
-              {date}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {dayFixtures.map((f) => (
-                <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={setSelectedFixture} />
-              ))}
+        {!loading &&
+          dateEntries.map(([date, dayFixtures]) => (
+            <div key={date} style={{ marginBottom: '12px' }}>
+              <p
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: theme.textMuted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  margin: '0 0 6px',
+                }}
+              >
+                {date}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {dayFixtures.map((f) => (
+                  <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={setSelectedFixture} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+      </div>
 
       {selectedFixture && (
         <EuropaFixtureDetailOverlay
