@@ -350,6 +350,11 @@ export default function App() {
         {tab === 'tabelle' && (
           <StandingsTab theme={theme} t={t} language={language} league={league} onSelectLeague={selectLeague} onSwipeLeague={swipeLeague} />
         )}
+        {tab === 'europa' && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.textMuted, fontSize: '14px' }}>
+            Champions League · Europa League · Conference League
+          </div>
+        )}
         {tab === 'einstellungen' && (
           <SettingsTab
             theme={theme}

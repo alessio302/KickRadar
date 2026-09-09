@@ -30,7 +30,7 @@ function ordinalEn(n) {
 }
 
 const de = {
-  nav: { transfers: 'Transfers', fixtures: 'Spiele', standings: 'Tabelle', settings: 'Einstellungen' },
+  nav: { transfers: 'Transfers', fixtures: 'Spiele', standings: 'Tabelle', europa: 'Europa', settings: 'Einstellungen' },
   common: {
     loading: 'Lädt…',
     chooseClub: 'Verein wählen…',
@@ -188,7 +188,7 @@ const de = {
 };
 
 const en = {
-  nav: { transfers: 'Transfers', fixtures: 'Fixtures', standings: 'Table', settings: 'Settings' },
+  nav: { transfers: 'Transfers', fixtures: 'Fixtures', standings: 'Table', europa: 'Europe', settings: 'Settings' },
   common: {
     loading: 'Loading…',
     chooseClub: 'Choose club…',
@@ -344,7 +344,7 @@ const en = {
 };
 
 const it = {
-  nav: { transfers: 'Trasferimenti', fixtures: 'Partite', standings: 'Classifica', settings: 'Impostazioni' },
+  nav: { transfers: 'Trasferimenti', fixtures: 'Partite', standings: 'Classifica', europa: 'Europa', settings: 'Impostazioni' },
   common: {
     loading: 'Caricamento…',
     chooseClub: 'Scegli squadra…',
@@ -500,7 +500,7 @@ const it = {
 };
 
 const fr = {
-  nav: { transfers: 'Transferts', fixtures: 'Matchs', standings: 'Classement', settings: 'Réglages' },
+  nav: { transfers: 'Transferts', fixtures: 'Matchs', standings: 'Classement', europa: 'Europe', settings: 'Réglages' },
   common: {
     loading: 'Chargement…',
     chooseClub: 'Choisir un club…',
@@ -656,7 +656,7 @@ const fr = {
 };
 
 const es = {
-  nav: { transfers: 'Traspasos', fixtures: 'Partidos', standings: 'Clasificación', settings: 'Ajustes' },
+  nav: { transfers: 'Traspasos', fixtures: 'Partidos', standings: 'Clasificación', europa: 'Europa', settings: 'Ajustes' },
   common: {
     loading: 'Cargando…',
     chooseClub: 'Elegir club…',
