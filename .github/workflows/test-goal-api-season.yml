@@ -1,0 +1,58 @@
+name: Test GOAL API season endpoint
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probe /leagues/{id}/fixtures without date
+        env:
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
+        run: |
+          node --input-type=module <<'EOF'
+          const BASE_URL = 'https://api.goal-api.com/v1';
+          const apiKey = process.env.GOAL_API_KEY;
+
+          const COMPS = [
+            { id: 'cmr77dw3900f6rx06tuqwft2d', name: 'EL' },
+            { id: 'cmr77dw3900f9rx06laad8onf', name: 'UECL' },
+          ];
+
+          for (const comp of COMPS) {
+            const url = new URL(`${BASE_URL}/leagues/${comp.id}/fixtures`);
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+            const body = await res.text();
+            const parsed = JSON.parse(body);
+            const fixtures = parsed.data ?? [];
+            console.log(`\n[${comp.name}] no date → HTTP ${res.status}, ${fixtures.length} fixtures`);
+            if (fixtures.length > 0) {
+              const dates = fixtures.map(f => (f.kickoffUtc ?? '').slice(0, 10)).filter(Boolean).sort();
+              console.log(`  range: ${dates[0]} – ${dates[dates.length - 1]}`);
+              console.log('  sample keys:', Object.keys(fixtures[0]).join(', '));
+            } else {
+              console.log('  raw (500c):', body.slice(0, 500));
+            }
+
+            // Also try ?season=2026
+            const url2 = new URL(`${BASE_URL}/leagues/${comp.id}/fixtures`);
+            url2.searchParams.set('season', '2026');
+            const res2 = await fetch(url2, { headers: { Authorization: `Bearer ${apiKey}` } });
+            const body2 = await res2.text();
+            const parsed2 = JSON.parse(body2);
+            const fixtures2 = parsed2.data ?? [];
+            console.log(`[${comp.name}] ?season=2026 → HTTP ${res2.status}, ${fixtures2.length} fixtures`);
+            if (fixtures2.length > 0) {
+              const dates2 = fixtures2.map(f => (f.kickoffUtc ?? '').slice(0, 10)).filter(Boolean).sort();
+              console.log(`  range: ${dates2[0]} – ${dates2[dates2.length - 1]}`);
+            } else {
+              console.log('  raw (500c):', body2.slice(0, 500));
+            }
+          }
+          EOF
