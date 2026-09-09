@@ -26,6 +26,20 @@ import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 const LOOKAHEAD_MIN = 45;
 const LOOKBACK_MIN = 90;
 
+// Separate, much tighter cutoff than PAST_WINDOW_DAYS below -- that window
+// exists for the EVENTS backfill, which already has its own proper stop
+// condition (events_synced_at, set once and never re-checked). Lineup
+// confirmation had no such gate at all: a finished fixture whose lineup
+// GOAL API simply never populates (a genuine data gap, not a timing issue)
+// stayed "pending" for the full 15-day window, costing a fresh
+// getFixtureLineups() call -- and keeping its whole league/date group's
+// getLeagueFixtures() call alive too -- on every single 15-minute run,
+// forever. 6 hours is well past any plausible late-submission delay (real
+// lineups confirm within minutes of kickoff, per this file's own top
+// comment); a fixture past this without a confirmed lineup on both sides
+// is treated as one GOAL API won't ever populate, not one still pending.
+const LINEUP_GIVE_UP_MIN = 360;
+
 // Separately, also revisit any *finished* fixture within the app's own
 // display window (matches web/src/hooks/useFixtures.js's PAST_WINDOW_DAYS)
 // that's still missing a lineup or hasn't had its events fetched yet.
@@ -232,14 +246,14 @@ export async function syncLineups() {
 
   const { data: nearKickoff, error: nkErr } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at, goal_api_id')
     .gte('kickoff_at', windowStart)
     .lte('kickoff_at', windowEnd);
   if (nkErr) throw nkErr;
 
   const { data: finishedRecent, error: frErr } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at, goal_api_id')
     .eq('status', 'finished')
     .gte('kickoff_at', pastCutoff);
   if (frErr) throw frErr;
@@ -265,8 +279,13 @@ export async function syncLineups() {
     existingLineups.filter((r) => r.confirmed).map((r) => confirmedKey(r.fixture_id, r.club_id))
   );
 
-  const lineupNeeded = (f) =>
-    !(alreadyConfirmed.has(confirmedKey(f.id, f.home_club_id)) && alreadyConfirmed.has(confirmedKey(f.id, f.away_club_id)));
+  const lineupNeeded = (f) => {
+    const bothConfirmed =
+      alreadyConfirmed.has(confirmedKey(f.id, f.home_club_id)) && alreadyConfirmed.has(confirmedKey(f.id, f.away_club_id));
+    if (bothConfirmed) return false;
+    const minutesSinceKickoff = (now.getTime() - new Date(f.kickoff_at).getTime()) / 60000;
+    return minutesSinceKickoff <= LINEUP_GIVE_UP_MIN;
+  };
   const eventsNeeded = (f) => f.status === 'finished' && !f.events_synced_at;
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
@@ -303,36 +322,54 @@ export async function syncLineups() {
   }
 
   for (const { league, dateStr, fixtures: groupFixtures } of groups.values()) {
-    let apiFixtures;
-    try {
-      apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
-    } catch (err) {
-      console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
-      continue;
-    }
-
     const leagueClubs = allClubs.filter((c) => c.league_id === groupFixtures[0]?.league_id);
+
+    // Cached in fixtures.goal_api_id (048_fixtures_goal_api_id.sql), same
+    // column syncLiveEvents.js's resolveGoalApiIds() writes -- a fixture's
+    // GOAL API id never changes once resolved, so this file's own
+    // getLeagueFixtures() call (previously made unconditionally, every
+    // 15-min run, for every group with anything still pending) only
+    // actually runs when the group has at least one fixture this file (or
+    // syncLiveEvents.js, while the match was live) hasn't already resolved.
+    const needsResolution = groupFixtures.some((f) => !f.goal_api_id);
+    let apiFixtures = null;
+    if (needsResolution) {
+      try {
+        apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
+      } catch (err) {
+        console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
+      }
+    }
 
     for (const f of groupFixtures) {
       const homeClub = clubById.get(f.home_club_id);
       const awayClub = clubById.get(f.away_club_id);
       if (!homeClub || !awayClub) continue;
 
-      const match = apiFixtures.find((m) => {
-        const homeMatch = resolveClub(m.homeTeam?.name, leagueClubs)?.id === homeClub.id;
-        const awayMatch = resolveClub(m.awayTeam?.name, leagueClubs)?.id === awayClub.id;
-        return homeMatch && awayMatch;
-      });
-      if (!match) continue;
+      let goalApiId = f.goal_api_id;
+      if (!goalApiId) {
+        if (!apiFixtures) continue; // resolution needed but failed (or wasn't attempted) this run
+        const match = apiFixtures.find((m) => {
+          const homeMatch = resolveClub(m.homeTeam?.name, leagueClubs)?.id === homeClub.id;
+          const awayMatch = resolveClub(m.awayTeam?.name, leagueClubs)?.id === awayClub.id;
+          return homeMatch && awayMatch;
+        });
+        if (!match) continue;
+        goalApiId = String(match.id);
+        // Best-effort: a failed write here only costs re-resolving this one
+        // fixture again next run, never lost lineup/events coverage for it.
+        const { error: cacheErr } = await supabase.from('fixtures').update({ goal_api_id: goalApiId }).eq('id', f.id);
+        if (cacheErr) console.error(`Failed to cache goal_api_id for fixture ${f.id}:`, cacheErr.message);
+      }
 
       checked += 1;
 
       if (lineupNeeded(f)) {
         let lineups;
         try {
-          lineups = await getFixtureLineups(match.id);
+          lineups = await getFixtureLineups(goalApiId);
         } catch (err) {
-          console.error(`GOAL API lineups failed for match ${match.id}:`, err.message);
+          console.error(`GOAL API lineups failed for match ${goalApiId}:`, err.message);
           lineups = null;
         }
 
@@ -386,12 +423,12 @@ export async function syncLineups() {
         let goals, cards, substitutions;
         try {
           [goals, cards, substitutions] = await Promise.all([
-            getFixtureEvents(match.id),
-            getFixtureCards(match.id),
-            getFixtureSubstitutions(match.id),
+            getFixtureEvents(goalApiId),
+            getFixtureCards(goalApiId),
+            getFixtureSubstitutions(goalApiId),
           ]);
         } catch (err) {
-          console.error(`GOAL API events/cards/substitutions failed for match ${match.id}:`, err.message);
+          console.error(`GOAL API events/cards/substitutions failed for match ${goalApiId}:`, err.message);
           goals = null;
         }
 
