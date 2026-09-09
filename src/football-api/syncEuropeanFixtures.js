@@ -3,10 +3,22 @@
 // UCL (Champions League) comes from football-data.org -- the full current
 // season in one call (same pattern as syncFixtures.js for domestic leagues).
 // EL and UECL come from GOAL API per-date, since football-data.org returns
-// 403 for competition IDs 2146/2191 on the free tier. Date window: 7 days
-// back to 60 days ahead -- keeps recent results and a solid forward fixture
-// list without hitting GOAL API's 1,000 req/day budget too hard
-// (2 competitions × 67 dates = 134 calls per sync run).
+// 403 for competition IDs 2146/2191 on the free tier -- there's no "whole
+// season" endpoint there, so this is a per-(league,date) loop, unconditional
+// on whether that date could have changed since the last run.
+//
+// Date window is env-controlled (see DAYS_BACK/DAYS_AHEAD below) rather than
+// fixed: confirmed live, 2026-09-09, the original always-on ±7d/+60d window
+// (2 competitions × 67 dates = 134 calls, each paced 500ms apart to respect
+// GOAL API's 15-min sliding budget) made a manually-triggered run take 6+
+// minutes even though the same-day result it was actually run for lands
+// within the first ~10 calls -- the other ~120 calls that run were almost
+// entirely re-confirming a forward calendar and past results that hadn't
+// changed since the previous run. The daily cron now uses a narrow window
+// (today's results + the next couple weeks' schedule); a separate weekly
+// workflow sets EUROPEAN_FIXTURES_FULL_SYNC=true to still walk the full
+// ±7d/+60d range periodically, catching a matchday reschedule further out
+// that the narrow window would otherwise miss indefinitely.
 //
 // All three competitions store home_team_name / away_team_name directly
 // (confirmed live: UCL clubs like Real Madrid and Bayern Munich aren't in our
@@ -155,10 +167,16 @@ function extractScore(fixture) {
   return { home: null, away: null };
 }
 
+// Narrow by default -- see this file's own top comment. Full-sync mode
+// (weekly workflow) restores the original ±7d/+60d range.
+const FULL_SYNC = process.env.EUROPEAN_FIXTURES_FULL_SYNC === 'true';
+const DAYS_BACK = FULL_SYNC ? 7 : 3;
+const DAYS_AHEAD = FULL_SYNC ? 60 : 14;
+
 async function syncGoalApiCompetition(supabase, comp, leagueId) {
   const today = new Date();
   const dates = [];
-  for (let d = -7; d <= 60; d++) {
+  for (let d = -DAYS_BACK; d <= DAYS_AHEAD; d++) {
     const dt = new Date(today);
     dt.setUTCDate(today.getUTCDate() + d);
     dates.push(dt.toISOString().slice(0, 10));

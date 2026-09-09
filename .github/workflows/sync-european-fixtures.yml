@@ -3,20 +3,17 @@ name: European fixtures sync
 on:
   schedule:
     # Once daily (07:00 UTC), not 2x/day -- dropped from 2x/day (2026-09-09):
-    # this file's own top comment already flags the real cost -- 2
-    # competitions x 67 dates = 134 GOAL API calls PER RUN, unconditional
-    # (every date is queried regardless of whether that date has a match;
-    # "empty array" only means the call was cheap in wall-clock time, not
-    # that it was free against the shared 1000/day budget). At 2x/day that
-    # was 268/day spent purely discovering the calendar, before any
-    # lineup/live-score/live-event job (which DO scale down to near-zero
-    # on quiet days) had made a single call -- confirmed against this
-    # project's own goal_api_usage table as a meaningful share of several
-    # days that ran over the 1000/day cap entirely. One run still catches
-    # every fixture within the ±7d/+60d window syncEuropeanFixtures.js
-    # scans; the 16:00 UTC run only existed to catch a same-day kickoff-
-    # time publication a few hours earlier than the next morning's run
-    # would anyway.
+    # 2 competitions' worth of GOAL API calls per run was a meaningful share
+    # of several days that ran over the shared 1000/day cap, confirmed
+    # against this project's own goal_api_usage table. The 16:00 UTC run
+    # only existed to catch a same-day kickoff-time publication a few hours
+    # earlier than the next morning's run would anyway.
+    #
+    # This run uses the narrow default date window (see
+    # syncEuropeanFixtures.js's own top comment) -- today's results plus the
+    # next couple weeks' schedule, not the full ±7d/+60d range. See
+    # sync-european-fixtures-full.yml for the weekly wide-window run that
+    # still catches a reschedule further out.
     - cron: '0 7 * * *'
   workflow_dispatch: {}
 
