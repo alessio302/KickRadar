@@ -27,6 +27,7 @@ const STATUS_RANK = { scheduled: 0, postponed: 0, cancelled: 0, live: 1, finishe
 async function syncUCL(supabase, comp, leagueId) {
   const matches = await getMatches({ competitionId: comp.externalCompetitionId });
   if (matches.length === 0) return 0;
+  console.log(`  [league-logo] champions-league:`, matches[0]?.competition?.emblem ?? 'n/a');
 
   const { data: existingRows, error: existingErr } = await supabase
     .from('fixtures')
