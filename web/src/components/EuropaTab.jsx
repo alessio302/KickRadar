@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useEuropaFixtures } from '../hooks/useEuropaFixtures.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { UEFA_COMPETITIONS } from '../lib/leagues.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 import MatchScore from './MatchScore.jsx';
+import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 
 const BADGE_SIZE = 56;
 const BADGE_PADDING = 6;
@@ -171,7 +173,8 @@ function pickActiveMatchday(fixtures) {
 }
 
 export default function EuropaTab({ theme, t, language }) {
-  const { data, loading } = useEuropaFixtures();
+  const { data, loading, refreshing, refetch } = useEuropaFixtures();
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
   const locale = DATE_LOCALES[language];
   const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
@@ -201,6 +204,7 @@ export default function EuropaTab({ theme, t, language }) {
 
   return (
     <div
+      ref={scrollRef}
       style={{
         height: '100%',
         overflowY: 'auto',
@@ -209,6 +213,7 @@ export default function EuropaTab({ theme, t, language }) {
         padding: '12px 16px 14px',
       }}
     >
+      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       <CompetitionSelector selected={selectedComp} theme={theme} onSelect={setSelectedComp} />
 
       {/* Filter bar -- matches FixturesTab layout exactly */}
