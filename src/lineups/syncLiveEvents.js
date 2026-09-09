@@ -76,7 +76,7 @@ async function findCandidateFixtures(supabase) {
 
   const { data, error } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, goal_api_id')
     .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return data;
@@ -86,6 +86,16 @@ async function findCandidateFixtures(supabase) {
 // (a cuid, unrelated to our numeric id) -- same club-name matching approach
 // as syncLineups.js, grouped by (league, date) so one GOAL API call covers
 // every candidate in that league on that date instead of one call per fixture.
+//
+// Cached in fixtures.goal_api_id (048_fixtures_goal_api_id.sql) once
+// resolved, same pattern as clubs/players' own goal_api_id columns --
+// confirmed live this was the dominant GOAL API request source in this
+// file: connectAndTrack()'s 60-second rescan calls this on every tick for
+// as long as anything is live/about to kick off, and before this cache
+// existed that meant a fresh getLeagueFixtures() call per active league on
+// EVERY tick, all day, for an id that never changes once a match exists. A
+// candidate with a cached id now costs zero GOAL API calls to resolve --
+// only genuinely new (never-before-seen) fixtures still need one.
 export async function resolveGoalApiIds(supabase, candidates) {
   if (candidates.length === 0) return new Map();
 
@@ -97,10 +107,23 @@ export async function resolveGoalApiIds(supabase, candidates) {
   if (clubsErr) throw clubsErr;
   const clubById = new Map(allClubs.map((c) => [c.id, c]));
 
-  const groups = new Map();
+  const resolved = new Map(); // internal fixture id -> { goalApiId, homeClubId, awayClubId, leagueSlug }
+  const unresolved = [];
+
   for (const f of candidates) {
     const leagueSlug = leagueSlugById.get(f.league_id);
-    const league = LEAGUES.find((l) => l.slug === leagueSlug);
+    if (!leagueSlug) continue;
+    if (f.goal_api_id) {
+      resolved.set(f.id, { goalApiId: f.goal_api_id, homeClubId: f.home_club_id, awayClubId: f.away_club_id, leagueSlug });
+      continue;
+    }
+    unresolved.push({ ...f, leagueSlug });
+  }
+  if (unresolved.length === 0) return resolved;
+
+  const groups = new Map();
+  for (const f of unresolved) {
+    const league = LEAGUES.find((l) => l.slug === f.leagueSlug);
     if (!league) continue;
     const dateStr = toDateString(new Date(f.kickoff_at));
     const key = `${league.slug}|${dateStr}`;
@@ -108,7 +131,6 @@ export async function resolveGoalApiIds(supabase, candidates) {
     groups.get(key).fixtures.push(f);
   }
 
-  const resolved = new Map(); // internal fixture id -> { goalApiId, homeClubId, awayClubId }
   for (const { league, dateStr, fixtures } of groups.values()) {
     let apiFixtures;
     try {
@@ -129,7 +151,13 @@ export async function resolveGoalApiIds(supabase, candidates) {
         return homeMatch && awayMatch;
       });
       if (!match) continue;
-      resolved.set(f.id, { goalApiId: String(match.id), homeClubId: homeClub.id, awayClubId: awayClub.id, leagueSlug: league.slug });
+      const goalApiId = String(match.id);
+      resolved.set(f.id, { goalApiId, homeClubId: homeClub.id, awayClubId: awayClub.id, leagueSlug: league.slug });
+
+      // Best-effort: a failed write here only costs re-resolving this one
+      // fixture again on the next rescan, never lost live coverage for it.
+      const { error: cacheErr } = await supabase.from('fixtures').update({ goal_api_id: goalApiId }).eq('id', f.id);
+      if (cacheErr) console.error(`Failed to cache goal_api_id for fixture ${f.id}:`, cacheErr.message);
     }
   }
   return resolved;
