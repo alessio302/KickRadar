@@ -55,7 +55,14 @@ function startsInsideHorizontalScroller(target, boundary) {
 // only during the post-release snap/spring-back animation, letting the
 // caller add a CSS transition then and only then (a transition applied
 // during the live drag would make it visibly lag the finger).
-export function useLeagueCarousel(activeLeague, onCommit) {
+//
+// `adjacent` decouples this from LEAGUES specifically -- everything above
+// is just drag physics over an ordered, cyclic list of slugs, so
+// EuropaTab.jsx reuses this unchanged for UEFA_COMPETITIONS by passing
+// adjacentCompetition instead of the default adjacentLeague. "activeLeague"/
+// "fromLeague"/"toLeague" keep their original names either way; they're
+// just slugs into whichever list `adjacent` walks.
+export function useLeagueCarousel(activeLeague, onCommit, adjacent = adjacentLeague) {
   const containerRef = useRef(null);
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
@@ -153,7 +160,7 @@ export function useLeagueCarousel(activeLeague, onCommit) {
   }, []);
 
   const fromLeague = frozenFrom ?? activeLeague;
-  const toLeague = direction ? adjacentLeague(fromLeague, direction === 'next' ? 1 : -1).slug : null;
+  const toLeague = direction ? adjacent(fromLeague, direction === 'next' ? 1 : -1).slug : null;
 
   return { containerRef, offsetX, direction, settling, fromLeague, toLeague };
 }

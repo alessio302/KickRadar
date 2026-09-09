@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useEuropaFixtures } from '../hooks/useEuropaFixtures.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
-import { UEFA_COMPETITIONS } from '../lib/leagues.js';
+import LeagueCarousel from './LeagueCarousel.jsx';
+import { UEFA_COMPETITIONS, adjacentCompetition } from '../lib/leagues.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 import MatchScore from './MatchScore.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
@@ -121,7 +122,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
 
   return (
     <div
-      onClick={() => onSelectFixture(fixture)}
+      onClick={() => onSelectFixture?.(fixture)}
       style={{
         background: theme.surfaceRaised,
         padding: '10px 14px',
@@ -175,17 +176,15 @@ function pickActiveMatchday(fixtures) {
   return all.length ? Math.max(...all) : null;
 }
 
-export default function EuropaTab({ theme, t, language }) {
-  const { data, loading, refreshing, refetch } = useEuropaFixtures();
+// The fixture list for one competition -- rendered twice by LeagueCarousel
+// while a swipe is in progress (the active competition and whichever
+// neighbor is being dragged into view), same split as FixturesTab.jsx's
+// own FixturesList. onSelectFixture is only passed for the active
+// instance (see LeagueCarousel.jsx's own comment on why the preview one
+// stays non-interactive) -- EuropaFixtureRow's onClick already guards
+// against it being undefined.
+function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, refetch, refreshing, onSelectFixture }) {
   const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
-  const locale = DATE_LOCALES[language];
-  const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
-  const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
-  const [liveOnly, setLiveOnly] = useState(false);
-  const [selectedFixture, setSelectedFixture] = useState(null);
-
-  const fixtures = data[selectedComp] ?? [];
-
   const activeMatchday = useMemo(() => pickActiveMatchday(fixtures), [fixtures]);
 
   const grouped = useMemo(() => {
@@ -207,19 +206,77 @@ export default function EuropaTab({ theme, t, language }) {
   const dateEntries = Object.entries(grouped);
 
   return (
+    <div
+      ref={scrollRef}
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehaviorY: 'none',
+        padding: '0 16px 14px',
+      }}
+    >
+      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
+
+      {loading && (
+        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
+          {t.common.loading}
+        </p>
+      )}
+
+      {!loading && dateEntries.length === 0 && (
+        <p style={{ fontSize: '13px', color: theme.textMuted, paddingLeft: '4px' }}>
+          {t.fixtures.empty}
+        </p>
+      )}
+
+      {!loading &&
+        dateEntries.map(([date, dayFixtures]) => (
+          <div key={date} style={{ marginBottom: '12px' }}>
+            <p
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: theme.textMuted,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                margin: '0 0 6px',
+              }}
+            >
+              {date}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {dayFixtures.map((f) => (
+                <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={onSelectFixture} />
+              ))}
+            </div>
+          </div>
+        ))}
+    </div>
+  );
+}
+
+export default function EuropaTab({ theme, t, language }) {
+  const { data, loading, refreshing, refetch } = useEuropaFixtures();
+  const locale = DATE_LOCALES[language];
+  const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
+  const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
+  const [liveOnly, setLiveOnly] = useState(false);
+  const [selectedFixture, setSelectedFixture] = useState(null);
+
+  // direction 1 = swipe left (next competition), -1 = swipe right --
+  // same contract as App.jsx's own swipeLeague, just over UEFA_COMPETITIONS
+  // via adjacentCompetition instead of LEAGUES/adjacentLeague.
+  const swipeComp = (direction) => setSelectedComp(adjacentCompetition(selectedComp, direction).slug);
+
+  return (
     // Same app-shell split as FixturesTab.jsx: a pinned, non-scrolling
-    // header (selector + filters) as a flexShrink:0 sibling, then a
-    // separate flex:1/minHeight:0 box that actually scrolls. Previously
-    // this whole tab -- selector, filters, AND the fixture list -- was one
-    // single scrolling div, with the fixture-detail overlay rendered as
-    // its last child. That put the overlay's `position: fixed` backdrop
-    // inside a WebkitOverflowScrolling:'touch' ancestor -- confirmed live
-    // (screenshot) this makes iOS Safari treat "fixed" as scoped to that
-    // scrolling box instead of the true viewport (a known iOS momentum-
-    // scroll quirk), so the sheet rendered clipped under the status bar
-    // and never covered the bottom nav. Rendering the overlay as a sibling
-    // OUTSIDE the scrolling box, like FixtureDetailOverlay already is in
-    // FixturesTab, avoids that ancestor entirely.
+    // header (selector + filters) as a flexShrink:0 sibling, then
+    // LeagueCarousel's own swipe-pager for the actual fixture list. The
+    // fixture-detail overlay stays a sibling AFTER LeagueCarousel, not
+    // nested inside its scrolling box -- see this file's own git history
+    // for why a position:fixed overlay nested inside a
+    // WebkitOverflowScrolling:'touch' ancestor renders clipped on iOS.
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>
         <CompetitionSelector selected={selectedComp} theme={theme} onSelect={setSelectedComp} />
@@ -290,54 +347,26 @@ export default function EuropaTab({ theme, t, language }) {
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehaviorY: 'none',
-          padding: '0 16px 14px',
-        }}
-      >
-        <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
-
-        {loading && (
-          <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
-            {t.common.loading}
-          </p>
+      <LeagueCarousel
+        league={selectedComp}
+        onSwitchLeague={swipeComp}
+        adjacent={adjacentCompetition}
+        renderPage={(slug) => (
+          <EuropaFixturesList
+            key={slug}
+            theme={theme}
+            t={t}
+            locale={locale}
+            fixtures={data[slug] ?? []}
+            loading={loading}
+            currentMatchdayOnly={currentMatchdayOnly}
+            liveOnly={liveOnly}
+            refetch={refetch}
+            refreshing={refreshing}
+            onSelectFixture={slug === selectedComp ? setSelectedFixture : undefined}
+          />
         )}
-
-        {!loading && dateEntries.length === 0 && (
-          <p style={{ fontSize: '13px', color: theme.textMuted, paddingLeft: '4px' }}>
-            {t.fixtures.empty}
-          </p>
-        )}
-
-        {!loading &&
-          dateEntries.map(([date, dayFixtures]) => (
-            <div key={date} style={{ marginBottom: '12px' }}>
-              <p
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: theme.textMuted,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  margin: '0 0 6px',
-                }}
-              >
-                {date}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {dayFixtures.map((f) => (
-                  <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={setSelectedFixture} />
-                ))}
-              </div>
-            </div>
-          ))}
-      </div>
+      />
 
       {selectedFixture && (
         <EuropaFixtureDetailOverlay

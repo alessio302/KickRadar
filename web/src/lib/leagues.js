@@ -141,6 +141,16 @@ export function adjacentLeague(slug, direction) {
   return LEAGUES[(base + direction + LEAGUES.length) % LEAGUES.length];
 }
 
+// Same cyclic neighbor lookup, over UEFA_COMPETITIONS instead of LEAGUES --
+// passed to useLeagueCarousel.js's own `adjacent` param so EuropaTab.jsx
+// gets the identical swipe-to-switch gesture the 5 domestic leagues
+// already have, without duplicating that hook's touch-drag physics.
+export function adjacentCompetition(slug, direction) {
+  const idx = UEFA_COMPETITIONS.findIndex((c) => c.slug === slug);
+  const base = idx === -1 ? 0 : idx;
+  return UEFA_COMPETITIONS[(base + direction + UEFA_COMPETITIONS.length) % UEFA_COMPETITIONS.length];
+}
+
 // Which competition zone a table position falls into for a given league,
 // or null outside every zone (mid-table). Relegation is counted from the
 // bottom of that league's own team count, not a fixed row number, since

@@ -18,9 +18,16 @@ import { useLeagueCarousel, LEAGUE_CAROUSEL_TRANSITION } from '../hooks/useLeagu
 // deliberately not passed a league override, since the preview panel
 // represents "what you're about to land on", not something meant to be
 // interacted with mid-drag.
-export default function LeagueCarousel({ league, onSwitchLeague, renderPage }) {
-  const { containerRef, offsetX, direction, settling, fromLeague, toLeague } = useLeagueCarousel(league, (dir) =>
-    onSwitchLeague(dir === 'next' ? 1 : -1)
+//
+// `adjacent` is optional (defaults to useLeagueCarousel's own
+// adjacentLeague) -- EuropaTab.jsx passes adjacentCompetition to reuse
+// this same shell for swiping between UEFA_COMPETITIONS instead of
+// LEAGUES, "league"/"leagueSlug" naming throughout notwithstanding.
+export default function LeagueCarousel({ league, onSwitchLeague, renderPage, adjacent }) {
+  const { containerRef, offsetX, direction, settling, fromLeague, toLeague } = useLeagueCarousel(
+    league,
+    (dir) => onSwitchLeague(dir === 'next' ? 1 : -1),
+    adjacent
   );
   const transition = settling ? LEAGUE_CAROUSEL_TRANSITION : 'none';
 
