@@ -5,10 +5,30 @@ import { getStandings, sleep } from './client.js';
 export async function syncStandingsForLeague(supabase, league) {
   const { data: dbLeague, error: leagueErr } = await supabase
     .from('leagues')
-    .select('id')
+    .select('id, standings_finished_count')
     .eq('slug', league.slug)
     .single();
   if (leagueErr) throw leagueErr;
+
+  // A league's table only actually changes when a fixture transitions to
+  // 'finished' (points/GF/GA update) -- this job used to call
+  // football-data.org and re-upsert all ~20 rows on every single
+  // scheduled run regardless, 4x/day, even on a day with zero matches
+  // played yet. The count of finished fixtures is a cheap, reliable
+  // "did anything happen" signal: unchanged since the last successful
+  // sync means skip entirely (no API call, no DB write); changed means
+  // re-fetch and store the new count below. Doesn't catch the rare case
+  // of a result being corrected after the match was already finished
+  // (e.g. a post-match VAR/disciplinary review) -- accepted gap, same
+  // class of tradeoff as this project's other "genuine edge case, not
+  // worth the complexity" calls.
+  const { count: finishedCount, error: countErr } = await supabase
+    .from('fixtures')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', dbLeague.id)
+    .eq('status', 'finished');
+  if (countErr) throw countErr;
+  if (finishedCount === dbLeague.standings_finished_count) return 0;
 
   const { data: clubs, error: clubsErr } = await supabase
     .from('clubs')
@@ -42,6 +62,14 @@ export async function syncStandingsForLeague(supabase, league) {
     .from('standings')
     .upsert(rows, { onConflict: 'league_id,club_id' });
   if (error) throw error;
+
+  // Best-effort: a failed write here only costs one extra (harmless,
+  // idempotent) re-sync next run, never stale standings data.
+  const { error: markErr } = await supabase
+    .from('leagues')
+    .update({ standings_finished_count: finishedCount })
+    .eq('id', dbLeague.id);
+  if (markErr) console.error(`Failed to mark standings_finished_count for ${league.slug}:`, markErr.message);
 
   return rows.length;
 }
