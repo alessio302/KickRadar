@@ -5,6 +5,7 @@ import { UEFA_COMPETITIONS } from '../lib/leagues.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 import MatchScore from './MatchScore.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
+import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
 
 const BADGE_SIZE = 56;
 const BADGE_PADDING = 6;
@@ -103,7 +104,7 @@ function TeamBadge({ url, name, size = 20, theme }) {
   );
 }
 
-function EuropaFixtureRow({ fixture, theme, t, locale }) {
+function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
   const isLive = fixture.status === 'live';
   const isFinished = fixture.status === 'finished';
 
@@ -120,6 +121,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale }) {
 
   return (
     <div
+      onClick={() => onSelectFixture(fixture)}
       style={{
         background: theme.surfaceRaised,
         padding: '10px 14px',
@@ -128,6 +130,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale }) {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
+        cursor: 'pointer',
       }}
     >
       <span
@@ -179,6 +182,7 @@ export default function EuropaTab({ theme, t, language }) {
   const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [liveOnly, setLiveOnly] = useState(false);
+  const [selectedFixture, setSelectedFixture] = useState(null);
 
   const fixtures = data[selectedComp] ?? [];
 
@@ -311,11 +315,21 @@ export default function EuropaTab({ theme, t, language }) {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {dayFixtures.map((f) => (
-                <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} />
+                <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={setSelectedFixture} />
               ))}
             </div>
           </div>
         ))}
+
+      {selectedFixture && (
+        <EuropaFixtureDetailOverlay
+          theme={theme}
+          t={t}
+          language={language}
+          fixture={selectedFixture}
+          onClose={() => setSelectedFixture(null)}
+        />
+      )}
     </div>
   );
 }

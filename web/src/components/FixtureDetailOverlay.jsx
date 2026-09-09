@@ -238,7 +238,7 @@ function PitchFormation({ formation, rows, onSelectPlayer }) {
   );
 }
 
-function LineupList({ theme, t, row, onSelectPlayer }) {
+export function LineupList({ theme, t, row, onSelectPlayer }) {
   if (!row) {
     return (
       <div style={{ padding: '32px 16px', textAlign: 'center' }}>
