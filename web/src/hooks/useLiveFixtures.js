@@ -32,7 +32,15 @@ export function useLiveFixtures() {
             .select(
               'id, league_id, matchday, home_club_id, away_club_id, kickoff_at, kickoff_confirmed, status, home_score, away_score, referee, live_minute, highlight_video_url'
             )
-            .eq('status', 'live'),
+            .eq('status', 'live')
+            // Excludes UEFA competitions -- they carry no home_club_id/
+            // away_club_id at all (team_name-keyed instead, see
+            // syncEuropeanFixtures.js's own comment), so this club_id-joined
+            // card (ClubJersey + homeClub/awayClub) rendered them with an
+            // invisible badge and name once syncLiveEvents.js/the webhook
+            // started marking European fixtures 'live' too -- confirmed live,
+            // 2026-09-09. EuropaTab already has its own live handling.
+            .not('home_club_id', 'is', null),
           supabase.from('clubs').select('id, name, short_name, crest_url'),
           supabase.from('leagues').select('id, slug'),
         ]);
