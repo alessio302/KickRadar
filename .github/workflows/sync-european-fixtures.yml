@@ -1,0 +1,29 @@
+name: European fixtures sync
+
+on:
+  schedule:
+    # 2x/day -- European matches play Tuesday/Wednesday/Thursday evenings;
+    # morning run (07:00 UTC) catches overnight result updates, evening run
+    # (16:00 UTC) picks up any late-day kickoff-time publications before
+    # prime time. On days without matches the GOAL API returns empty arrays
+    # and the run completes quickly.
+    - cron: '0 7,16 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncEuropeanFixtures.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}

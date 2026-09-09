@@ -99,8 +99,35 @@ export const LEAGUES = [
   },
 ];
 
+// UEFA club competitions -- display metadata only, no teamCount/zone data
+// (those only apply to domestic league tables). Colors match the zone
+// markers already used in StandingsTab.jsx (cl/el/uecl constants there).
+export const UEFA_COMPETITIONS = [
+  {
+    slug: 'champions-league',
+    label: 'Champions League',
+    shortName: 'UCL',
+    color: '#3D8BFD',
+    logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/bf/UEFA_Champions_League_logo_2.svg/200px-UEFA_Champions_League_logo_2.svg.png',
+  },
+  {
+    slug: 'europa-league',
+    label: 'Europa League',
+    shortName: 'UEL',
+    color: '#F5A623',
+    logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a5/UEFA_Europa_League_logo_%282021%E2%80%93present%29.svg/200px-UEFA_Europa_League_logo_%282021%E2%80%93present%29.svg.png',
+  },
+  {
+    slug: 'conference-league',
+    label: 'Conference League',
+    shortName: 'UECL',
+    color: '#3DBA6E',
+    logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a7/UEFA_Europa_Conference_League_logo.svg/200px-UEFA_Europa_Conference_League_logo.svg.png',
+  },
+];
+
 export function leagueBySlug(slug) {
-  return LEAGUES.find((l) => l.slug === slug);
+  return LEAGUES.find((l) => l.slug === slug) ?? UEFA_COMPETITIONS.find((c) => c.slug === slug);
 }
 
 // Cyclic neighbor lookup for swipe-to-switch (see useLeagueCarousel.js) --

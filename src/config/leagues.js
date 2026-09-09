@@ -68,3 +68,35 @@ export function leagueBySlug(slug) {
 export function leagueByNewsSource(sourceKey) {
   return LEAGUES.find((l) => l.newsSources.includes(sourceKey));
 }
+
+// UEFA club competitions -- separate from LEAGUES so existing callers
+// (syncFixtures, syncStandings, etc.) don't accidentally iterate them.
+// externalCompetitionId: 2001 = UCL (football-data.org free tier); EL/UECL
+// use GOAL API exclusively (2146/2191 return 403 on the free tier).
+// goalApiLeagueId confirmed live from the European leagues diagnostic.
+export const UEFA_COMPETITIONS = [
+  {
+    slug: 'champions-league',
+    name: 'Champions League',
+    shortName: 'UCL',
+    externalCompetitionId: 2001,
+    goalApiLeagueId: 'cmr77dw3900f5rx06j05wgzv4',
+    source: 'football-data',
+  },
+  {
+    slug: 'europa-league',
+    name: 'Europa League',
+    shortName: 'UEL',
+    externalCompetitionId: null,
+    goalApiLeagueId: 'cmr77dw3900f6rx06tuqwft2d',
+    source: 'goal-api',
+  },
+  {
+    slug: 'conference-league',
+    name: 'Conference League',
+    shortName: 'UECL',
+    externalCompetitionId: null,
+    goalApiLeagueId: 'cmr77dw3900f9rx06laad8onf',
+    source: 'goal-api',
+  },
+];

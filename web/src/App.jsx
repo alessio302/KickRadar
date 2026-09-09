@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import StandingsTab from './components/StandingsTab.jsx';
+import EuropaTab from './components/EuropaTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
@@ -351,9 +352,7 @@ export default function App() {
           <StandingsTab theme={theme} t={t} language={language} league={league} onSelectLeague={selectLeague} onSwipeLeague={swipeLeague} />
         )}
         {tab === 'europa' && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.textMuted, fontSize: '14px' }}>
-            Champions League · Europa League · Conference League
-          </div>
+          <EuropaTab theme={theme} t={t} language={language} />
         )}
         {tab === 'einstellungen' && (
           <SettingsTab
