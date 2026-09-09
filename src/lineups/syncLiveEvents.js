@@ -8,15 +8,62 @@
 // key rows by content, and that content-based key needs to be reconciled
 // away rather than trusted forever.
 //
-// Deliberately never touches fixtures.status/home_score/away_score --
-// syncLiveScores.js (football-data.org) already owns that, and having two
-// writers race on the same columns from two different providers would be
-// its own bug. This file only ever writes to match_events.
+// Deliberately never touches DOMESTIC fixtures' status/home_score/
+// away_score -- syncLiveScores.js (football-data.org) already owns that,
+// and having two writers race on the same columns from two different
+// providers would be its own bug. UEFA_COMPETITIONS fixtures are
+// different: nothing else updates their status/score/live_minute in real
+// time at all (football-data.org's UCL match object has no live push,
+// and the goal-api-webhook Edge Function only knows the 5 domestic
+// leagues' club_id-keyed fixtures) -- syncEuropeanFixtures.js's once-daily
+// calendar sync was the only writer before this, hours behind an actual
+// live match. This connection is the sole live writer for those three
+// leagues, so it does own status/score/live_minute for them.
+//
+// One WS connection total, tracking BOTH domestic and European matches at
+// once -- GOAL API's FREE plan caps maxConnections at 1 (confirmed live,
+// see connectAndTrack()'s own comment), so a second, independently-
+// scheduled job opening its own connection would fight this one for it
+// rather than adding coverage. byGoalApiId's info shape now carries a
+// `kind` ('domestic' | 'european') deciding both how to resolve/key a
+// match (club_id vs team_name -- European fixtures have no clubs table
+// row, see syncEuropeanFixtures.js's own comment) and whether this file
+// writes status/score for it.
 import { getSupabaseClient } from '../db/supabaseClient.js';
-import { LEAGUES } from '../config/leagues.js';
+import { LEAGUES, UEFA_COMPETITIONS } from '../config/leagues.js';
 import { getLeagueFixtures, getWsToken, GOAL_API_WS_URL } from './goalApiClient.js';
 import { resolveClub } from '../news/clubMatch.js';
+import { namesLooselyMatch } from './syncEuropeanLineups.js';
 import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
+
+// Same anti-regression guard syncFixtures.js/syncEuropeanFixtures.js/
+// syncLiveScores.js already use everywhere else a fixture's status gets
+// written from more than one place over time -- a live WS tick arriving
+// out of order (or a stray unrecognized match_status string) must never
+// walk a fixture backwards through scheduled -> live -> finished.
+const STATUS_RANK = { scheduled: 0, postponed: 0, cancelled: 0, live: 1, finished: 2 };
+
+// GOAL API's match_status field for a EUROPEAN fixture's live write --
+// deriving scheduled/live/finished from it, not just the live-minute
+// parsing parseLiveMinute() already does below. Two known shapes: a bare
+// elapsed-minute string ("23", "45+2") or "Half Time"/"HT" while in play
+// (confirmed live for the 5 domestic leagues, same match_status field --
+// parseLiveMinute() already handles both), or one of the short phase
+// codes GOAL API's own docs show ("1H"/"2H"/"HT"/"FT"/"NS"/...). Both are
+// handled here rather than picking one, since this hasn't been confirmed
+// live yet specifically for a UEFA fixture. Deliberately returns null
+// (write nothing) for anything unrecognized -- the same conservative
+// "don't guess" principle resolveClub()/parseLiveMinute() already apply,
+// since a wrong guess here would show a wrong status/score to real users
+// mid-match, worse than a fixture staying on whatever it last had.
+function deriveEuropeanStatus(matchStatus) {
+  if (typeof matchStatus !== 'string') return null;
+  const s = matchStatus.trim();
+  if (parseLiveMinute(s)) return 'live';
+  if (/^(1h|2h|et|live|inplay|in_play|in.progress)$/i.test(s)) return 'live';
+  if (/^(ft|finished|full.?time|aet|pen|penalties|ended)$/i.test(s)) return 'finished';
+  return null;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,9 +121,13 @@ async function findCandidateFixtures(supabase) {
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
 
+  // No league_id filter -- deliberately covers every tracked league
+  // (domestic and UEFA alike), same as it always has; home_team_name/
+  // away_team_name are only ever populated (and only ever read) for the
+  // European ones.
   const { data, error } = await supabase
     .from('fixtures')
-    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, goal_api_id')
+    .select('id, league_id, home_club_id, away_club_id, home_team_name, away_team_name, kickoff_at, status, goal_api_id')
     .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return data;
@@ -107,59 +158,126 @@ export async function resolveGoalApiIds(supabase, candidates) {
   if (clubsErr) throw clubsErr;
   const clubById = new Map(allClubs.map((c) => [c.id, c]));
 
-  const resolved = new Map(); // internal fixture id -> { goalApiId, homeClubId, awayClubId, leagueSlug }
-  const unresolved = [];
+  const uefaSlugs = new Set(UEFA_COMPETITIONS.map((c) => c.slug));
+
+  // internal fixture id -> either
+  //   { goalApiId, leagueSlug, kind: 'domestic', homeClubId, awayClubId }
+  // or
+  //   { goalApiId, leagueSlug, kind: 'european', homeTeamName, awayTeamName }
+  const resolved = new Map();
+  const unresolvedDomestic = [];
+  const unresolvedEuropean = [];
 
   for (const f of candidates) {
     const leagueSlug = leagueSlugById.get(f.league_id);
     if (!leagueSlug) continue;
+    const isEuropean = uefaSlugs.has(leagueSlug);
+
     if (f.goal_api_id) {
-      resolved.set(f.id, { goalApiId: f.goal_api_id, homeClubId: f.home_club_id, awayClubId: f.away_club_id, leagueSlug });
+      resolved.set(
+        f.id,
+        isEuropean
+          ? { goalApiId: f.goal_api_id, leagueSlug, kind: 'european', homeTeamName: f.home_team_name, awayTeamName: f.away_team_name }
+          : { goalApiId: f.goal_api_id, leagueSlug, kind: 'domestic', homeClubId: f.home_club_id, awayClubId: f.away_club_id }
+      );
       continue;
     }
-    unresolved.push({ ...f, leagueSlug });
-  }
-  if (unresolved.length === 0) return resolved;
-
-  const groups = new Map();
-  for (const f of unresolved) {
-    const league = LEAGUES.find((l) => l.slug === f.leagueSlug);
-    if (!league) continue;
-    const dateStr = toDateString(new Date(f.kickoff_at));
-    const key = `${league.slug}|${dateStr}`;
-    if (!groups.has(key)) groups.set(key, { league, dateStr, fixtures: [] });
-    groups.get(key).fixtures.push(f);
+    (isEuropean ? unresolvedEuropean : unresolvedDomestic).push({ ...f, leagueSlug });
   }
 
-  for (const { league, dateStr, fixtures } of groups.values()) {
-    let apiFixtures;
-    try {
-      apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
-    } catch (err) {
-      console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
-      continue;
+  // Domestic resolution -- unchanged from before this file tracked Europe
+  // too, just reading from unresolvedDomestic instead of a single shared
+  // unresolved array.
+  if (unresolvedDomestic.length > 0) {
+    const groups = new Map();
+    for (const f of unresolvedDomestic) {
+      const league = LEAGUES.find((l) => l.slug === f.leagueSlug);
+      if (!league) continue;
+      const dateStr = toDateString(new Date(f.kickoff_at));
+      const key = `${league.slug}|${dateStr}`;
+      if (!groups.has(key)) groups.set(key, { league, dateStr, fixtures: [] });
+      groups.get(key).fixtures.push(f);
     }
-    const leagueClubs = allClubs.filter((c) => c.league_id === fixtures[0]?.league_id);
 
-    for (const f of fixtures) {
-      const homeClub = clubById.get(f.home_club_id);
-      const awayClub = clubById.get(f.away_club_id);
-      if (!homeClub || !awayClub) continue;
-      const match = apiFixtures.find((m) => {
-        const homeMatch = resolveClub(m.homeTeam?.name, leagueClubs)?.id === homeClub.id;
-        const awayMatch = resolveClub(m.awayTeam?.name, leagueClubs)?.id === awayClub.id;
-        return homeMatch && awayMatch;
-      });
-      if (!match) continue;
-      const goalApiId = String(match.id);
-      resolved.set(f.id, { goalApiId, homeClubId: homeClub.id, awayClubId: awayClub.id, leagueSlug: league.slug });
+    for (const { league, dateStr, fixtures } of groups.values()) {
+      let apiFixtures;
+      try {
+        apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
+      } catch (err) {
+        console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
+        continue;
+      }
+      const leagueClubs = allClubs.filter((c) => c.league_id === fixtures[0]?.league_id);
 
-      // Best-effort: a failed write here only costs re-resolving this one
-      // fixture again on the next rescan, never lost live coverage for it.
-      const { error: cacheErr } = await supabase.from('fixtures').update({ goal_api_id: goalApiId }).eq('id', f.id);
-      if (cacheErr) console.error(`Failed to cache goal_api_id for fixture ${f.id}:`, cacheErr.message);
+      for (const f of fixtures) {
+        const homeClub = clubById.get(f.home_club_id);
+        const awayClub = clubById.get(f.away_club_id);
+        if (!homeClub || !awayClub) continue;
+        const match = apiFixtures.find((m) => {
+          const homeMatch = resolveClub(m.homeTeam?.name, leagueClubs)?.id === homeClub.id;
+          const awayMatch = resolveClub(m.awayTeam?.name, leagueClubs)?.id === awayClub.id;
+          return homeMatch && awayMatch;
+        });
+        if (!match) continue;
+        const goalApiId = String(match.id);
+        resolved.set(f.id, { goalApiId, leagueSlug: league.slug, kind: 'domestic', homeClubId: homeClub.id, awayClubId: awayClub.id });
+
+        // Best-effort: a failed write here only costs re-resolving this
+        // one fixture again on the next rescan, never lost live coverage.
+        const { error: cacheErr } = await supabase.from('fixtures').update({ goal_api_id: goalApiId }).eq('id', f.id);
+        if (cacheErr) console.error(`Failed to cache goal_api_id for fixture ${f.id}:`, cacheErr.message);
+      }
     }
   }
+
+  // European resolution -- in practice only ever reached for UCL: EL/UECL
+  // fixtures always already carry a goal_api_id from
+  // syncEuropeanFixtures.js (GOAL API is their fixture source directly),
+  // so they hit the `if (f.goal_api_id)` branch above and never land in
+  // unresolvedEuropean at all. UCL comes from football-data.org instead,
+  // so it needs the same team-name resolution syncEuropeanLineups.js
+  // already does against GOAL API's own UCL fixture list.
+  if (unresolvedEuropean.length > 0) {
+    const compBySlug = new Map(UEFA_COMPETITIONS.map((c) => [c.slug, c]));
+    const groups = new Map();
+    for (const f of unresolvedEuropean) {
+      const comp = compBySlug.get(f.leagueSlug);
+      if (!comp) continue;
+      const dateStr = toDateString(new Date(f.kickoff_at));
+      const key = `${comp.slug}|${dateStr}`;
+      if (!groups.has(key)) groups.set(key, { comp, dateStr, fixtures: [] });
+      groups.get(key).fixtures.push(f);
+    }
+
+    for (const { comp, dateStr, fixtures } of groups.values()) {
+      let apiFixtures;
+      try {
+        apiFixtures = await getLeagueFixtures(comp.goalApiLeagueId, dateStr);
+      } catch (err) {
+        console.error(`GOAL API fixtures failed for ${comp.slug} ${dateStr}:`, err.message);
+        continue;
+      }
+
+      for (const f of fixtures) {
+        const match = apiFixtures.find(
+          (m) => namesLooselyMatch(m.homeTeam?.name, f.home_team_name) && namesLooselyMatch(m.awayTeam?.name, f.away_team_name)
+        );
+        if (!match) continue;
+        const goalApiId = String(match.id);
+        resolved.set(f.id, {
+          goalApiId,
+          leagueSlug: comp.slug,
+          kind: 'european',
+          homeTeamName: f.home_team_name,
+          awayTeamName: f.away_team_name,
+        });
+
+        const { error: cacheErr } = await supabase.from('fixtures').update({ goal_api_id: goalApiId }).eq('id', f.id);
+        if (cacheErr) console.error(`Failed to cache goal_api_id for fixture ${f.id}:`, cacheErr.message);
+      }
+    }
+  }
+
   return resolved;
 }
 
@@ -167,7 +285,20 @@ export async function resolveGoalApiIds(supabase, candidates) {
 // (with a "(o.g.)" suffix) appears under the field of the team that
 // *benefited*, not the scorer's actual club -- same call made in
 // syncLineups.js's buildEventRows for the REST path, kept consistent here.
-function buildLiveEventRows(fixtureId, homeClubId, awayClubId, data) {
+//
+// `info` (the same value byGoalApiId stores) decides how a side is keyed --
+// club_id for a domestic fixture, team_name for a European one (no clubs
+// table row -- see this file's own top comment). sideRef() below returns
+// exactly one of {club_id} or {team_name} to spread into a row, never both
+// and never neither, matching lineups.js/sql/054's own "exactly one set"
+// contract.
+function sideRef(info, isHomeField) {
+  return info.kind === 'european'
+    ? { team_name: isHomeField ? info.homeTeamName : info.awayTeamName }
+    : { club_id: isHomeField ? info.homeClubId : info.awayClubId };
+}
+
+function buildLiveEventRows(fixtureId, info, data) {
   const rows = [];
 
   for (const g of data.goalscorer ?? []) {
@@ -179,7 +310,7 @@ function buildLiveEventRows(fixtureId, homeClubId, awayClubId, data) {
     const isOwnGoal = /\(o\.g\.\)/i.test(rawName);
     rows.push({
       fixture_id: fixtureId,
-      club_id: isHomeField ? homeClubId : awayClubId,
+      ...sideRef(info, isHomeField),
       type: isOwnGoal ? 'Own Goal' : 'Goal',
       minute: String(g.time ?? ''),
       player: rawName,
@@ -197,7 +328,7 @@ function buildLiveEventRows(fixtureId, homeClubId, awayClubId, data) {
     const type = /red/i.test(c.card || '') ? 'Red Card' : 'Yellow Card';
     rows.push({
       fixture_id: fixtureId,
-      club_id: isHomeField ? homeClubId : awayClubId,
+      ...sideRef(info, isHomeField),
       type,
       minute: String(c.time ?? ''),
       player,
@@ -215,7 +346,7 @@ function buildLiveEventRows(fixtureId, homeClubId, awayClubId, data) {
       if (!inName) continue;
       rows.push({
         fixture_id: fixtureId,
-        club_id: side === 'home' ? homeClubId : awayClubId,
+        ...sideRef(info, side === 'home'),
         type: 'Substitution',
         minute: String(s.time ?? ''),
         player: inName,
@@ -267,13 +398,14 @@ function countLiveEvents(data) {
 // connection closes for any other reason (GOAL API bouncing it, a network
 // blip, an auth failure -- resolves reachedDeadline: false so the caller
 // reconnects instead of treating the whole run as done). byGoalApiId,
-// lastCounts, lastMinutes and pendingRemovals are the same Maps across
-// every reconnect attempt within one run (mutated in place, never
-// recreated here), so a fresh connection picks up exactly where a dropped
-// one left off -- already-known matches, minutes and event counts don't
-// need rediscovering, and a reconnect's own auth_success re-subscribes to
-// all of them in one go, same as the very first connection did.
-async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, confirmedRetractions, counts }) {
+// lastCounts, lastMinutes, lastEuropeanState and pendingRemovals are the
+// same Maps across every reconnect attempt within one run (mutated in
+// place, never recreated here), so a fresh connection picks up exactly
+// where a dropped one left off -- already-known matches, minutes, event
+// counts and European status/score don't need rediscovering, and a
+// reconnect's own auth_success re-subscribes to all of them in one go,
+// same as the very first connection did.
+async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, lastEuropeanState, pendingRemovals, confirmedRetractions, counts }) {
   const { token } = await getWsToken();
 
   return new Promise((resolve, reject) => {
@@ -353,7 +485,7 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
                 droppedForCapacity += 1;
                 continue;
               }
-              byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
+              byGoalApiId.set(info.goalApiId, { ...info, fixtureId });
               subscribeTo(info.goalApiId);
             }
             // Confirmed live: MAX_SUBSCRIPTIONS (GOAL API FREE plan's own
@@ -393,11 +525,38 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
         if (minuteErr) console.error(`Failed to update live minute for fixture ${info.fixtureId}:`, minuteErr.message);
       }
 
+      // European fixtures only (see this file's own top comment) -- this
+      // connection is their sole live writer for status/score, unlike
+      // domestic fixtures where syncLiveScores.js/the webhook already own
+      // it. lastEuropeanState starts empty each run (same as
+      // lastMinutes/lastCounts), so the STATUS_RANK comparison falls back
+      // to 'scheduled' (rank 0) for a goalApiId not yet seen this run --
+      // exactly matching the actual DB state findCandidateFixtures()
+      // already filtered these fixtures down to (scheduled or live).
+      if (info.kind === 'european') {
+        const derivedStatus = deriveEuropeanStatus(data.match_status);
+        const home = Number.parseInt(data.match_hometeam_score, 10);
+        const away = Number.parseInt(data.match_awayteam_score, 10);
+        const prev = lastEuropeanState.get(goalApiId) ?? { status: 'scheduled', home: null, away: null };
+        const nextStatus =
+          derivedStatus && STATUS_RANK[derivedStatus] >= STATUS_RANK[prev.status] ? derivedStatus : prev.status;
+        const nextHome = Number.isFinite(home) ? home : prev.home;
+        const nextAway = Number.isFinite(away) ? away : prev.away;
+        if (nextStatus !== prev.status || nextHome !== prev.home || nextAway !== prev.away) {
+          lastEuropeanState.set(goalApiId, { status: nextStatus, home: nextHome, away: nextAway });
+          const update = { status: nextStatus };
+          if (nextHome != null) update.home_score = nextHome;
+          if (nextAway != null) update.away_score = nextAway;
+          const { error: statusErr } = await supabase.from('fixtures').update(update).eq('id', info.fixtureId);
+          if (statusErr) console.error(`Failed to update status/score for European fixture ${info.fixtureId}:`, statusErr.message);
+        }
+      }
+
       const count = countLiveEvents(data);
       if (lastCounts.get(goalApiId) === count) return; // no new goal/card/sub since last push
       lastCounts.set(goalApiId, count);
 
-      const rows = buildLiveEventRows(info.fixtureId, info.homeClubId, info.awayClubId, data);
+      const rows = buildLiveEventRows(info.fixtureId, info, data);
 
       // GOAL API's own payload can retract an event after this file already
       // wrote it -- a goal disallowed on VAR review (or, less commonly, a
@@ -512,11 +671,11 @@ export async function syncLiveEvents() {
   const resolved = await resolveGoalApiIds(supabase, candidates);
   if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: 0, reconnects: 0 };
 
-  // goalApiId -> { fixtureId, homeClubId, awayClubId, leagueSlug }
+  // goalApiId -> { fixtureId, leagueSlug, kind, ...(homeClubId/awayClubId | homeTeamName/awayTeamName) }
   const byGoalApiId = new Map();
   for (const [fixtureId, info] of resolved) {
     if (byGoalApiId.size >= MAX_SUBSCRIPTIONS) break;
-    byGoalApiId.set(info.goalApiId, { fixtureId, homeClubId: info.homeClubId, awayClubId: info.awayClubId, leagueSlug: info.leagueSlug });
+    byGoalApiId.set(info.goalApiId, { ...info, fixtureId });
   }
   // See connectAndTrack()'s rescan loop for why this is logged, not just
   // silently dropped -- same MAX_SUBSCRIPTIONS cap, hit here on the run's
@@ -530,6 +689,7 @@ export async function syncLiveEvents() {
 
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
   const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
+  const lastEuropeanState = new Map(); // goalApiId -> last-written {status, home, away} for a European fixture, to skip no-op writes and guard against regression
   const pendingRemovals = new Map(); // goalApiId -> event_keys missing on the immediately-preceding check, awaiting a second miss to confirm
   const confirmedRetractions = new Set(); // goalApiIds where score.changed arrived -- next match_update's first miss triggers immediate deletion
   const counts = { updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: droppedAtStart };
@@ -544,7 +704,7 @@ export async function syncLiveEvents() {
   while (Date.now() < deadline) {
     let reachedDeadline;
     try {
-      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, pendingRemovals, confirmedRetractions, counts });
+      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, lastEuropeanState, pendingRemovals, confirmedRetractions, counts });
     } catch (err) {
       console.error('Live events connection attempt failed:', err.message);
       reachedDeadline = false;

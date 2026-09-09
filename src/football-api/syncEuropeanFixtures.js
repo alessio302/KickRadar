@@ -12,6 +12,14 @@
 // (confirmed live: UCL clubs like Real Madrid and Bayern Munich aren't in our
 // clubs table, which only tracks the 5 domestic leagues). home_club_id /
 // away_club_id stay null for every European fixture and are never resolved.
+//
+// This file's own status/score writes are the only ones these three
+// leagues get for most of the day, but NOT during a live match: while a
+// tracked fixture is scheduled-near-kickoff or live, syncLiveEvents.js's
+// WebSocket connection takes over as the real-time writer for status/
+// home_score/away_score/live_minute (unlike the 5 domestic leagues, where
+// that connection deliberately never touches those columns -- see its own
+// top comment for why the split is the other way round for Europe).
 
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
