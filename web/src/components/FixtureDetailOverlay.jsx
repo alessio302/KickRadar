@@ -312,7 +312,7 @@ export function LineupList({ theme, t, row, onSelectPlayer }) {
 // no-ring simplification tried in between. Kept as-is and just rotated
 // so the mouthpiece points left instead of the reference photo's
 // original diagonal angle.
-function Whistle({ size = 16, style }) {
+export function Whistle({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <g transform="rotate(32 16.3 11.3)">
@@ -329,7 +329,7 @@ function Whistle({ size = 16, style }) {
 // Boundary, halfway line, centre circle -- the penalty boxes were dropped
 // (confirmed live: at icon size their open ends, flush with the rounded
 // outer corners, just read as four stray disconnected lines).
-function PitchIcon({ size = 16, style }) {
+export function PitchIcon({ size = 16, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <rect x="1" y="5" width="22" height="14" rx="2" />

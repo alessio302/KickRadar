@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
-import { LineupList } from './FixtureDetailOverlay.jsx';
+import { LineupList, Whistle, PitchIcon } from './FixtureDetailOverlay.jsx';
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -14,6 +14,35 @@ function formatKickoff(iso, locale, kickoffConfirmed, tbdLabel) {
     return `${new Date(iso).toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' })} · ${tbdLabel}`;
   }
   return new Date(iso).toLocaleString(locale, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// Counterpart to FixtureDetailOverlay.jsx's own MatchInfoFooter, sourced
+// from the fixture row directly instead of homeClub.venue -- there's no
+// clubs table row here to fall back to (see syncEuropeanLineups.js's own
+// top comment), but syncEuropeanFixtures.js writes both fields straight
+// from the fixture itself: referee from football-data.org's UCL match
+// object (referees[]) or GOAL API's EL/UECL matchReferee, venue from
+// GOAL API's matchStadium only (confirmed live football-data.org's UCL
+// match object carries no venue at all, so it stays null for UCL rows).
+function MatchInfoFooter({ theme, fixture }) {
+  if (!fixture.referee && !fixture.venue) return null;
+
+  return (
+    <div style={{ margin: '0 16px 16px', paddingTop: '14px', borderTop: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {fixture.referee && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
+          <Whistle size={15} style={{ flexShrink: 0 }} />
+          <span>{fixture.referee}</span>
+        </div>
+      )}
+      {fixture.venue && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: theme.textMuted }}>
+          <PitchIcon size={15} style={{ flexShrink: 0 }} />
+          <span>{fixture.venue}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Slim counterpart to FixtureDetailOverlay.jsx for UCL/UEL/UECL fixtures --
@@ -157,6 +186,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
 
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <LineupList theme={theme} t={t} row={activeRow} onSelectPlayer={handleSelectPlayer} />
+            <MatchInfoFooter theme={theme} fixture={fixture} />
           </div>
         </div>
       </div>

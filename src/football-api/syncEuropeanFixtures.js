@@ -53,6 +53,16 @@ async function syncUCL(supabase, comp, leagueId) {
       status: regressing ? existing.status : fetchedStatus,
       home_score: regressing ? existing.home_score : (m.score?.fullTime?.home ?? null),
       away_score: regressing ? existing.away_score : (m.score?.fullTime?.away ?? null),
+      // Same extraction as syncFixtures.js's domestic sync -- confirmed
+      // live UCL's match object carries the identical referees[] shape.
+      // No venue here on purpose: confirmed live football-data.org's UCL
+      // match object carries no venue field at all (only referees), same
+      // free-tier gap domestic fixtures already have (see
+      // FixtureDetailOverlay.jsx's own MatchInfoFooter comment) -- there
+      // it's papered over by falling back to the home club's static
+      // stadium, which isn't available here (no clubs table row for
+      // Real Madrid etc.).
+      referee: m.referees?.find((r) => r.type === 'REFEREE')?.name ?? m.referees?.[0]?.name ?? null,
       external_fixture_id: m.id,
       updated_at: new Date().toISOString(),
     };
@@ -193,6 +203,11 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
         status: regressing ? existing.status : fetchedStatus,
         home_score: regressing ? existing.home_score : score.home,
         away_score: regressing ? existing.away_score : score.away,
+        // Confirmed live: GOAL API's fixture object carries both directly
+        // (matchStadium/matchReferee) -- unlike UCL's football-data.org
+        // source, which has referees but no venue at all.
+        venue: f.matchStadium ?? null,
+        referee: f.matchReferee ?? null,
         external_fixture_id: null,
         goal_api_id: goalApiId,
         updated_at: new Date().toISOString(),
