@@ -66,12 +66,12 @@ async function syncUCL(supabase, comp, leagueId) {
 // ── GOAL API EL / UECL sync ────────────────────────────────────────────────��──
 
 // Attempt to read an ISO kickoff time from a GOAL API fixture object.
-// GOAL API uses 'startAt' (confirmed by field-probing on first run below).
+// Confirmed field name from live run: kickoffUtc.
 // Falls back to noon UTC on the queried date if no recognisable timestamp
 // is found, so the row still lands with a useful date even if the exact
 // kick-off time isn't yet published.
 function extractKickoff(fixture, dateStr) {
-  const raw = fixture.startAt ?? fixture.dateTime ?? fixture.date ?? fixture.kickoffAt;
+  const raw = fixture.kickoffUtc ?? fixture.startAt ?? fixture.dateTime ?? fixture.date ?? fixture.kickoffAt;
   if (raw && typeof raw === 'string' && (raw.includes('T') || raw.includes(' '))) {
     const t = new Date(raw);
     if (!isNaN(t)) return t.toISOString();
@@ -80,7 +80,7 @@ function extractKickoff(fixture, dateStr) {
 }
 
 function extractMatchday(fixture) {
-  const r = fixture.round ?? fixture.matchday ?? fixture.roundNumber;
+  const r = fixture.matchRound ?? fixture.round ?? fixture.matchday ?? fixture.roundNumber;
   if (r == null) return null;
   if (typeof r === 'number') return r;
   if (typeof r === 'object') {
@@ -91,8 +91,9 @@ function extractMatchday(fixture) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Maps GOAL API status strings (several naming conventions seen across
-// their documentation and live responses) to our internal four-way enum.
+// Maps GOAL API status strings to our internal four-way enum.
+// Confirmed from live run: GOAL API uses matchStatus field with values like
+// SCHEDULED, AFTER_ET, FINISHED, etc.
 const GOAL_STATUS_MAP = {
   NOTSTARTED: 'scheduled',
   NOT_STARTED: 'scheduled',
@@ -103,6 +104,8 @@ const GOAL_STATUS_MAP = {
   HALFTIME: 'live',
   HALF_TIME: 'live',
   FINISHED: 'finished',
+  AFTER_ET: 'finished',
+  AFTER_PEN: 'finished',
   ENDED: 'finished',
   FULL_TIME: 'finished',
   FULLTIME: 'finished',
@@ -115,11 +118,17 @@ const GOAL_STATUS_MAP = {
 };
 
 function extractStatus(fixture) {
-  const raw = (fixture.status ?? fixture.statusName ?? '').toUpperCase().replace(/\s+/g, '_');
+  const raw = (fixture.matchStatus ?? fixture.status ?? fixture.statusName ?? '').toUpperCase().replace(/\s+/g, '_');
   return GOAL_STATUS_MAP[raw] ?? 'scheduled';
 }
 
 function extractScore(fixture) {
+  // Confirmed from live run: GOAL API uses homeTeamScore/awayTeamScore as strings
+  if (fixture.homeTeamScore != null) {
+    const home = parseInt(fixture.homeTeamScore, 10);
+    const away = parseInt(fixture.awayTeamScore, 10);
+    return { home: Number.isFinite(home) ? home : null, away: Number.isFinite(away) ? away : null };
+  }
   if (fixture.homeGoals != null) return { home: fixture.homeGoals, away: fixture.awayGoals };
   if (fixture.score?.home != null) return { home: fixture.score.home, away: fixture.score.away };
   if (fixture.score?.fullTime?.home != null) return { home: fixture.score.fullTime.home, away: fixture.score.fullTime.away };
