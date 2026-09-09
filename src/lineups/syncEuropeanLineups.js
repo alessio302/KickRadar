@@ -55,7 +55,7 @@ function normalizeTeamName(name) {
     .trim();
 }
 
-function namesLooselyMatch(a, b) {
+export function namesLooselyMatch(a, b) {
   const na = normalizeTeamName(a);
   const nb = normalizeTeamName(b);
   if (!na || !nb) return false;

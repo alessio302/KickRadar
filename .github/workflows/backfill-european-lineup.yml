@@ -1,0 +1,26 @@
+name: Backfill European lineup
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixture_id:
+        description: 'Internal fixtures.id of the UCL/UEL/UECL match to backfill'
+        required: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/lineups/backfillEuropeanLineup.js "$FIXTURE_ID"
+        env:
+          FIXTURE_ID: ${{ inputs.fixture_id }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
