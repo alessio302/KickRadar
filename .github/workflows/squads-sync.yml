@@ -2,8 +2,14 @@ name: Squads sync
 
 on:
   schedule:
-    # Daily -- squads change far less often than fixtures/news.
-    - cron: '30 4 * * *'
+    # Weekly, not daily -- this data's only scheduled consumer,
+    # runNewsScraper.js's transfer-direction resolution, itself only runs
+    # once a week (news-scraper.yml: Monday 03:00 UTC), so a squad sync
+    # more often than that can never actually be used more often than
+    # that. Scheduled 1h ahead of it (Monday 02:00 UTC) so this week's
+    # transfers are reflected before the scraper reads squad_memberships,
+    # with real headroom over this job's own ~10-minute runtime.
+    - cron: '0 2 * * 1'
   workflow_dispatch: {}
 
 jobs:

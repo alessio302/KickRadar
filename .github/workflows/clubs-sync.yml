@@ -2,8 +2,16 @@ name: Clubs sync
 
 on:
   schedule:
-    # Daily is plenty -- squad/roster lists change rarely, unlike fixtures.
-    - cron: '0 3 * * *'
+    # Weekly, not daily -- this file's own comment already said "changes
+    # rarely", but daily didn't actually match that: club name/crest/venue/
+    # short_name essentially only change over the summer/January transfer
+    # windows or when a promoted club needs its first sync, same rarity
+    # class as club-goal-api-ids-sync.yml's founded/venue_capacity/
+    # goal_api_id (already weekly for exactly this reason). Runs 17 minutes
+    # before that job, same day -- club-goal-api-ids-sync.yml matches GOAL
+    # API teams against these club rows by name, so this needs to have
+    # already written this week's names first.
+    - cron: '0 3 * * 0'
   workflow_dispatch: {}
 
 jobs:
