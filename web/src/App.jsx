@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import StandingsTab from './components/StandingsTab.jsx';
@@ -6,7 +6,6 @@ import EuropaTab from './components/EuropaTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
-import ViewportDebugOverlay from './components/ViewportDebugOverlay.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 import { adjacentLeague } from './lib/leagues.js';
@@ -94,7 +93,6 @@ const ACCENT_PALETTES = {
 };
 
 export default function App() {
-  const shellRef = useRef(null);
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
   const [initialFixtureId, setInitialFixtureId] = useState(null);
@@ -261,7 +259,6 @@ export default function App() {
   // extending under both).
   return (
     <div
-      ref={shellRef}
       style={{
         background: theme.bg,
         // User-reported (screenshot, iPhone, both a Safari tab and an
@@ -276,24 +273,21 @@ export default function App() {
         // bottom of the physical screen either: window.screen.height
         // measurably exceeded visualViewport.height by a fixed amount,
         // outside what any web content on the page can address at all in
-        // this rendering context. Swapping this height to 100svh, tested
-        // on its own against a version with no top spacer, made no visible
-        // difference at the time.
-        //
-        // Trying '100%' instead of a vh/dvh/svh unit next (2026-09-10,
-        // re-opened after a fresh repro on the Einstellungen tab
-        // specifically -- see ViewportDebugOverlay.jsx, temporarily
-        // reintroduced to measure this exact attempt): every viewport unit
-        // tried so far is computed by the same browser layout code path as
-        // window.innerHeight/visualViewport.height, which this file's own
-        // earlier measurement already showed stopping short of
-        // window.screen.height -- untested until now is whether a plain
-        // percentage, resolved against the html/body/#root height:100%
-        // chain index.html already sets up, hits a different calculation
-        // path and reaches further. Revert to 100dvh if
-        // ViewportDebugOverlay's own shellBottom/screenH reading shows no
-        // change.
-        height: '100%',
+        // this rendering context. Swapping this height to 100svh (tested
+        // on its own against a version with no top spacer) and later to a
+        // plain '100%' percentage resolved against the html/body/#root
+        // height:100% chain in index.html (2026-09-10, re-verified via
+        // ViewportDebugOverlay on the Einstellungen tab specifically) both
+        // made zero measurable difference -- innerHeight/
+        // visualViewport.height/this div's own rect stayed identical
+        // (797px) against the same 844px window.screen.height every time,
+        // confirming this is a genuine, current iOS standalone-PWA
+        // platform reservation outside any web-addressable layout, not a
+        // sizing bug reachable via a different CSS unit. Back to 100dvh as
+        // the simplest correct option; see the native-wrapper discussion
+        // (chat history) for the only approach that could actually remove
+        // this reservation.
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         color: theme.text,
@@ -390,7 +384,6 @@ export default function App() {
         <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
-      <ViewportDebugOverlay shellRef={shellRef} />
     </div>
   );
 }
