@@ -208,13 +208,20 @@ function parseDaznTeams(title) {
   return { home, away };
 }
 
-const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
-  'champions-league': {
-    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCB-GdMjyokO9lZkKU_oIK6g',
-    parseTeams: parseDaznTeams,
-  },
-  // europa-league / conference-league: intentionally absent -- see top comment.
-};
+// EMPTY for now -- confirmed live 2026-09-10 (a real user hitting it in
+// the app, then a full oEmbed sweep of every video this file had attached:
+// 9/9 returned 401 "embedding disabled by owner") that DAZN's own channel
+// blocks embedding on every single upload, not just some -- likely a
+// deliberate policy protecting their paid subscription platform, the same
+// way a paid broadcaster has every incentive a free-to-air one doesn't.
+// This ALSO retroactively invalidates the earlier "beIN SPORTS Asia is
+// geo-blocked" finding as the only problem with that source; it was never
+// re-checked for embeddability either before being dropped. Nothing wired
+// in until a source passes BOTH checks -- current AND embeddable, verified
+// live via the oEmbed endpoint (https://www.youtube.com/oembed?url=...),
+// not just a feed fetch. europa-league/conference-league were already
+// unmapped anyway -- see top comment.
+const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {};
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const RECHECK_INTERVAL_MS = 30 * 60 * 1000;

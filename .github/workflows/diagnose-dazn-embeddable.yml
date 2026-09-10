@@ -14,4 +14,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/lineups/diagnoseDaznEmbeddable.js
+      - run: node src/lineups/diagnoseUclPlaylist.js
