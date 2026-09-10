@@ -1,7 +1,11 @@
 name: Diagnose DAZN UCL channel (temporary)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      channel_id:
+        required: false
+        default: 'UCB-GdMjyokO9lZkKU_oIK6g'
 
 jobs:
   diagnose:
@@ -15,3 +19,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node src/lineups/diagnoseDaznChannel.js
+        env:
+          CHANNEL_ID: ${{ github.event.inputs.channel_id }}

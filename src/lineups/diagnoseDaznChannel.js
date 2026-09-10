@@ -5,7 +5,8 @@
 // resolution). Re-verifying against the correct id before trusting either
 // claim. Also printing <published> dates so staleness is checked from real
 // data, not guessed.
-const res = await fetch('https://www.youtube.com/feeds/videos.xml?channel_id=UCB-GdMjyokO9lZkKU_oIK6g', {
+const channelId = process.env.CHANNEL_ID || 'UCB-GdMjyokO9lZkKU_oIK6g';
+const res = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   },
