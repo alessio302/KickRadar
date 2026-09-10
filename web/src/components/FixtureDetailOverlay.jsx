@@ -667,7 +667,7 @@ function StandingRow({ theme, t, club, entry }) {
 // that's itself only shown for a finished fixture (see the tab list
 // below), so "not finished yet" was never a state this needs to handle --
 // only "finished, but no clip found (yet or ever)" is.
-function HighlightsTab({ theme, t, fixture }) {
+export function HighlightsTab({ theme, t, fixture }) {
   if (!fixture.highlight_video_url) {
     return <p style={{ ...HINT_STYLE(theme), textAlign: 'center', padding: '32px 16px' }}>{t.matchInfo.noHighlights}</p>;
   }

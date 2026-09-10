@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
-import { LineupList, Whistle, PitchIcon } from './FixtureDetailOverlay.jsx';
+import { LineupList, Whistle, PitchIcon, HighlightsTab } from './FixtureDetailOverlay.jsx';
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -46,14 +46,23 @@ function MatchInfoFooter({ theme, fixture }) {
 }
 
 // Slim counterpart to FixtureDetailOverlay.jsx for UCL/UEL/UECL fixtures --
-// only the Aufstellungen tab, since Spielinfo/Statistik/Tabelle all key off
-// a clubs table row or one of our 5 tracked domestic league standings,
-// neither of which exists for European fixtures (see
+// only Aufstellungen + Highlights, since Spielinfo/Statistik/Tabelle all
+// key off a clubs table row or one of our 5 tracked domestic league
+// standings, neither of which exists for European fixtures (see
 // src/lineups/syncEuropeanLineups.js's own top comment). Reuses
-// FixtureDetailOverlay's LineupList as-is -- it only needs a `row` shaped
-// { confirmed, formation, players }, nothing club_id-specific -- and the
-// same drag-to-dismiss bottom-sheet shell.
+// FixtureDetailOverlay's LineupList and HighlightsTab as-is -- LineupList
+// only needs a `row` shaped { confirmed, formation, players }, nothing
+// club_id-specific, and HighlightsTab only ever reads
+// fixture.highlight_video_url -- and the same drag-to-dismiss bottom-sheet
+// shell. highlight_video_url is populated by
+// src/lineups/syncEuropeanHighlights.js, the European counterpart of
+// syncHighlights.js (see that file's own top comment for the YouTube
+// source and matching rationale).
 export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture, onClose }) {
+  // 'lineups' | 'highlights' -- mirrors FixtureDetailOverlay.jsx's own
+  // `view` state, just without the 'info'/'stats'/'table' tabs this slim
+  // overlay has no data source for.
+  const [view, setView] = useState('lineups');
   const [side, setSide] = useState('home');
   const { byTeamName } = useEuropaLineups(fixture.id);
   const locale = DATE_LOCALES[language];
@@ -157,36 +166,75 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               </p>
             </div>
 
-            <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', border: `1px solid ${theme.border}` }}>
-              {[['home', homeClub], ['away', awayClub]].map(([key, club]) => (
+            {/* Same tab-switcher styling as FixtureDetailOverlay.jsx's own
+                (identical padding/border/color values) -- only offered
+                once the match is over, same reasoning as that file's own
+                highlights tab: an upcoming or live European fixture can
+                never have a highlight clip yet. */}
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
+              {[
+                ['lineups', t.matchInfo.tabLineups],
+                ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights]] : []),
+              ].map(([key, label]) => (
                 <button
                   key={key}
-                  onClick={() => setSide(key)}
+                  onClick={() => setView(key)}
                   style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: '8px',
+                    padding: '6px 2px 10px',
                     fontSize: '13px',
-                    fontWeight: side === key ? 700 : 600,
-                    borderRadius: '7px',
+                    fontWeight: view === key ? 700 : 600,
                     border: 'none',
+                    borderBottom: view === key ? `2px solid ${theme.accent}` : '2px solid transparent',
+                    background: 'transparent',
+                    color: view === key ? theme.text : theme.textMuted,
                     cursor: 'pointer',
-                    background: side === key ? theme.surfaceRaised : 'transparent',
-                    color: side === key ? theme.text : theme.textMuted,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
                   }}
                 >
-                  {club?.name || '–'}
+                  {label}
                 </button>
               ))}
             </div>
+
+            {/* Which side's lineup is shown -- meaningless outside the
+                Aufstellungen tab, so hidden for Highlights same as
+                FixtureDetailOverlay.jsx's own side toggle. */}
+            {view === 'lineups' && (
+              <div style={{ display: 'flex', background: theme.surface, borderRadius: '10px', padding: '3px', border: `1px solid ${theme.border}` }}>
+                {[['home', homeClub], ['away', awayClub]].map(([key, club]) => (
+                  <button
+                    key={key}
+                    onClick={() => setSide(key)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      padding: '8px',
+                      fontSize: '13px',
+                      fontWeight: side === key ? 700 : 600,
+                      borderRadius: '7px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: side === key ? theme.surfaceRaised : 'transparent',
+                      color: side === key ? theme.text : theme.textMuted,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {club?.name || '–'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <LineupList theme={theme} t={t} row={activeRow} onSelectPlayer={handleSelectPlayer} />
-            <MatchInfoFooter theme={theme} fixture={fixture} />
+            {view === 'lineups' && (
+              <>
+                <LineupList theme={theme} t={t} row={activeRow} onSelectPlayer={handleSelectPlayer} />
+                <MatchInfoFooter theme={theme} fixture={fixture} />
+              </>
+            )}
+            {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
           </div>
         </div>
       </div>
