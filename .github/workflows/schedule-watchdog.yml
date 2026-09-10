@@ -22,6 +22,16 @@ name: Schedule watchdog
 # was relying solely on GitHub's own unreliable scheduler with no safety
 # net. Same threshold as lineups-sync.yml below: same 15-min native cadence.
 #
+# live-scores-european.yml (added 2026-09-10, same outage this whole
+# comment documents) had the exact same gap: confirmed live it fired
+# exactly once ever -- the manual workflow_dispatch that added it -- and
+# never again on its own native schedule, leaving 3 live CL fixtures stuck
+# on a 20-minutes-stale score for the rest of their match with nobody
+# catching it, the very failure mode this watchdog exists for. Same
+# reasoning and threshold as live-scores.yml below (self-loops ~13 min
+# while live; checked aggressively since it's nearly free when nothing's
+# live).
+#
 # This watchdog's own schedule is subject to the identical GitHub
 # reliability issue -- it isn't a way around the root cause, since nothing
 # we control is. That's why it's also wired up to be triggered externally:
@@ -105,5 +115,6 @@ jobs:
           check_and_trigger lineups-sync.yml 25     # cadence 15 min
           check_and_trigger live-events.yml 25      # cadence 15 min
           check_and_trigger live-scores.yml 14      # self-loops ~13 min while live; see comment above
+          check_and_trigger live-scores-european.yml 14  # same self-loop shape as live-scores.yml
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
           check_and_trigger highlights-sync.yml 50  # cadence 30 min
