@@ -123,17 +123,27 @@ const GERMAN_CITY_EXONYMS = {
   brugge: 'brugge',
 };
 // Known colloquial/abbreviated forms DAZN's titles use in place of a
-// club's own name -- confirmed live in the real feed dump above (psg, man
-// city). Grown the same way SHORT_NAME_OVERRIDES (syncClubs.js) is: add an
-// entry here once a REAL mismatch is confirmed via the console.warn below,
-// never guessed ahead of time for a club that hasn't actually shown up
-// mismatched yet -- same "don't guess a title format" discipline
+// club's own name -- confirmed live in the real feed dump above. Split
+// into two tables by shape: a PHRASE can't be caught by the per-token pass
+// below (it doesn't correspond to a single word in the source title, e.g.
+// "psg" isn't one of "paris"/"saint"/"germain"), so it's substituted as a
+// whole word-boundary-anchored phrase before the string is ever split into
+// words; a single-word alias (e.g. "inter" for "internazionale") is
+// substituted per-token instead, same pass as GERMAN_CITY_EXONYMS, so it
+// still works when embedded inside a longer title fragment like "Inter
+// Mailand". Both grown the same way SHORT_NAME_OVERRIDES (syncClubs.js) is:
+// add an entry once a REAL mismatch is confirmed via the console.warn
+// below, never guessed ahead of time for a club that hasn't actually shown
+// up mismatched yet -- same "don't guess a title format" discipline
 // syncHighlights.js's own parseTeams functions already hold to.
-const DAZN_TEAM_ALIASES = {
+const DAZN_PHRASE_ALIASES = {
   psg: 'paris saint germain',
   'man city': 'manchester city',
   'man utd': 'manchester united',
   'man united': 'manchester united',
+};
+const DAZN_TOKEN_ALIASES = {
+  inter: 'internazionale',
 };
 
 function tokenSet(rawName) {
@@ -142,14 +152,14 @@ function tokenSet(rawName) {
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .trim();
-  for (const [alias, full] of Object.entries(DAZN_TEAM_ALIASES)) {
-    if (name === alias) name = full;
+  for (const [phrase, full] of Object.entries(DAZN_PHRASE_ALIASES)) {
+    name = name.replace(new RegExp(`\\b${phrase}\\b`, 'g'), full);
   }
   name = name.replace(/[^a-z0-9]+/g, ' ');
   const words = name
     .split(' ')
     .filter(Boolean)
-    .map((w) => GERMAN_CITY_EXONYMS[w] || w)
+    .map((w) => GERMAN_CITY_EXONYMS[w] || DAZN_TOKEN_ALIASES[w] || w)
     .filter((w) => !CLUB_SUFFIX_WORDS.has(w) && !CONNECTOR_WORDS.has(w));
   return new Set(words);
 }
@@ -327,7 +337,8 @@ export async function syncEuropeanHighlights() {
       }
     }
 
-    // Visibility for growing DAZN_TEAM_ALIASES/GERMAN_CITY_EXONYMS above
+    // Visibility for growing DAZN_PHRASE_ALIASES/DAZN_TOKEN_ALIASES/
+    // GERMAN_CITY_EXONYMS above
     // from real evidence instead of guessing ahead of time -- confirmed
     // this candidate had a real title in the feed that PARSED into a team
     // pair but still didn't match either side, worth a human glance at the
