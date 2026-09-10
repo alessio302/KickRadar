@@ -80,10 +80,9 @@ async function resolveVideoUploader(videoId) {
 }
 
 const VIDEO_CANDIDATES = [
-  { label: 'CL match highlight video: Real Madrid 2-1 Inter Milan', videoId: 'EBv3-fQRABM' },
-  { label: 'CL match highlight video: Barcelona v Feyenoord', videoId: 'Sesw2_Nkpmg' },
-  { label: 'CL match highlight video: AEK Athens vs LASK', videoId: 'y-b-D29wmpo' },
-  { label: 'UECL match highlight video: Malisheva - Vllaznia', videoId: '0zoVuP-pulk' },
+  { label: 'EL (24/25) match highlight video: Athletic Club 0-3 Manchester United', videoId: '8y4TGVfIDXE' },
+  { label: 'EL (25/26) match highlight video: Real Betis 2-0 Lyon', videoId: '530D2K6AG7U' },
+  { label: 'UECL (25/26 final) match highlight video: Crystal Palace 1-0 Rayo Vallecano', videoId: 'ftogtnv7wXg' },
 ];
 
 const seenChannelIds = new Set();
