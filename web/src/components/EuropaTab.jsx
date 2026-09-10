@@ -110,8 +110,17 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
   const isFinished = fixture.status === 'finished';
 
   let timeLabel;
-  if (isLive && fixture.live_minute) {
-    timeLabel = fixture.live_minute === 'HT' ? 'HT' : `${fixture.live_minute}'`;
+  if (isLive) {
+    // live_minute lags status by however long syncLiveEvents.js's WS takes
+    // to push a first tick for this match (or never arrives at all --
+    // confirmed live 2026-09-10 GOAL API's WS doesn't reliably push for
+    // every subscribed match, see syncEuropeanLiveScores.js's own
+    // comment). Falling through to the kickoff-clock-time branch below in
+    // that gap showed the original kickoff time on an already-live match,
+    // reading as "hasn't started yet" -- wrong in the exact way a live
+    // match least affords. A bare "LIVE" label is honest about what's
+    // actually known; same fallback FixtureRow.jsx (domestic) uses.
+    timeLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? 'HT' : `${fixture.live_minute}'`) : t.fixtures.live;
   } else if (isFinished) {
     timeLabel = t.fixtures.finished;
   } else if (fixture.kickoff_confirmed === false) {

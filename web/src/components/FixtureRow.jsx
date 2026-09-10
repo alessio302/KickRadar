@@ -85,10 +85,22 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
       <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '66px', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
         {fixture.status === 'finished'
           ? t.fixtures.finished
-          : fixture.status === 'live' && fixture.live_minute
-            ? fixture.live_minute === 'HT'
-              ? fixture.live_minute
-              : `${fixture.live_minute}'`
+          : fixture.status === 'live'
+            ? // live_minute lags status by however long syncLiveEvents.js's
+              // WS takes to push a first tick for this match (or never
+              // arrives at all -- confirmed live 2026-09-10 GOAL API's WS
+              // doesn't reliably push for every subscribed match, see
+              // syncEuropeanLiveScores.js's own comment for the European
+              // side of this). Falling through to formatTime() below in
+              // that gap showed the original kickoff clock time on an
+              // already-live match, reading as "hasn't started yet" --
+              // wrong in the exact way a live match least affords. A bare
+              // "LIVE" label is honest about what's actually known.
+              fixture.live_minute
+              ? fixture.live_minute === 'HT'
+                ? fixture.live_minute
+                : `${fixture.live_minute}'`
+              : t.fixtures.live
             : // Confirmed live: a fixture far enough out that the
               // broadcaster hasn't announced its kickoff time yet still
               // carries a kickoff_at (football-data.org's own 00:00:00 UTC
