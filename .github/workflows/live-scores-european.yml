@@ -21,7 +21,26 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Confirmed live 2026-09-10: at 15 (matching live-scores.yml, its
+    # domestic counterpart's own timeout-minutes), BOTH of this brand-new
+    # workflow's first two real runs got killed by this hard timeout mid-
+    # poll instead of exiting cleanly via JOB_BUDGET_MS's own ~13-min
+    # self-check -- some combination of GOAL API rate-limit retry backoff
+    # (this file polls 3 competitions/cycle against the same strained
+    # account-wide budget syncLiveEvents.js/syncLineups.js also draw from)
+    # pushed actual wall time past 15 min. A "cancelled" run never reports
+    # success, and the schedule watchdog's own check_and_trigger() only
+    # ever compares against the *last successful* run -- with zero of
+    # those on record yet, it logged "no prior successful run found --
+    # skipping" and never re-dispatched, leaving this job with no working
+    # safety net despite being registered there. live-scores.yml tolerates
+    # the exact same occasional cancellation fine, but only because it
+    # already has plenty of short, successfully-completed early-exit runs
+    # (nothing live) on record for the watchdog to find in between; this
+    # one had never yet completed even once. 20 gives real headroom beyond
+    # the 13-min internal budget so a run can actually finish and report
+    # success, breaking that deadlock for every check after the first.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
