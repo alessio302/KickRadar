@@ -67,6 +67,21 @@ export function useFixtures(leagueSlug) {
   const [matchdays, setMatchdays] = useState(() => cache.get(leagueId) ?? []);
   const [loading, setLoading] = useState(() => leagueId == null || !cache.has(leagueId));
   const [refreshing, setRefreshing] = useState(false);
+  // Confirmed live 2026-09-10: FixturesTab.jsx now sometimes calls this hook
+  // a second time for the SAME league (its own live-fixture-overlay lookup,
+  // alongside FixturesList's already-open list subscription) -- both used
+  // to build the channel topic as plain `fixtures-${leagueId}`, and two
+  // channel objects sharing one exact topic string over the same
+  // Supabase Realtime socket collide (Phoenix channels are unique per
+  // topic per socket): the second subscribe interfered with the first, and
+  // tearing either one down broke the other's delivery too, freezing
+  // *every* open tab's live updates at once, not just the new call site.
+  // A random per-instance suffix keeps each hook instance's own topic
+  // unique regardless of how many simultaneously subscribe to the same
+  // league -- the postgres_changes `filter` below still scopes rows by
+  // league_id the same way, this only decouples the client-side topic name
+  // from it.
+  const [instanceId] = useState(() => Math.random().toString(36).slice(2));
 
   const buildQuery = useCallback(() => {
     const cutoff = new Date(Date.now() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -109,7 +124,7 @@ export function useFixtures(leagueSlug) {
     // manual reload. Filtered server-side to this league so a goal
     // elsewhere doesn't wake up every open tab watching a different one.
     const channel = supabase
-      .channel(`fixtures-${leagueId}`)
+      .channel(`fixtures-${leagueId}-${instanceId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'fixtures', filter: `league_id=eq.${leagueId}` },
@@ -128,7 +143,7 @@ export function useFixtures(leagueSlug) {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [leagueId, leagueSlug, buildQuery]);
+  }, [leagueId, leagueSlug, buildQuery, instanceId]);
 
   // Re-queries Supabase directly for pull-to-refresh -- same rationale as
   // useTransfers.js's own refetch(): this never touches football-data.org
