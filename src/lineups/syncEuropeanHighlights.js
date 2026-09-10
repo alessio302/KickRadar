@@ -5,9 +5,12 @@
 // this file), adapted for the 3 UEFA club competitions in two ways:
 //  - No clubs table row exists for European fixtures (home_club_id/
 //    away_club_id are always null -- see syncEuropeanLineups.js's own top
-//    comment), so matching goes through that file's namesLooselyMatch()
-//    against fixtures.home_team_name/away_team_name directly, instead of
-//    resolveClub() against a clubs table row.
+//    comment), so matching goes against fixtures.home_team_name/
+//    away_team_name directly via this file's own daznNamesMatch() (see its
+//    comment further down for why that's a local, order-independent
+//    word-set matcher rather than syncEuropeanLineups.js's shared
+//    namesLooselyMatch()), instead of resolveClub() against a clubs table
+//    row.
 //  - No push-notification step, unlike syncHighlights.js's own (it pushes
 //    to favorite_fixtures and clears them once a clip lands) -- confirmed
 //    live EuropaTab.jsx has no favoriting/star feature at all (zero
@@ -70,7 +73,103 @@
 //    but their own feeds returned 0 entries -- inactive/empty channels.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { namesLooselyMatch } from './syncEuropeanLineups.js';
+
+// Local matcher, deliberately NOT namesLooselyMatch() from
+// syncEuropeanLineups.js -- that one is shared, load-bearing code for
+// resolving GOAL API's own goal_api_id (syncLiveEvents.js, the webhook),
+// so it stays untouched here rather than risk it for a cosmetic feature.
+// namesLooselyMatch's plain substring check turned out too strict for
+// DAZN's own titles specifically -- confirmed live against the real feed
+// (channel UCB-GdMjyokO9lZkKU_oIK6g, 2026-09-10) across just 8 matches:
+//  - "PSG" for "Paris Saint-Germain FC" -- an abbreviation, no substring
+//    relation either way.
+//  - "Neapel" for "SSC Napoli", "Inter Mailand" for "FC Internazionale
+//    Milano" -- DAZN's German-language titles use German exonyms for the
+//    city/club name, not the club's own official-language name.
+//  - "Man City" for "Manchester City FC" -- same abbreviation problem as
+//    PSG, one substring check can't bridge "manchester" vs "man".
+//  - "Atletico Madrid" for "Club Atlético de Madrid" -- missing "de".
+//  - "OSC Lille" for our own stored "Lille OSC" -- the two words are
+//    plain reordered, which a substring check can never match regardless
+//    of wording (neither string contains the other as a contiguous run).
+// A token-SET comparison (order-independent, drop a small set of known
+// connector/suffix words, apply the fixed alias substitutions below)
+// fixes all five of these at once, generically, rather than patching each
+// pair as its own special case.
+const CLUB_SUFFIX_WORDS = new Set(['fc', 'cf', 'afc', 'ac', 'sc', 'cd', 'ud', 'ssc', 'ssd', 'calcio', 'club', 'sk', 'kv', 'fk']);
+// Connector words that show up inside a full club name ("Club Atlético DE
+// Madrid") but get dropped in a shorter colloquial form ("Atletico
+// Madrid") -- generic grammatical filler, not specific to any one club.
+const CONNECTOR_WORDS = new Set(['de', 'del', 'der', 'des', 'van', 'von', 'da', 'do', 'dos']);
+// DAZN's own German-language exonyms for a handful of European
+// city/country names that anchor a club's own name -- a fixed, verifiable
+// list of standard German place names, not a per-club guess. Extend this
+// (not the alias table below) whenever a future mismatch turns out to be
+// this same "city translated into German" shape rather than an
+// abbreviation.
+const GERMAN_CITY_EXONYMS = {
+  neapel: 'napoli',
+  mailand: 'milano',
+  munchen: 'munich', // diacritic already stripped by the time this runs
+  athen: 'athens',
+  warschau: 'warszawa',
+  kiew: 'kyiv',
+  moskau: 'moscow',
+  genua: 'genova',
+  turin: 'torino',
+  rom: 'roma',
+  florenz: 'firenze',
+  lissabon: 'lisbon',
+  brugge: 'brugge',
+};
+// Known colloquial/abbreviated forms DAZN's titles use in place of a
+// club's own name -- confirmed live in the real feed dump above (psg, man
+// city). Grown the same way SHORT_NAME_OVERRIDES (syncClubs.js) is: add an
+// entry here once a REAL mismatch is confirmed via the console.warn below,
+// never guessed ahead of time for a club that hasn't actually shown up
+// mismatched yet -- same "don't guess a title format" discipline
+// syncHighlights.js's own parseTeams functions already hold to.
+const DAZN_TEAM_ALIASES = {
+  psg: 'paris saint germain',
+  'man city': 'manchester city',
+  'man utd': 'manchester united',
+  'man united': 'manchester united',
+};
+
+function tokenSet(rawName) {
+  let name = rawName
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+  for (const [alias, full] of Object.entries(DAZN_TEAM_ALIASES)) {
+    if (name === alias) name = full;
+  }
+  name = name.replace(/[^a-z0-9]+/g, ' ');
+  const words = name
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => GERMAN_CITY_EXONYMS[w] || w)
+    .filter((w) => !CLUB_SUFFIX_WORDS.has(w) && !CONNECTOR_WORDS.has(w));
+  return new Set(words);
+}
+
+// Order-independent, either-direction subset match -- mirrors
+// namesLooselyMatch's own "a.includes(b) || b.includes(a)" philosophy
+// (neither side is assumed to be the more complete one: DAZN sometimes
+// carries MORE words than our stored name, e.g. matching against a club's
+// full name, and sometimes FEWER, e.g. a short colloquial title), just at
+// the word level instead of the character-substring level.
+function daznNamesMatch(a, b) {
+  const setA = tokenSet(a);
+  const setB = tokenSet(b);
+  if (setA.size === 0 || setB.size === 0) return false;
+  const [smaller, larger] = setA.size <= setB.size ? [setA, setB] : [setB, setA];
+  for (const word of smaller) {
+    if (!larger.has(word)) return false;
+  }
+  return true;
+}
 
 // Title pattern confirmed live against both DAZN channels above, two shapes
 // mixed in the same feed:
@@ -83,13 +182,9 @@ import { namesLooselyMatch } from './syncEuropeanLineups.js';
 // before the first "|" -- taking the text after the LAST colon in that
 // first pipe segment handles the clean shape too (no colon there at all,
 // so the "after last colon" text is just the whole segment unchanged).
-// Team names here are sometimes DAZN's own colloquial/short/German-
-// language form ("PSG", "Inter Mailand", "Atletico Madrid" without "de")
-// rather than the fixture's own stored full name -- namesLooselyMatch()
-// won't catch every one of those (same accepted gap as syncHighlights.js's
-// own Ligue 1 source, see that file's own comment); a fixture that misses
-// this way just stays unmatched until a later sync run or a differently-
-// worded second upload of the same match catches it, same as there.
+// The extracted team names are matched against fixtures via
+// daznNamesMatch() above, not a plain string comparison -- see that
+// function's own comment for why.
 function parseDaznTeams(title) {
   const firstSegment = title.split('|')[0].trim();
   const afterHeadline = firstSegment.includes(':')
@@ -179,10 +274,10 @@ export async function syncEuropeanHighlights() {
   if (candidates.length === 0) return { checked: 0, found: 0 };
 
   // Fetch and parse each distinct feed URL at most once per sync run --
-  // today all 3 competitions map to the same beIN SPORTS Asia feed (see
-  // the top comment), but this is keyed by feedUrl rather than by
-  // competition so a future per-competition source swap still only
-  // fetches each real URL once.
+  // only champions-league has a mapped source today (see the top
+  // comment), but this is keyed by feedUrl rather than by competition so
+  // adding europa-league/conference-league sources later, even ones that
+  // happen to share a feed URL, still only fetches each real URL once.
   const slugByLeagueId = new Map(dbLeagues.map((l) => [l.id, l.slug]));
   const feedUrls = new Set(
     dbLeagues
@@ -219,18 +314,28 @@ export async function syncEuropeanHighlights() {
     const entries = source ? parsedEntriesByFeedUrl.get(source.feedUrl) ?? [] : [];
 
     let url = null;
+    const unmatchedTitleTeams = [];
     if (source) {
       for (const entry of entries) {
         const teams = source.parseTeams(entry.title);
         if (!teams) continue;
-        if (
-          namesLooselyMatch(teams.home, fixture.home_team_name) &&
-          namesLooselyMatch(teams.away, fixture.away_team_name)
-        ) {
+        if (daznNamesMatch(teams.home, fixture.home_team_name) && daznNamesMatch(teams.away, fixture.away_team_name)) {
           url = `https://www.youtube.com/embed/${entry.videoId}`;
           break;
         }
+        unmatchedTitleTeams.push(teams);
       }
+    }
+
+    // Visibility for growing DAZN_TEAM_ALIASES/GERMAN_CITY_EXONYMS above
+    // from real evidence instead of guessing ahead of time -- confirmed
+    // this candidate had a real title in the feed that PARSED into a team
+    // pair but still didn't match either side, worth a human glance at the
+    // next sync run's own log rather than staying silent about it.
+    if (!url && unmatchedTitleTeams.length > 0) {
+      console.warn(
+        `No DAZN title matched fixture ${fixture.id} (${fixture.home_team_name} vs ${fixture.away_team_name}) -- parsed candidates: ${JSON.stringify(unmatchedTitleTeams)}`
+      );
     }
 
     await supabase
