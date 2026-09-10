@@ -271,7 +271,29 @@ export default function EuropaTab({ theme, t, language }) {
   const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [liveOnly, setLiveOnly] = useState(false);
+  // Holds whatever `data` had for the clicked row at click time -- kept
+  // only as a fallback for the split second before the live lookup below
+  // resolves, and for a fixture that fell outside the loaded window.
   const [selectedFixture, setSelectedFixture] = useState(null);
+
+  // Confirmed live 2026-09-10: passing selectedFixture straight into
+  // EuropaFixtureDetailOverlay meant an overlay left open across a status
+  // change (scheduled -> live) or a new match_events row showed neither --
+  // it's a frozen copy of the row from the moment it was clicked, and
+  // useEuropaFixtures.js's own realtime updates land in `data`, not in this
+  // separately-held snapshot. Re-reading the live row from `data` by id on
+  // every render (rather than searching just selectedComp's list -- the
+  // user can swipe to a different competition tab while the overlay stays
+  // open) keeps the open overlay's fixture prop current for free, same as
+  // FixturesTab.jsx's own equivalent fix.
+  const liveSelectedFixture = useMemo(() => {
+    if (!selectedFixture) return null;
+    for (const list of Object.values(data)) {
+      const found = list.find((f) => f.id === selectedFixture.id);
+      if (found) return found;
+    }
+    return selectedFixture;
+  }, [data, selectedFixture]);
 
   // direction 1 = swipe left (next competition), -1 = swipe right --
   // same contract as App.jsx's own swipeLeague, just over UEFA_COMPETITIONS
@@ -377,12 +399,12 @@ export default function EuropaTab({ theme, t, language }) {
         )}
       />
 
-      {selectedFixture && (
+      {liveSelectedFixture && (
         <EuropaFixtureDetailOverlay
           theme={theme}
           t={t}
           language={language}
-          fixture={selectedFixture}
+          fixture={liveSelectedFixture}
           onClose={() => setSelectedFixture(null)}
         />
       )}
