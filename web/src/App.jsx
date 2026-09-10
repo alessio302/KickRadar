@@ -278,11 +278,22 @@ export default function App() {
         // outside what any web content on the page can address at all in
         // this rendering context. Swapping this height to 100svh, tested
         // on its own against a version with no top spacer, made no visible
-        // difference at the time -- reverted back to 100dvh (the unit the
-        // app used the entire time this exact layout was last confirmed
-        // working) rather than keep an untested-in-combination unit change
-        // sitting alongside the restored top spacer below.
-        height: '100dvh',
+        // difference at the time.
+        //
+        // Trying '100%' instead of a vh/dvh/svh unit next (2026-09-10,
+        // re-opened after a fresh repro on the Einstellungen tab
+        // specifically -- see ViewportDebugOverlay.jsx, temporarily
+        // reintroduced to measure this exact attempt): every viewport unit
+        // tried so far is computed by the same browser layout code path as
+        // window.innerHeight/visualViewport.height, which this file's own
+        // earlier measurement already showed stopping short of
+        // window.screen.height -- untested until now is whether a plain
+        // percentage, resolved against the html/body/#root height:100%
+        // chain index.html already sets up, hits a different calculation
+        // path and reaches further. Revert to 100dvh if
+        // ViewportDebugOverlay's own shellBottom/screenH reading shows no
+        // change.
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         color: theme.text,
