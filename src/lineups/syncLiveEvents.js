@@ -12,13 +12,19 @@
 // away_score -- syncLiveScores.js (football-data.org) already owns that,
 // and having two writers race on the same columns from two different
 // providers would be its own bug. UEFA_COMPETITIONS fixtures are
-// different: nothing else updates their status/score/live_minute in real
-// time at all (football-data.org's UCL match object has no live push,
-// and the goal-api-webhook Edge Function only knows the 5 domestic
-// leagues' club_id-keyed fixtures) -- syncEuropeanFixtures.js's once-daily
-// calendar sync was the only writer before this, hours behind an actual
-// live match. This connection is the sole live writer for those three
-// leagues, so it does own status/score/live_minute for them.
+// different: football-data.org's UCL match object has no live push, and
+// the goal-api-webhook Edge Function only knows the 5 domestic leagues'
+// club_id-keyed fixtures -- this connection is this file's real-time
+// writer for status/score/live_minute for the three UEFA competitions.
+// "Real-time", not "sole", as of syncEuropeanLiveScores.js: confirmed live
+// 2026-09-10 that GOAL API's FREE-tier WS accepts a subscribe for every
+// candidate match but doesn't reliably push match_update for all of them
+// (3 of 4 simultaneously-live CL fixtures got zero WS messages that day,
+// stuck on 'scheduled' for the rest of the match despite GOAL API's own
+// REST snapshot already showing the correct live score). That file is a
+// REST poll backstop for status/home_score/away_score alone -- this
+// connection stays the only writer for live_minute and match_events,
+// which have no REST equivalent to fall back to.
 //
 // One WS connection total, tracking BOTH domestic and European matches at
 // once -- GOAL API's FREE plan caps maxConnections at 1 (confirmed live,

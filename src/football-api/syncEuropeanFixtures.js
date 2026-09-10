@@ -25,13 +25,25 @@
 // clubs table, which only tracks the 5 domestic leagues). home_club_id /
 // away_club_id stay null for every European fixture and are never resolved.
 //
-// This file's own status/score writes are the only ones these three
-// leagues get for most of the day, but NOT during a live match: while a
-// tracked fixture is scheduled-near-kickoff or live, syncLiveEvents.js's
-// WebSocket connection takes over as the real-time writer for status/
-// home_score/away_score/live_minute (unlike the 5 domestic leagues, where
-// that connection deliberately never touches those columns -- see its own
-// top comment for why the split is the other way round for Europe).
+// This file's own status/score writes are the primary ones these three
+// leagues get for most of the day. While a tracked fixture is
+// scheduled-near-kickoff or live, syncLiveEvents.js's WebSocket connection
+// additionally writes status/home_score/away_score/live_minute in real
+// time (unlike the 5 domestic leagues, where that connection deliberately
+// never touches those columns -- see its own top comment for why the split
+// is the other way round for Europe). Confirmed live 2026-09-10: GOAL
+// API's FREE-tier WebSocket accepts a subscribe for every candidate match
+// but doesn't reliably PUSH match_update for all of them -- 3 of 4
+// simultaneously-live CL fixtures never got a single WS message that day,
+// stuck showing 'scheduled' for the rest of the match, even though GOAL
+// API's own REST snapshot (the same one this file's syncGoalApiCompetition
+// already parses) had the correct live status/score the whole time.
+// syncEuropeanLiveScores.js exists because of that: a REST poll backstop
+// for status/home_score/away_score alone (no live_minute -- GOAL API's
+// fixtures-by-date response has no elapsed-minute field, only the
+// live/finished/etc phase text), same relationship syncLiveScores.js
+// already has to the goal-api-webhook Edge Function for the 5 domestic
+// leagues.
 //
 // home_team_short_name/away_team_short_name (sql/055) are populated here
 // for UCL from football-data.org's own shortName field, confirmed live
@@ -179,12 +191,15 @@ const GOAL_STATUS_MAP = {
   ABANDONED: 'cancelled',
 };
 
-function extractStatus(fixture) {
+// Exported for syncEuropeanLiveScores.js's own REST poll -- same status/
+// score parsing GOAL API's fixtures-by-date response needs there, no point
+// duplicating it.
+export function extractStatus(fixture) {
   const raw = (fixture.matchStatus ?? fixture.status ?? fixture.statusName ?? '').toUpperCase().replace(/\s+/g, '_');
   return GOAL_STATUS_MAP[raw] ?? 'scheduled';
 }
 
-function extractScore(fixture) {
+export function extractScore(fixture) {
   // Confirmed from live run: GOAL API uses homeTeamScore/awayTeamScore as strings
   if (fixture.homeTeamScore != null) {
     const home = parseInt(fixture.homeTeamScore, 10);

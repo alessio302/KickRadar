@@ -1,0 +1,36 @@
+name: Live scores (European)
+
+# Same shape as live-scores.yml (its domestic counterpart) -- fires every
+# 15 min, the script itself loops internally with ~2min sleeps whenever
+# something is live or about to kick off. REST poll backstop for
+# syncLiveEvents.js's WebSocket -- see syncEuropeanLiveScores.js's own top
+# comment for why this exists.
+on:
+  schedule:
+    # Offset to :13/:28/:43/:58 -- distinct from every other 4x/hour
+    # workflow's own minutes (see live-scores.yml/live-events.yml/
+    # lineups-sync.yml's own comments on why: several workflows sharing one
+    # cron pattern made GitHub Actions' scheduler throttle all of them).
+    - cron: '13,28,43,58 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: live-scores-european
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncEuropeanLiveScores.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
