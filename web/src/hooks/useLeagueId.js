@@ -9,6 +9,7 @@ export function useLeagueId(slug) {
   const [id, setId] = useState(cache.get(slug) ?? null);
 
   useEffect(() => {
+    if (slug == null) return;
     if (cache.has(slug)) {
       setId(cache.get(slug));
       return;

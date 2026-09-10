@@ -192,6 +192,30 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   const [selected, setSelected] = useState(null);
   const locale = DATE_LOCALES[language];
 
+  // Confirmed live 2026-09-10 (same root cause first found in EuropaTab.jsx):
+  // `selected.fixture` above is a snapshot of the row from the moment it
+  // was tapped, never re-synced afterwards -- an already-open
+  // FixtureDetailOverlay kept showing that same stale status/score/
+  // live_minute even though useFixtures.js's own realtime subscription was
+  // already updating the list underneath it the whole time. FixturesList's
+  // own `matchdays` (where that live data actually lands) lives inside that
+  // per-league component instance, not up here, and selected.league can
+  // differ from the currently active tab's `league` (a LiveCarousel tap can
+  // open a fixture from any of the 5 leagues) -- so re-deriving from a
+  // second useFixtures() call for selected's own league, rather than trying
+  // to read the active FixturesList's state, covers both the common
+  // same-tab case and the cross-league carousel one. useLeagueId/useFixtures'
+  // own module-level caches mean this doesn't re-fetch anything already
+  // loaded; it does open one more realtime channel for that league while a
+  // fixture is open, on top of FixturesList's own -- a small, temporary
+  // duplicate subscription rather than a bigger restructure to share one.
+  const { matchdays: selectedLeagueMatchdays } = useFixtures(selected?.league);
+  const liveSelectedFixture = useMemo(() => {
+    if (!selected) return null;
+    const found = selectedLeagueMatchdays.flatMap((m) => m.games).find((f) => f.id === selected.fixture.id);
+    return found ?? selected.fixture;
+  }, [selected, selectedLeagueMatchdays]);
+
   const handleToggleFavorite = async (fixture) => {
     try {
       const result = await toggleFavorite(fixture.id);
@@ -317,13 +341,13 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
         )}
       />
 
-      {selected && (
+      {liveSelectedFixture && (
         <FixtureDetailOverlay
           theme={theme}
           t={t}
           language={language}
           league={selected.league}
-          fixture={selected.fixture}
+          fixture={liveSelectedFixture}
           homeClub={selected.homeClub}
           awayClub={selected.awayClub}
           initialView={selected.view}
