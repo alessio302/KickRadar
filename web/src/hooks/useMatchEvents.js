@@ -25,7 +25,7 @@ export function useMatchEvents(fixtureId) {
 
     supabase
       .from('match_events')
-      .select('id, club_id, type, minute, player, assist, substituted, created_at')
+      .select('id, club_id, team_name, type, minute, player, assist, substituted, created_at')
       .eq('fixture_id', fixtureId)
       .then(({ data, error }) => {
         if (cancelled) return;

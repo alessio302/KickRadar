@@ -499,7 +499,7 @@ function MatchEventTimelineRow({ theme, t, event, side }) {
   );
 }
 
-function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
+export function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
   const { events, loading } = useMatchEvents(fixture.id);
 
   // 'live' shown here too, not just 'finished' -- src/lineups/syncLiveEvents.js
@@ -534,7 +534,17 @@ function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
           seams between rows and keeps the dots' spacing exactly even. */}
       <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: '2px', background: theme.border, transform: 'translateX(-50%)' }} />
       {sorted.map((event, i) => {
-        const side = event.club_id === homeClub?.id ? 'home' : event.club_id === awayClub?.id ? 'away' : null;
+        // club_id resolves a domestic event's side; a European event (no
+        // clubs table row -- see syncEuropeanLineups.js's own top comment)
+        // carries team_name instead (sql/054), matched against the
+        // fixture-derived homeClub/awayClub.name EuropaFixtureDetailOverlay.jsx
+        // passes in for that case.
+        const side =
+          event.club_id === homeClub?.id || (event.team_name && event.team_name === homeClub?.name)
+            ? 'home'
+            : event.club_id === awayClub?.id || (event.team_name && event.team_name === awayClub?.name)
+              ? 'away'
+              : null;
         if (!side) {
           return (
             <div key={i} style={{ padding: '10px 0', textAlign: 'center' }}>

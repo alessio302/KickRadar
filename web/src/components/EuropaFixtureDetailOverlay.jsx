@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
-import { LineupList, Whistle, PitchIcon, HighlightsTab } from './FixtureDetailOverlay.jsx';
+import { LineupList, Whistle, PitchIcon, HighlightsTab, MatchInfoTimeline } from './FixtureDetailOverlay.jsx';
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -46,22 +46,28 @@ function MatchInfoFooter({ theme, fixture }) {
 }
 
 // Slim counterpart to FixtureDetailOverlay.jsx for UCL/UEL/UECL fixtures --
-// only Aufstellungen + Highlights, since Spielinfo/Statistik/Tabelle all
+// Aufstellungen + Spielinfo + Highlights, but no Statistik/Tabelle: those
 // key off a clubs table row or one of our 5 tracked domestic league
 // standings, neither of which exists for European fixtures (see
 // src/lineups/syncEuropeanLineups.js's own top comment). Reuses
-// FixtureDetailOverlay's LineupList and HighlightsTab as-is -- LineupList
-// only needs a `row` shaped { confirmed, formation, players }, nothing
-// club_id-specific, and HighlightsTab only ever reads
-// fixture.highlight_video_url -- and the same drag-to-dismiss bottom-sheet
-// shell. highlight_video_url is populated by
+// FixtureDetailOverlay's LineupList, MatchInfoTimeline and HighlightsTab
+// as-is -- LineupList only needs a `row` shaped { confirmed, formation,
+// players }, MatchInfoTimeline's own side-detection already falls back to
+// matching an event's team_name against homeClub.name/awayClub.name when
+// club_id doesn't resolve (see its own comment), and HighlightsTab only
+// ever reads fixture.highlight_video_url -- plus the same drag-to-dismiss
+// bottom-sheet shell. match_events rows come from
+// src/lineups/backfillEuropeanMatchEvents.js (a one-off, workflow_dispatch-
+// only backfill, not a recurring job -- see its own top comment for why:
+// it draws from the same GOAL API REST budget already strained for the
+// domestic leagues). highlight_video_url is populated by
 // src/lineups/syncEuropeanHighlights.js, the European counterpart of
 // syncHighlights.js (see that file's own top comment for the YouTube
 // source and matching rationale).
 export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture, onClose }) {
-  // 'lineups' | 'highlights' -- mirrors FixtureDetailOverlay.jsx's own
-  // `view` state, just without the 'info'/'stats'/'table' tabs this slim
-  // overlay has no data source for.
+  // 'lineups' | 'info' | 'highlights' -- mirrors FixtureDetailOverlay.jsx's
+  // own `view` state, just without the 'stats'/'table' tabs this slim
+  // overlay has no data source for (see the top comment).
   const [view, setView] = useState('lineups');
   const [side, setSide] = useState('home');
   const { byTeamName } = useEuropaLineups(fixture.id);
@@ -167,13 +173,18 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
             </div>
 
             {/* Same tab-switcher styling as FixtureDetailOverlay.jsx's own
-                (identical padding/border/color values) -- only offered
-                once the match is over, same reasoning as that file's own
-                highlights tab: an upcoming or live European fixture can
-                never have a highlight clip yet. */}
+                (identical padding/border/color values). Spielinfo shows
+                once there's something to time-line (live or finished, same
+                gate MatchInfoTimeline itself applies) -- syncLiveEvents.js's
+                WebSocket already writes match_events for a live European
+                fixture the same way it does for the 5 domestic leagues, so
+                this isn't only fed by the one-off finished-match backfill.
+                Highlights stays finished-only: an upcoming or live European
+                fixture can never have a highlight clip yet. */}
             <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
               {[
                 ['lineups', t.matchInfo.tabLineups],
+                ...(fixture.status === 'finished' || fixture.status === 'live' ? [['info', t.matchInfo.tabInfo]] : []),
                 ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights]] : []),
               ].map(([key, label]) => (
                 <button
@@ -234,6 +245,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
                 <MatchInfoFooter theme={theme} fixture={fixture} />
               </>
             )}
+            {view === 'info' && <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
             {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
           </div>
         </div>
