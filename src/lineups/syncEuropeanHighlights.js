@@ -15,25 +15,42 @@
 //    European analog to that trigger to port. Left out entirely rather
 //    than ported as dead code.
 //
-// Source, all 3 competitions: beIN SPORTS Asia's own YouTube channel
-// (channel_id UCYtNSrfGdXooZYu_hkq18_w). Confirmed live via three separate
-// already-finished 2026/27 UCL fixtures (Real Madrid 2-1 Inter Milan,
-// Barcelona 5-1 Feyenoord, Liverpool 2-1 Atlético de Madrid) sitting in
-// this channel's current uploads feed with exactly the title format
-// parsed below, plus a PAST-season Europa League upload ("Athletic Club
-// 0-3 Manchester United | Europa League 24/25 Match Highlights") and a
-// UEFA Conference League one ("Crystal Palace 1-0 Rayo Vallecano | UEFA
-// Conference League 25/26 Final Match Highlights") from the SAME channel
-// id, in the same title shape -- so this one feed is expected to also
-// cover EL/UECL once their 2026/27 league phase kicks off (2026-09-16/17,
-// confirmed live via WebSearch; no finished EL/UECL fixtures exist yet in
-// this database to verify those two competitions end-to-end the way UCL
-// was). WebSearch also confirms beIN SPORTS Asia holds UEFA's live
-// broadcast rights for all 3 club competitions across multiple APAC
-// territories through 2026/27 -- the same "a rights-holder's broadcaster
-// channel" pattern syncHighlights.js already uses for Bundesliga
-// (ZDFsportstudio) and Premier League (Sky Sport Premier League), just one
-// channel covering all 3 UEFA competitions instead of needing three.
+// Source: DAZN's own per-competition German-language YouTube channels.
+// SUPERSEDES an earlier version of this file that used beIN SPORTS Asia
+// (channel_id UCYtNSrfGdXooZYu_hkq18_w) -- confirmed live IN PRODUCTION
+// (2026-09-10, a real user hitting it in the app) that beIN's videos are
+// geo-blocked outside its own APAC broadcast territory ("Der Uploader
+// stellt dieses Video in deinem Land nicht zur Verfügung"), which the
+// RSS feed itself never surfaces (only visible once actually embedded and
+// played) -- a real gap in "confirmed live" here: a feed returning valid,
+// well-formatted, current entries is NOT the same as those entries being
+// watchable from every viewer's country, and this file's first version
+// never checked that. DAZN's own regional channel is a safer bet
+// specifically BECAUSE it's the local broadcaster for this app's own
+// (German) users, mirroring exactly why syncHighlights.js already prefers
+// ZDFsportstudio/Sky Sport Premier League's own regional channels over a
+// global one for Bundesliga/Premier League.
+//
+// champions-league: channel_id UCB-GdMjyokO9lZkKU_oIK6g ("DAZN UEFA
+// Champions League", resolved via WebSearch off the user's own originally-
+// suggested @DAZNUEFAChampionsLeague handle -- an EARLIER attempt to
+// resolve this handle to a channel_id landed on a stale/wrong one instead,
+// which is what led to beIN in the first place; this id is the one
+// actually confirmed live, 2026-09-10, current uploads matching real
+// 2026/27 matchday-1 fixtures already in this database).
+// europa-league / conference-league: left UNMAPPED for now, deliberately --
+// a WebSearch-suggested "DAZN UEFA Europa League" channel_id
+// (UCNxq-0KJ0N3C3QfUWhLxNkw) looked plausible by name but its own feed
+// returned 0 entries when actually fetched (confirmed live, 2026-09-10) --
+// same dead-channel problem as @UEFAEuropaLeagueUEL below, not a source
+// worth wiring in unverified. No dedicated DAZN Conference League channel
+// was even found by name (search only turns up a general "DAZN" channel
+// mixing every sport DAZN carries, the same firehose problem that ruled
+// out UEFA's own main channel below). Neither is urgent to resolve yet
+// anyway: EL/UECL's 2026/27 league phase hasn't started
+// (2026-09-16/17, confirmed live via WebSearch), so findCandidates() below
+// naturally yields zero candidates for either competition until then --
+// worth a fresh, real check once there's something to verify against.
 //
 // UEFA's own official-looking YouTube presence was checked FIRST and
 // rejected, same vetting standard as every source in syncHighlights.js:
@@ -51,41 +68,47 @@
 //  - @UEFAEuropaLeagueUEL and the "uefa conference League" channel
 //    (UCABKzbH3IJnzFqIgrYTh1kQ) both resolve to real, distinct channel ids
 //    but their own feeds returned 0 entries -- inactive/empty channels.
-//  - DAZN's regional channel (@DAZNUEFAChampionsLeague, the user's own
-//    original suggestion) was confirmed live to be stale (newest entry
-//    from July 2024) and not even CL-specific (mixed LaLiga/Serie A/Saudi
-//    Pro League clips) -- rejected for the same staleness/wrong-content
-//    reasons as UEFA's own main channel, not because it's a broadcaster
-//    rather than the league itself (beIN SPORTS Asia below is ALSO a
-//    broadcaster, just a current and CL/EL/UECL-specific one).
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
 
-// Title pattern confirmed live against beIN SPORTS Asia's own channel feed
-// for all 3 competitions: "<home> <homeScore>-<awayScore> <away> | <comp>
-// <season>[ Final] Match Highlights" -- the score sits between the two
-// team names in the first pipe segment, the same shape
-// syncHighlights.js's own parseScoreEmbeddedTeams handles for LaLiga's
-// official channel. Kept as its own small copy here rather than imported
-// from that file -- the two modules are otherwise unrelated, with their
-// own top comments, and this is a 4-line function.
-function parseScoreEmbeddedTeams(title) {
-  const scoreLine = title.split('|')[0].trim();
-  const m = scoreLine.match(/^(.+?)\s+\d+\s*-\s*\d+\s+(.+)$/);
-  if (!m) return null;
-  const home = m[1].trim();
-  const away = m[2].trim();
+// Title pattern confirmed live against both DAZN channels above, two shapes
+// mixed in the same feed:
+//  - Clean: "<home> - <away> | N. Spieltag | UEFA Champions League | DAZN
+//    Highlights"
+//  - Narrative (a headline teaser, same match, uploaded separately): "<some
+//    headline>: <home> - <away> | N. Spieltag | UEFA Champions League |
+//    DAZN"
+// Both put "<home> - <away>" as the last ": "-separated segment right
+// before the first "|" -- taking the text after the LAST colon in that
+// first pipe segment handles the clean shape too (no colon there at all,
+// so the "after last colon" text is just the whole segment unchanged).
+// Team names here are sometimes DAZN's own colloquial/short/German-
+// language form ("PSG", "Inter Mailand", "Atletico Madrid" without "de")
+// rather than the fixture's own stored full name -- namesLooselyMatch()
+// won't catch every one of those (same accepted gap as syncHighlights.js's
+// own Ligue 1 source, see that file's own comment); a fixture that misses
+// this way just stays unmatched until a later sync run or a differently-
+// worded second upload of the same match catches it, same as there.
+function parseDaznTeams(title) {
+  const firstSegment = title.split('|')[0].trim();
+  const afterHeadline = firstSegment.includes(':')
+    ? firstSegment.slice(firstSegment.lastIndexOf(':') + 1).trim()
+    : firstSegment;
+  const dashIndex = afterHeadline.indexOf(' - ');
+  if (dashIndex === -1) return null;
+  const home = afterHeadline.slice(0, dashIndex).trim();
+  const away = afterHeadline.slice(dashIndex + 3).trim();
   if (!home || !away) return null;
   return { home, away };
 }
 
-const BEIN_SPORTS_ASIA_FEED = 'https://www.youtube.com/feeds/videos.xml?channel_id=UCYtNSrfGdXooZYu_hkq18_w';
-
 const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
-  'champions-league': { feedUrl: BEIN_SPORTS_ASIA_FEED, parseTeams: parseScoreEmbeddedTeams },
-  'europa-league': { feedUrl: BEIN_SPORTS_ASIA_FEED, parseTeams: parseScoreEmbeddedTeams },
-  'conference-league': { feedUrl: BEIN_SPORTS_ASIA_FEED, parseTeams: parseScoreEmbeddedTeams },
+  'champions-league': {
+    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCB-GdMjyokO9lZkKU_oIK6g',
+    parseTeams: parseDaznTeams,
+  },
+  // europa-league / conference-league: intentionally absent -- see top comment.
 };
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -133,17 +156,12 @@ async function findCandidates(supabase, leagueIds) {
   return data;
 }
 
-// Confirmed live (workflow_dispatch run against real data, 2026-09-10):
-// 5 of 12 finished-and-candidate UCL fixtures got a highlight_video_url on
-// the first run (Liverpool 2-1 Atlético de Madrid, PSG 6-1 Slovan
-// Bratislava, Napoli 0-1 Arsenal, Barcelona 5-1 Feyenoord, VfB Stuttgart
-// 3-1 Viking) -- the other 7, including the earlier 2026-09-08 matchday
-// (e.g. Real Madrid vs Inter Milan), simply weren't in beIN SPORTS Asia's
-// uploads feed's last-15-items window anymore by the time this ran, same
-// "prolific channel, match highlights roll off the RSS window fast"
-// caveat syncHighlights.js's own comment documents for LaLiga's official
-// channel. RECHECK_INTERVAL_MS means a fixture that misses this window
-// keeps getting rechecked, but a clip that's already rolled off 15 items
+// Re-verify after switching sources (see top comment) before trusting this
+// comment block's own numbers -- update it with a fresh workflow_dispatch
+// result against the DAZN channel, not the stale beIN-era one. Same
+// RECHECK_INTERVAL_MS/rolling-15-item caveat as syncHighlights.js's own
+// LaLiga source: a fixture that misses this window keeps getting rechecked,
+// but a clip that's already rolled off 15 items
 // by the first check will likely never be caught this way -- same
 // accepted tradeoff as the domestic job, not a bug here.
 export async function syncEuropeanHighlights() {
