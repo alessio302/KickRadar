@@ -133,6 +133,19 @@ async function findCandidates(supabase, leagueIds) {
   return data;
 }
 
+// Confirmed live (workflow_dispatch run against real data, 2026-09-10):
+// 5 of 12 finished-and-candidate UCL fixtures got a highlight_video_url on
+// the first run (Liverpool 2-1 Atlético de Madrid, PSG 6-1 Slovan
+// Bratislava, Napoli 0-1 Arsenal, Barcelona 5-1 Feyenoord, VfB Stuttgart
+// 3-1 Viking) -- the other 7, including the earlier 2026-09-08 matchday
+// (e.g. Real Madrid vs Inter Milan), simply weren't in beIN SPORTS Asia's
+// uploads feed's last-15-items window anymore by the time this ran, same
+// "prolific channel, match highlights roll off the RSS window fast"
+// caveat syncHighlights.js's own comment documents for LaLiga's official
+// channel. RECHECK_INTERVAL_MS means a fixture that misses this window
+// keeps getting rechecked, but a clip that's already rolled off 15 items
+// by the first check will likely never be caught this way -- same
+// accepted tradeoff as the domestic job, not a bug here.
 export async function syncEuropeanHighlights() {
   const supabase = getSupabaseClient();
 
