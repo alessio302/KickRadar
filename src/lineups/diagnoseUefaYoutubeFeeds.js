@@ -64,3 +64,35 @@ for (const c of CANDIDATES) {
 // (no handle to resolve) -- dump its feed regardless of whether the page
 // regex above found it too.
 await dumpFeed('UECL: channel UCABKzbH3IJnzFqIgrYTh1kQ (direct)', 'https://www.youtube.com/feeds/videos.xml?channel_id=UCABKzbH3IJnzFqIgrYTh1kQ');
+
+// Round 2: WebSearch surfaced real 2026/27 match-highlight video pages
+// (titles like "Real Madrid 2-1 Inter Milan | Champions League 26/27
+// Match Highlights") but truncated any playlist_id in the snippet -- find
+// the actual uploader channel straight from the video's own watch page,
+// then dump THAT channel's uploads feed.
+async function resolveVideoUploader(videoId) {
+  const { ok, status, text } = await fetchText(`https://www.youtube.com/watch?v=${videoId}`);
+  if (!ok) return { error: `${status}` };
+  const channelId = text.match(/"channelId":"(UC[\w-]+)"/)?.[1] ?? null;
+  const author = text.match(/"author":"([^"]+)"/)?.[1] ?? null;
+  const title = text.match(/<title>([^<]*)<\/title>/)?.[1] ?? null;
+  return { channelId, author, title };
+}
+
+const VIDEO_CANDIDATES = [
+  { label: 'CL match highlight video: Real Madrid 2-1 Inter Milan', videoId: 'EBv3-fQRABM' },
+  { label: 'CL match highlight video: Barcelona v Feyenoord', videoId: 'Sesw2_Nkpmg' },
+  { label: 'CL match highlight video: AEK Athens vs LASK', videoId: 'y-b-D29wmpo' },
+  { label: 'UECL match highlight video: Malisheva - Vllaznia', videoId: '0zoVuP-pulk' },
+];
+
+const seenChannelIds = new Set();
+for (const v of VIDEO_CANDIDATES) {
+  console.log(`\n#### Resolving uploader of ${v.label} (${v.videoId}) ####`);
+  const info = await resolveVideoUploader(v.videoId);
+  console.log(JSON.stringify(info));
+  if (info.channelId && !seenChannelIds.has(info.channelId)) {
+    seenChannelIds.add(info.channelId);
+    await dumpFeed(`${v.label} -- uploader channel ${info.channelId} (${info.author})`, `https://www.youtube.com/feeds/videos.xml?channel_id=${info.channelId}`);
+  }
+}
