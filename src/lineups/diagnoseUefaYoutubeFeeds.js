@@ -15,7 +15,11 @@ async function fetchText(url) {
 async function resolveChannelId(handleUrl) {
   const { ok, status, text } = await fetchText(handleUrl);
   if (!ok) return { error: `${status}` };
-  const idMatch = text.match(/"channelId":"(UC[\w-]+)"/);
+  const idMatch =
+    text.match(/"channelId":"(UC[\w-]+)"/) ||
+    text.match(/"externalId":"(UC[\w-]+)"/) ||
+    text.match(/"browseId":"(UC[\w-]+)"/) ||
+    text.match(/channel\/(UC[\w-]{10,})/);
   const nameMatch = text.match(/"channelMetadataRenderer":\{"title":"([^"]+)"/);
   const subsMatch = text.match(/"subscriberCountText":\{"simpleText":"([^"]+)"/) || text.match(/"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+)"/);
   return { channelId: idMatch?.[1] ?? null, name: nameMatch?.[1] ?? null, subs: subsMatch?.[1] ?? null };
@@ -55,3 +59,8 @@ for (const c of CANDIDATES) {
     await dumpFeed(c.label, `https://www.youtube.com/feeds/videos.xml?channel_id=${info.channelId}`);
   }
 }
+
+// UECL's channel id is already known directly from the search result URL
+// (no handle to resolve) -- dump its feed regardless of whether the page
+// regex above found it too.
+await dumpFeed('UECL: channel UCABKzbH3IJnzFqIgrYTh1kQ (direct)', 'https://www.youtube.com/feeds/videos.xml?channel_id=UCABKzbH3IJnzFqIgrYTh1kQ');
