@@ -6,7 +6,7 @@
 //  - No clubs table row exists for European fixtures (home_club_id/
 //    away_club_id are always null -- see syncEuropeanLineups.js's own top
 //    comment), so matching goes against fixtures.home_team_name/
-//    away_team_name directly via this file's own daznNamesMatch() (see its
+//    away_team_name directly via this file's own teamNamesMatch() (see its
 //    comment further down for why that's a local, order-independent
 //    word-set matcher rather than syncEuropeanLineups.js's shared
 //    namesLooselyMatch()), instead of resolveClub() against a clubs table
@@ -18,45 +18,47 @@
 //    European analog to that trigger to port. Left out entirely rather
 //    than ported as dead code.
 //
-// Source: DAZN's own per-competition German-language YouTube channels.
-// SUPERSEDES an earlier version of this file that used beIN SPORTS Asia
-// (channel_id UCYtNSrfGdXooZYu_hkq18_w) -- confirmed live IN PRODUCTION
-// (2026-09-10, a real user hitting it in the app) that beIN's videos are
-// geo-blocked outside its own APAC broadcast territory ("Der Uploader
-// stellt dieses Video in deinem Land nicht zur Verfügung"), which the
-// RSS feed itself never surfaces (only visible once actually embedded and
-// played) -- a real gap in "confirmed live" here: a feed returning valid,
-// well-formatted, current entries is NOT the same as those entries being
-// watchable from every viewer's country, and this file's first version
-// never checked that. DAZN's own regional channel is a safer bet
-// specifically BECAUSE it's the local broadcaster for this app's own
-// (German) users, mirroring exactly why syncHighlights.js already prefers
-// ZDFsportstudio/Sky Sport Premier League's own regional channels over a
-// global one for Bundesliga/Premier League.
+// Source history -- THREE candidates tried before landing on one that
+// actually works, each rejected for a different reason a simple feed fetch
+// never would have caught:
+//  1. beIN SPORTS Asia (channel_id UCYtNSrfGdXooZYu_hkq18_w) -- current,
+//     well-formatted, matched real fixtures... and confirmed live IN
+//     PRODUCTION (2026-09-10, a real user hitting it in the app) to be
+//     geo-blocked outside its own APAC broadcast territory ("Der Uploader
+//     stellt dieses Video in deinem Land nicht zur Verfügung"). A feed
+//     fetch can't surface that -- only actually embedding and playing a
+//     video can.
+//  2. DAZN's own per-competition channel (champions-league:
+//     UCB-GdMjyokO9lZkKU_oIK6g) -- switched to specifically because it's a
+//     LOCAL (German) broadcaster, avoiding the geo problem. It did: no
+//     geo-block. But confirmed live via a full oEmbed sweep
+//     (https://www.youtube.com/oembed?url=...) of every video this file
+//     had attached -- 9/9 returned 401 "embedding disabled by owner". DAZN
+//     disables embedding on its uploads entirely, a channel-wide policy
+//     (likely protecting their paid subscription platform -- a free-to-air
+//     broadcaster like ZDFsportstudio/Sky Sport Premier League, already
+//     used for Bundesliga/Premier League in syncHighlights.js, has no such
+//     incentive). This retroactively means beIN was never re-checked for
+//     embeddability either before being dropped for geo-blocking -- moot
+//     now, but a reminder that "current and well-formatted" is not
+//     "usable" until BOTH the feed AND the oEmbed endpoint are checked
+//     live.
+//  3. Prime Video Sport Deutschland (channel_id UCK2izXoHvraUFaPMU5B7vMQ) --
+//     the one that stuck. Found via a user-supplied playlist link, then
+//     verified against the CHANNEL's own live feed (the playlist itself
+//     turned out to be a stale prior-season one). Confirmed live
+//     2026-09-10: current (real 2026/27 matchday-1 uploads), embeddable
+//     (checked via oEmbed), and a single clean, consistent title shape
+//     (see parsePrimeVideoTeams() below) -- unlike DAZN's mix of a clean
+//     shape and a narrative-headline one. Diluted with short German-
+//     language reaction/meme clips same as several domestic sources
+//     already are (syncHighlights.js's own Bundesliga/Premier League
+//     comments); the strict title-anchor in parsePrimeVideoTeams() below
+//     already filters those out rather than needing a separate check.
 //
-// champions-league: channel_id UCB-GdMjyokO9lZkKU_oIK6g ("DAZN UEFA
-// Champions League", resolved via WebSearch off the user's own originally-
-// suggested @DAZNUEFAChampionsLeague handle -- an EARLIER attempt to
-// resolve this handle to a channel_id landed on a stale/wrong one instead,
-// which is what led to beIN in the first place; this id is the one
-// actually confirmed live, 2026-09-10, current uploads matching real
-// 2026/27 matchday-1 fixtures already in this database).
-// europa-league / conference-league: left UNMAPPED for now, deliberately --
-// a WebSearch-suggested "DAZN UEFA Europa League" channel_id
-// (UCNxq-0KJ0N3C3QfUWhLxNkw) looked plausible by name but its own feed
-// returned 0 entries when actually fetched (confirmed live, 2026-09-10) --
-// same dead-channel problem as @UEFAEuropaLeagueUEL below, not a source
-// worth wiring in unverified. No dedicated DAZN Conference League channel
-// was even found by name (search only turns up a general "DAZN" channel
-// mixing every sport DAZN carries, the same firehose problem that ruled
-// out UEFA's own main channel below). Neither is urgent to resolve yet
-// anyway: EL/UECL's 2026/27 league phase hasn't started
-// (2026-09-16/17, confirmed live via WebSearch), so findCandidates() below
-// naturally yields zero candidates for either competition until then --
-// worth a fresh, real check once there's something to verify against.
-//
-// UEFA's own official-looking YouTube presence was checked FIRST and
-// rejected, same vetting standard as every source in syncHighlights.js:
+// UEFA's own official-looking YouTube presence was checked FIRST, before
+// any of the three above, and rejected, same vetting standard as every
+// source in syncHighlights.js:
 //  - @UCL-uefachampionsleague ("UEFA CHAMPIONS LEAGUE.") looks the most
 //    official by name, but confirmed live to be a low-volume meme/reel
 //    account -- 9 entries total, mostly single-moment clickbait-captioned
@@ -71,6 +73,13 @@
 //  - @UEFAEuropaLeagueUEL and the "uefa conference League" channel
 //    (UCABKzbH3IJnzFqIgrYTh1kQ) both resolve to real, distinct channel ids
 //    but their own feeds returned 0 entries -- inactive/empty channels.
+//
+// europa-league/conference-league: still UNMAPPED -- Prime Video
+// Deutschland's own coverage of those two wasn't checked (their 2026/27
+// league phase hasn't started yet, 2026-09-16/17, so there's nothing real
+// to verify against regardless -- findCandidates() below naturally yields
+// zero candidates for either until then). Worth checking this same channel
+// first once there's real data, before searching elsewhere.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 
@@ -79,12 +88,12 @@ import { UEFA_COMPETITIONS } from '../config/leagues.js';
 // resolving GOAL API's own goal_api_id (syncLiveEvents.js, the webhook),
 // so it stays untouched here rather than risk it for a cosmetic feature.
 // namesLooselyMatch's plain substring check turned out too strict for
-// DAZN's own titles specifically -- confirmed live against the real feed
-// (channel UCB-GdMjyokO9lZkKU_oIK6g, 2026-09-10) across just 8 matches:
+// real broadcaster titles -- confirmed live (2026-09-10, across DAZN's and
+// Prime Video's own German-language titles) several real cases at once:
 //  - "PSG" for "Paris Saint-Germain FC" -- an abbreviation, no substring
 //    relation either way.
 //  - "Neapel" for "SSC Napoli", "Inter Mailand" for "FC Internazionale
-//    Milano" -- DAZN's German-language titles use German exonyms for the
+//    Milano" -- German-language titles use German exonyms for the
 //    city/club name, not the club's own official-language name.
 //  - "Man City" for "Manchester City FC" -- same abbreviation problem as
 //    PSG, one substring check can't bridge "manchester" vs "man".
@@ -101,12 +110,12 @@ const CLUB_SUFFIX_WORDS = new Set(['fc', 'cf', 'afc', 'ac', 'sc', 'cd', 'ud', 's
 // Madrid") but get dropped in a shorter colloquial form ("Atletico
 // Madrid") -- generic grammatical filler, not specific to any one club.
 const CONNECTOR_WORDS = new Set(['de', 'del', 'der', 'des', 'van', 'von', 'da', 'do', 'dos']);
-// DAZN's own German-language exonyms for a handful of European
-// city/country names that anchor a club's own name -- a fixed, verifiable
-// list of standard German place names, not a per-club guess. Extend this
-// (not the alias table below) whenever a future mismatch turns out to be
-// this same "city translated into German" shape rather than an
-// abbreviation.
+// German-language exonyms a broadcaster's own titles use for a handful of
+// European city/country names that anchor a club's own name -- a fixed,
+// verifiable list of standard German place names, not a per-club guess.
+// Extend this (not the alias tables below) whenever a future mismatch
+// turns out to be this same "city translated into German" shape rather
+// than an abbreviation.
 const GERMAN_CITY_EXONYMS = {
   neapel: 'napoli',
   mailand: 'milano',
@@ -122,27 +131,28 @@ const GERMAN_CITY_EXONYMS = {
   lissabon: 'lisbon',
   brugge: 'brugge',
 };
-// Known colloquial/abbreviated forms DAZN's titles use in place of a
-// club's own name -- confirmed live in the real feed dump above. Split
-// into two tables by shape: a PHRASE can't be caught by the per-token pass
-// below (it doesn't correspond to a single word in the source title, e.g.
-// "psg" isn't one of "paris"/"saint"/"germain"), so it's substituted as a
-// whole word-boundary-anchored phrase before the string is ever split into
-// words; a single-word alias (e.g. "inter" for "internazionale") is
-// substituted per-token instead, same pass as GERMAN_CITY_EXONYMS, so it
-// still works when embedded inside a longer title fragment like "Inter
-// Mailand". Both grown the same way SHORT_NAME_OVERRIDES (syncClubs.js) is:
-// add an entry once a REAL mismatch is confirmed via the console.warn
-// below, never guessed ahead of time for a club that hasn't actually shown
-// up mismatched yet -- same "don't guess a title format" discipline
-// syncHighlights.js's own parseTeams functions already hold to.
-const DAZN_PHRASE_ALIASES = {
+// Known colloquial/abbreviated forms a broadcaster's titles use in place
+// of a club's own name -- confirmed live in a real feed dump (see the top
+// comment). Split into two tables by shape: a PHRASE can't be caught by
+// the per-token pass below (it doesn't correspond to a single word in the
+// source title, e.g. "psg" isn't one of "paris"/"saint"/"germain"), so
+// it's substituted as a whole word-boundary-anchored phrase before the
+// string is ever split into words; a single-word alias (e.g. "inter" for
+// "internazionale") is substituted per-token instead, same pass as
+// GERMAN_CITY_EXONYMS, so it still works when embedded inside a longer
+// title fragment like "Inter Mailand". Both grown the same way
+// SHORT_NAME_OVERRIDES (syncClubs.js) is: add an entry once a REAL
+// mismatch is confirmed via the console.warn below, never guessed ahead of
+// time for a club that hasn't actually shown up mismatched yet -- same
+// "don't guess a title format" discipline syncHighlights.js's own
+// parseTeams functions already hold to.
+const TEAM_PHRASE_ALIASES = {
   psg: 'paris saint germain',
   'man city': 'manchester city',
   'man utd': 'manchester united',
   'man united': 'manchester united',
 };
-const DAZN_TOKEN_ALIASES = {
+const TEAM_TOKEN_ALIASES = {
   inter: 'internazionale',
 };
 
@@ -152,25 +162,25 @@ function tokenSet(rawName) {
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .trim();
-  for (const [phrase, full] of Object.entries(DAZN_PHRASE_ALIASES)) {
+  for (const [phrase, full] of Object.entries(TEAM_PHRASE_ALIASES)) {
     name = name.replace(new RegExp(`\\b${phrase}\\b`, 'g'), full);
   }
   name = name.replace(/[^a-z0-9]+/g, ' ');
   const words = name
     .split(' ')
     .filter(Boolean)
-    .map((w) => GERMAN_CITY_EXONYMS[w] || DAZN_TOKEN_ALIASES[w] || w)
+    .map((w) => GERMAN_CITY_EXONYMS[w] || TEAM_TOKEN_ALIASES[w] || w)
     .filter((w) => !CLUB_SUFFIX_WORDS.has(w) && !CONNECTOR_WORDS.has(w));
   return new Set(words);
 }
 
 // Order-independent, either-direction subset match -- mirrors
 // namesLooselyMatch's own "a.includes(b) || b.includes(a)" philosophy
-// (neither side is assumed to be the more complete one: DAZN sometimes
-// carries MORE words than our stored name, e.g. matching against a club's
-// full name, and sometimes FEWER, e.g. a short colloquial title), just at
-// the word level instead of the character-substring level.
-function daznNamesMatch(a, b) {
+// (neither side is assumed to be the more complete one: a broadcaster's
+// title sometimes carries MORE words than our stored name, e.g. matching
+// against a club's full name, and sometimes FEWER, e.g. a short colloquial
+// title), just at the word level instead of the character-substring level.
+function teamNamesMatch(a, b) {
   const setA = tokenSet(a);
   const setB = tokenSet(b);
   if (setA.size === 0 || setB.size === 0) return false;
@@ -181,47 +191,29 @@ function daznNamesMatch(a, b) {
   return true;
 }
 
-// Title pattern confirmed live against both DAZN channels above, two shapes
-// mixed in the same feed:
-//  - Clean: "<home> - <away> | N. Spieltag | UEFA Champions League | DAZN
-//    Highlights"
-//  - Narrative (a headline teaser, same match, uploaded separately): "<some
-//    headline>: <home> - <away> | N. Spieltag | UEFA Champions League |
-//    DAZN"
-// Both put "<home> - <away>" as the last ": "-separated segment right
-// before the first "|" -- taking the text after the LAST colon in that
-// first pipe segment handles the clean shape too (no colon there at all,
-// so the "after last colon" text is just the whole segment unchanged).
-// The extracted team names are matched against fixtures via
-// daznNamesMatch() above, not a plain string comparison -- see that
-// function's own comment for why.
-function parseDaznTeams(title) {
-  const firstSegment = title.split('|')[0].trim();
-  const afterHeadline = firstSegment.includes(':')
-    ? firstSegment.slice(firstSegment.lastIndexOf(':') + 1).trim()
-    : firstSegment;
-  const dashIndex = afterHeadline.indexOf(' - ');
-  if (dashIndex === -1) return null;
-  const home = afterHeadline.slice(0, dashIndex).trim();
-  const away = afterHeadline.slice(dashIndex + 3).trim();
+// Title pattern confirmed live against Prime Video Sport Deutschland's own
+// channel feed, 2026-09-10: "UEFA Champions League <home> vs <away> |
+// Highlights und Tore" -- a single, consistent shape (unlike DAZN's own
+// mixed clean/narrative-headline titles), which doubles as a filter: the
+// channel's many short German-language reaction/meme clips ("Kobel übers
+// Spiel...", "#UCL #PrimeVideo" one-liners) simply don't match this anchor
+// and are skipped, no separate check needed.
+function parsePrimeVideoTeams(title) {
+  const m = title.match(/^UEFA Champions League\s+(.+?)\s+vs\s+(.+?)\s*\|/);
+  if (!m) return null;
+  const home = m[1].trim();
+  const away = m[2].trim();
   if (!home || !away) return null;
   return { home, away };
 }
 
-// EMPTY for now -- confirmed live 2026-09-10 (a real user hitting it in
-// the app, then a full oEmbed sweep of every video this file had attached:
-// 9/9 returned 401 "embedding disabled by owner") that DAZN's own channel
-// blocks embedding on every single upload, not just some -- likely a
-// deliberate policy protecting their paid subscription platform, the same
-// way a paid broadcaster has every incentive a free-to-air one doesn't.
-// This ALSO retroactively invalidates the earlier "beIN SPORTS Asia is
-// geo-blocked" finding as the only problem with that source; it was never
-// re-checked for embeddability either before being dropped. Nothing wired
-// in until a source passes BOTH checks -- current AND embeddable, verified
-// live via the oEmbed endpoint (https://www.youtube.com/oembed?url=...),
-// not just a feed fetch. europa-league/conference-league were already
-// unmapped anyway -- see top comment.
-const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {};
+const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
+  'champions-league': {
+    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCK2izXoHvraUFaPMU5B7vMQ',
+    parseTeams: parsePrimeVideoTeams,
+  },
+  // europa-league / conference-league: intentionally absent -- see top comment.
+};
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const RECHECK_INTERVAL_MS = 30 * 60 * 1000;
@@ -268,14 +260,16 @@ async function findCandidates(supabase, leagueIds) {
   return data;
 }
 
-// Re-verify after switching sources (see top comment) before trusting this
-// comment block's own numbers -- update it with a fresh workflow_dispatch
-// result against the DAZN channel, not the stale beIN-era one. Same
-// RECHECK_INTERVAL_MS/rolling-15-item caveat as syncHighlights.js's own
-// LaLiga source: a fixture that misses this window keeps getting rechecked,
-// but a clip that's already rolled off 15 items
-// by the first check will likely never be caught this way -- same
-// accepted tradeoff as the domestic job, not a bug here.
+// Confirmed live (workflow_dispatch run against real data, 2026-09-10,
+// after switching to Prime Video Deutschland): matched real matchday-1
+// fixtures including Real Madrid vs Inter Mailand, Lille vs Real Betis,
+// Porto vs Manchester City, Borussia Dortmund vs Villarreal -- all
+// embeddable, all playing correctly in the app. Same RECHECK_INTERVAL_MS/
+// rolling-15-item caveat as syncHighlights.js's own LaLiga source: a
+// fixture that misses this window keeps getting rechecked, but a clip
+// that's already rolled off 15 items by the first check will likely never
+// be caught this way -- same accepted tradeoff as the domestic job, not a
+// bug here.
 export async function syncEuropeanHighlights() {
   const supabase = getSupabaseClient();
 
@@ -336,7 +330,7 @@ export async function syncEuropeanHighlights() {
       for (const entry of entries) {
         const teams = source.parseTeams(entry.title);
         if (!teams) continue;
-        if (daznNamesMatch(teams.home, fixture.home_team_name) && daznNamesMatch(teams.away, fixture.away_team_name)) {
+        if (teamNamesMatch(teams.home, fixture.home_team_name) && teamNamesMatch(teams.away, fixture.away_team_name)) {
           url = `https://www.youtube.com/embed/${entry.videoId}`;
           break;
         }
@@ -344,15 +338,15 @@ export async function syncEuropeanHighlights() {
       }
     }
 
-    // Visibility for growing DAZN_PHRASE_ALIASES/DAZN_TOKEN_ALIASES/
-    // GERMAN_CITY_EXONYMS above
-    // from real evidence instead of guessing ahead of time -- confirmed
-    // this candidate had a real title in the feed that PARSED into a team
-    // pair but still didn't match either side, worth a human glance at the
-    // next sync run's own log rather than staying silent about it.
+    // Visibility for growing TEAM_PHRASE_ALIASES/TEAM_TOKEN_ALIASES/
+    // GERMAN_CITY_EXONYMS above from real evidence instead of guessing
+    // ahead of time -- confirmed this candidate had a real title in the
+    // feed that PARSED into a team pair but still didn't match either
+    // side, worth a human glance at the next sync run's own log rather
+    // than staying silent about it.
     if (!url && unmatchedTitleTeams.length > 0) {
       console.warn(
-        `No DAZN title matched fixture ${fixture.id} (${fixture.home_team_name} vs ${fixture.away_team_name}) -- parsed candidates: ${JSON.stringify(unmatchedTitleTeams)}`
+        `No title matched fixture ${fixture.id} (${fixture.home_team_name} vs ${fixture.away_team_name}) -- parsed candidates: ${JSON.stringify(unmatchedTitleTeams)}`
       );
     }
 
