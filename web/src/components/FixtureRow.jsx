@@ -105,13 +105,21 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
     <div
       onClick={() => onSelectFixture(fixture)}
       style={{
+        position: 'relative',
         background: theme.surfaceRaised,
         border: `1px solid ${theme.border}`,
         borderRadius: '12px',
         display: 'flex',
         alignItems: 'stretch',
         gap: '10px',
-        padding: '12px 14px',
+        // Right padding reserves room for the star below, which is
+        // absolutely positioned rather than a flex sibling -- see its own
+        // comment for why. Constant regardless of whether this particular
+        // row actually renders a star (a finished, non-favoritable row),
+        // so unlike the old flex-sibling-plus-matching-spacer approach,
+        // every row's content column ends at the exact same x either way
+        // with no separate spacer element needed.
+        padding: '12px 40px 12px 14px',
         cursor: 'pointer',
       }}
     >
@@ -132,25 +140,24 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
         <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} isLive={isLive} />
         <TeamRow club={clubsById.get(fixture.away_club_id)} theme={theme} score={showScore ? fixture.away_score : null} isLive={isLive} />
       </div>
-      {favoritable ? (
+      {/* Absolutely positioned to the card's own top-right corner instead
+          of centered as a flex sibling -- user-reported (twice) that
+          flexbox auto-centering against the two-team-row block never
+          landed cleanly (either overlapping the scores, or just visibly
+          off-center between them once that overlap was fixed). Anchoring
+          to a fixed corner offset is unambiguous and identical on every
+          row regardless of content height, matching how most LiveScore-
+          style apps place a persistent favorite icon. */}
+      {favoritable && (
         <button
           onClick={handleStarClick}
           aria-label={isFavorite ? t.fixtures.unfavoriteAria : t.fixtures.favoriteAria}
           style={{
-            flex: '0 0 auto',
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
             width: '30px',
             height: '30px',
-            // Horizontal-only negative margin -- confirmed live: the
-            // original uniform '-4px' (all four sides) dates from when this
-            // was a single-line row, where a vertical overhang had nothing
-            // above/below to intrude on. In the stacked two-team-row layout,
-            // alignSelf: 'center' already puts this button right at the
-            // vertical midpoint between the two score numbers -- a
-            // negative TOP/BOTTOM margin on top of that rendered the star's
-            // enlarged tap target directly over them. Only the sides still
-            // need the pull-in (see the spacer's own matching comment
-            // below for why).
-            margin: '0 -4px',
             border: 'none',
             background: 'transparent',
             padding: 0,
@@ -158,20 +165,10 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            alignSelf: 'center',
           }}
         >
           <Star size={18} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
         </button>
-      ) : (
-        // margin matches the star button's own (horizontal-only, see its
-        // comment above) negative margin -- there to enlarge its tap target
-        // without widening its layout footprint. Confirmed live: without
-        // this, this plain spacer took up a genuine 30px while the button's
-        // negative margin shrank its own effective footprint by 8px, so
-        // every column after this one sat 8px further right on a finished
-        // row than on a favoritable one.
-        <span style={{ width: '30px', margin: '0 -4px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
     </div>
   );
