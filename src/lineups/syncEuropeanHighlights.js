@@ -74,12 +74,33 @@
 //    (UCABKzbH3IJnzFqIgrYTh1kQ) both resolve to real, distinct channel ids
 //    but their own feeds returned 0 entries -- inactive/empty channels.
 //
-// europa-league/conference-league: still UNMAPPED -- Prime Video
-// Deutschland's own coverage of those two wasn't checked (their 2026/27
-// league phase hasn't started yet, 2026-09-16/17, so there's nothing real
-// to verify against regardless -- findCandidates() below naturally yields
-// zero candidates for either until then). Worth checking this same channel
-// first once there's real data, before searching elsewhere.
+//  4. ZDFsportstudio (channel_id UClCIWcZNvq15p0Y-E4ToGOw) -- added
+//     2026-09-11 as a SECOND source alongside Prime Video, not a
+//     replacement: user-reported that Prime Video hadn't uploaded anything
+//     since 2026-09-08, confirmed live via its own feed (all 15 entries
+//     dated 2026-09-08, nothing for the two matchdays since). ZDF's feed
+//     turned out current (matchday-1 uploads from 2026-09-09/10) and
+//     embeddable (checked via oEmbed on 6 real match videos, all 200) --
+//     but confirmed NOT full-coverage the way Prime Video was: only 6 of
+//     that window's ~16 CL fixtures appeared in the channel's most recent
+//     15 items, all either involving a German club (Bayern, Dortmund,
+//     Stuttgart) or a marquee tie (Liverpool-Atlético) -- ZDF's own free-TV
+//     highlights editorial choice, not every matchday fixture gets one.
+//     Kept both sources active (tried in order per competition, see
+//     YOUTUBE_SOURCE_BY_COMPETITION_SLUG below) rather than switching
+//     outright: ZDF's narrower, German-interest-skewed coverage doesn't
+//     subsume Prime Video's broader one (or vice versa, whenever Prime
+//     Video resumes), so checking both maximizes how many fixtures get a
+//     clip at all. Title shape: "<home> – <away> | UEFA Champions League,
+//     <matchday>. Spieltag <season> | ZDFsportstudio" -- an EN DASH (–),
+//     not a hyphen, confirmed live from the raw feed XML.
+//
+// europa-league/conference-league: still UNMAPPED -- neither source's own
+// coverage of those two was checked (their 2026/27 league phase hasn't
+// started yet, 2026-09-16/17, so there's nothing real to verify against
+// regardless -- findCandidates() below naturally yields zero candidates
+// for either until then). Worth checking both channels first once there's
+// real data, before searching elsewhere.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 
@@ -156,12 +177,27 @@ const TEAM_TOKEN_ALIASES = {
   inter: 'internazionale',
 };
 
+// Confirmed live 2026-09-11 (same root cause goalApiClient.js's own
+// foldForGoalApiSearch already documents for a different call site): NFD
+// decomposition only catches a "base letter + combining accent" pair (ö ->
+// o + combining diaeresis, stripped below), it leaves a genuinely distinct
+// Latin letter like ø untouched. Without this, our own stored "FK
+// Bodø/Glimt" and ZDFsportstudio's own "FK Bodö/Glimt" diverged after
+// normalization -- ø isn't in [a-z0-9] so the non-alnum strip below turned
+// "bodø" into two tokens ("bod" + a word break) while NFD-decomposed "bodö"
+// correctly became one token ("bodo"), never matching. Folded explicitly
+// here, same table shape as the GOAL API one (not merged with it -- that
+// one is scoped to an outgoing search query, this one to this file's own
+// team-name comparison, no shared caller between them).
+const NON_NFD_LATIN_FOLD = { ø: 'o', æ: 'ae', œ: 'oe', ß: 'ss', đ: 'd', ð: 'd', þ: 'th', ł: 'l' };
+
 function tokenSet(rawName) {
   let name = rawName
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
-    .trim();
+    .trim()
+    .replace(/[øæœßđðþł]/g, (ch) => NON_NFD_LATIN_FOLD[ch] ?? ch);
   for (const [phrase, full] of Object.entries(TEAM_PHRASE_ALIASES)) {
     name = name.replace(new RegExp(`\\b${phrase}\\b`, 'g'), full);
   }
@@ -207,11 +243,37 @@ function parsePrimeVideoTeams(title) {
   return { home, away };
 }
 
+// Title pattern confirmed live against ZDFsportstudio's own channel feed,
+// 2026-09-11: "<home> – <away> | UEFA Champions League, <matchday>.
+// Spieltag <season> | ZDFsportstudio" -- note the EN DASH (–), not a
+// hyphen. Same filtering-by-anchor effect as parsePrimeVideoTeams: this
+// channel's many short-form reaction clips ("Bambi is back! 💪",
+// "#shorts") don't match this shape and are skipped for free.
+function parseZdfSportstudioTeams(title) {
+  const m = title.match(/^(.+?)\s*–\s*(.+?)\s*\|\s*UEFA Champions League/);
+  if (!m) return null;
+  const home = m[1].trim();
+  const away = m[2].trim();
+  if (!home || !away) return null;
+  return { home, away };
+}
+
+// One competition can list more than one source -- tried in order, first
+// match wins (see the main loop below). Kept as a list rather than a single
+// {feedUrl, parseTeams} pair specifically because ZDF and Prime Video's own
+// coverage don't subsume each other (see the top comment's source-history
+// entry 4) -- checking both maximizes how many fixtures get a clip.
 const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
-  'champions-league': {
-    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCK2izXoHvraUFaPMU5B7vMQ',
-    parseTeams: parsePrimeVideoTeams,
-  },
+  'champions-league': [
+    {
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UClCIWcZNvq15p0Y-E4ToGOw',
+      parseTeams: parseZdfSportstudioTeams,
+    },
+    {
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCK2izXoHvraUFaPMU5B7vMQ',
+      parseTeams: parsePrimeVideoTeams,
+    },
+  ],
   // europa-league / conference-league: intentionally absent -- see top comment.
 };
 
@@ -260,16 +322,18 @@ async function findCandidates(supabase, leagueIds) {
   return data;
 }
 
-// Confirmed live (workflow_dispatch run against real data, 2026-09-10,
-// after switching to Prime Video Deutschland): matched real matchday-1
-// fixtures including Real Madrid vs Inter Mailand, Lille vs Real Betis,
-// Porto vs Manchester City, Borussia Dortmund vs Villarreal -- all
-// embeddable, all playing correctly in the app. Same RECHECK_INTERVAL_MS/
-// rolling-15-item caveat as syncHighlights.js's own LaLiga source: a
-// fixture that misses this window keeps getting rechecked, but a clip
-// that's already rolled off 15 items by the first check will likely never
-// be caught this way -- same accepted tradeoff as the domestic job, not a
-// bug here.
+// Confirmed live (workflow_dispatch runs against real data): Prime Video
+// Deutschland alone matched real matchday-1 fixtures including Real Madrid
+// vs Inter Mailand, Lille vs Real Betis, Porto vs Manchester City, Borussia
+// Dortmund vs Villarreal (2026-09-10); ZDFsportstudio (added 2026-09-11,
+// see top comment's source-history entry 4) additionally covers Bayern vs
+// Bodø/Glimt, Como vs RB Leipzig, Liverpool vs Atlético, VfB Stuttgart vs
+// Viking -- all embeddable, all playing correctly in the app. Same
+// RECHECK_INTERVAL_MS/rolling-15-item caveat as syncHighlights.js's own
+// LaLiga source: a fixture that misses this window keeps getting
+// rechecked, but a clip that's already rolled off 15 items on EVERY mapped
+// source by the first check will likely never be caught this way -- same
+// accepted tradeoff as the domestic job, not a bug here.
 export async function syncEuropeanHighlights() {
   const supabase = getSupabaseClient();
 
@@ -285,15 +349,12 @@ export async function syncEuropeanHighlights() {
   if (candidates.length === 0) return { checked: 0, found: 0 };
 
   // Fetch and parse each distinct feed URL at most once per sync run --
-  // only champions-league has a mapped source today (see the top
-  // comment), but this is keyed by feedUrl rather than by competition so
-  // adding europa-league/conference-league sources later, even ones that
-  // happen to share a feed URL, still only fetches each real URL once.
+  // keyed by feedUrl rather than by competition/source-list-position so
+  // two competitions (or two entries in one competition's own source list)
+  // that happen to share a feed URL still only fetch it once.
   const slugByLeagueId = new Map(dbLeagues.map((l) => [l.id, l.slug]));
   const feedUrls = new Set(
-    dbLeagues
-      .map((l) => YOUTUBE_SOURCE_BY_COMPETITION_SLUG[l.slug]?.feedUrl)
-      .filter(Boolean)
+    dbLeagues.flatMap((l) => (YOUTUBE_SOURCE_BY_COMPETITION_SLUG[l.slug] ?? []).map((s) => s.feedUrl))
   );
 
   const parsedEntriesByFeedUrl = new Map();
@@ -321,12 +382,12 @@ export async function syncEuropeanHighlights() {
     }
 
     const slug = slugByLeagueId.get(fixture.league_id);
-    const source = slug ? YOUTUBE_SOURCE_BY_COMPETITION_SLUG[slug] : null;
-    const entries = source ? parsedEntriesByFeedUrl.get(source.feedUrl) ?? [] : [];
+    const sources = slug ? YOUTUBE_SOURCE_BY_COMPETITION_SLUG[slug] ?? [] : [];
 
     let url = null;
     const unmatchedTitleTeams = [];
-    if (source) {
+    for (const source of sources) {
+      const entries = parsedEntriesByFeedUrl.get(source.feedUrl) ?? [];
       for (const entry of entries) {
         const teams = source.parseTeams(entry.title);
         if (!teams) continue;
@@ -336,6 +397,7 @@ export async function syncEuropeanHighlights() {
         }
         unmatchedTitleTeams.push(teams);
       }
+      if (url) break;
     }
 
     // Visibility for growing TEAM_PHRASE_ALIASES/TEAM_TOKEN_ALIASES/
