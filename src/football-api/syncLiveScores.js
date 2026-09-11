@@ -38,6 +38,17 @@ import { buildFixtureStatusPayloads } from '../push/fixtureNotifier.js';
 // that league for one cycle instead of aborting the whole 13-minute loop.
 const POLL_INTERVAL_MS = 120_000;
 
+// Same anti-regression guard syncLiveEvents.js's own STATUS_RANK already
+// applies to its European live-score writes -- confirmed live this file
+// needed the exact same protection (2026-09-11, Stade Rennais vs
+// Marseille): the goal-api-webhook can legitimately finish a match before
+// football-data.org's own feed catches up, and this poll's status write
+// used to be unconditional, overwriting that correct 'finished' back to
+// 'live' on the very next tick and repeating every 120s until football-
+// data.org's own feed agreed (confirmed live: still wrong 8+ minutes and
+// several poll ticks after the webhook's match.finished had landed).
+const STATUS_RANK = { scheduled: 0, postponed: 0, cancelled: 0, live: 1, finished: 2 };
+
 // Bounded below the workflow's own 15-min job timeout so the process exits
 // cleanly on its own before GitHub Actions would kill it mid-request, and
 // below the outer schedule's 15-min cadence so consecutive runs don't
@@ -195,6 +206,18 @@ async function pollOnce(supabase, clubById) {
     const newStatus = STATUS_MAP[m.status] || 'live';
     const homeScore = m.score?.fullTime?.home ?? null;
     const awayScore = m.score?.fullTime?.away ?? null;
+
+    const { data: current, error: currentErr } = await supabase
+      .from('fixtures')
+      .select('status')
+      .eq('external_fixture_id', m.id)
+      .maybeSingle();
+    if (currentErr) {
+      console.error(`Failed to read current status for match ${m.id}:`, currentErr.message);
+    } else if (current && STATUS_RANK[newStatus] < STATUS_RANK[current.status]) {
+      continue; // already further along by a faster source (the webhook) -- never walk it backwards
+    }
+
     const { data: updatedRows, error } = await supabase
       .from('fixtures')
       .update({
