@@ -80,9 +80,23 @@ export function useLiveFixtures() {
       })
       .subscribe();
 
+    // Same fix as useFixtures.js/useEuropaFixtures.js for the same user-
+    // reported "frozen score/live_minute" symptom -- see useFixtures.js's
+    // own comment for the full reasoning. A plain reload on
+    // visibilitychange/focus doesn't depend on the Realtime channel above
+    // still being alive, which a standalone iOS PWA fully suspending JS
+    // while backgrounded/screen-locked can't guarantee.
+    function handleWake() {
+      if (!cancelled && document.visibilityState === 'visible') load();
+    }
+    document.addEventListener('visibilitychange', handleWake);
+    window.addEventListener('focus', handleWake);
+
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', handleWake);
+      window.removeEventListener('focus', handleWake);
     };
   }, []);
 

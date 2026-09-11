@@ -124,5 +124,24 @@ export function useEuropaFixtures() {
     }
   }, []);
 
+  // Same fix as useFixtures.js (domestic) for the same user-reported
+  // "frozen score/live_minute" symptom -- see its own comment for the full
+  // reasoning: a standalone iOS PWA fully suspends JS while backgrounded/
+  // screen-locked, so the Realtime channels above can go stale with no
+  // guarantee they self-heal the moment the tab is visible again. A plain
+  // REST refetch on visibilitychange/focus doesn't depend on that socket's
+  // own state at all.
+  useEffect(() => {
+    function handleWake() {
+      if (document.visibilityState === 'visible') refetch();
+    }
+    document.addEventListener('visibilitychange', handleWake);
+    window.addEventListener('focus', handleWake);
+    return () => {
+      document.removeEventListener('visibilitychange', handleWake);
+      window.removeEventListener('focus', handleWake);
+    };
+  }, [refetch]);
+
   return { data, loading, refreshing, refetch };
 }

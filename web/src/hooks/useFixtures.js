@@ -162,5 +162,29 @@ export function useFixtures(leagueSlug) {
     setRefreshing(false);
   }, [leagueId, leagueSlug, buildQuery]);
 
+  // User-reported (2026-09-11): score/live_minute "frozen" -- confirmed
+  // live the backend itself was fine (fixtures.updated_at seconds old),
+  // so an already-open tab's Realtime subscription above had gone stale
+  // without anything forcing a resync. iOS Safari (this is a standalone
+  // PWA) fully suspends JS execution while backgrounded/screen-locked;
+  // supabase-js's own socket keepalive/reconnect logic can't run during
+  // that window, and there's no guarantee it notices and recovers the
+  // moment the tab becomes visible again rather than staying silently
+  // dead. Forcing a plain REST refetch on visibilitychange/focus doesn't
+  // depend on that socket at all -- whatever the connection's actual
+  // state, this always gets the list caught back up the instant the app
+  // is reopened, same as a manual pull-to-refresh would.
+  useEffect(() => {
+    function handleWake() {
+      if (document.visibilityState === 'visible') refetch();
+    }
+    document.addEventListener('visibilitychange', handleWake);
+    window.addEventListener('focus', handleWake);
+    return () => {
+      document.removeEventListener('visibilitychange', handleWake);
+      window.removeEventListener('focus', handleWake);
+    };
+  }, [refetch]);
+
   return { matchdays, loading, refreshing, refetch };
 }
