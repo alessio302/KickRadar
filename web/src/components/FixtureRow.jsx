@@ -89,15 +89,19 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
   // live_minute lags status by however long syncLiveEvents.js's WS takes to
   // push a first tick for this match (or never arrives at all -- confirmed
   // live 2026-09-10 GOAL API's WS doesn't reliably push for every
-  // subscribed match). Rendering nothing here in that gap (rather than
-  // falling back to a "LIVE" word, since that's exactly what this redesign
-  // dropped) still reads as live via the left accent bar's own color --
-  // just without a minute number until one arrives.
+  // subscribed match). Confirmed live 2026-09-11: leaving this column blank
+  // in that gap (an earlier version of this redesign) read as inconsistent
+  // against LiveCarousel.jsx, which has always shown the "LIVE" word in the
+  // same missing-minute case -- same fixture, two different-looking cards.
+  // Falling back to that same word here now matches it. The original
+  // "drop the LIVE word" request was about not showing it redundantly next
+  // to an actual minute, not about the column going empty whenever one
+  // hasn't arrived yet.
   let statusLabel;
   if (isFinished) {
     statusLabel = t.fixtures.finished;
   } else if (isLive) {
-    statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : null;
+    statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : t.fixtures.live;
   } else if (fixture.kickoff_confirmed === false) {
     // Confirmed live: a fixture far enough out that the broadcaster hasn't
     // announced its kickoff time yet still carries a kickoff_at (football-

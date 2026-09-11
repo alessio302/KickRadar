@@ -162,10 +162,11 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
     // to push a first tick for this match (or never arrives at all --
     // confirmed live 2026-09-10 GOAL API's WS doesn't reliably push for
     // every subscribed match, see syncEuropeanLiveScores.js's own
-    // comment). Rendering nothing here in that gap (rather than a "LIVE"
-    // word, since that's exactly what this redesign dropped) still reads
-    // as live via the left accent bar's own color.
-    statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : null;
+    // comment). Falls back to the "LIVE" word in that gap, same as
+    // LiveCarousel.jsx and FixtureRow.jsx -- confirmed live 2026-09-11:
+    // leaving this blank made the same fixture look inconsistent between
+    // this list row and the carousel above it.
+    statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : t.fixtures.live;
   } else if (fixture.kickoff_confirmed === false) {
     statusLabel = t.fixtures.kickoffTbd;
   } else {
