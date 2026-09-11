@@ -35,7 +35,18 @@ function TeamRow({ club, theme, score, isLive }) {
         </span>
       </div>
       {score != null && (
-        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, flexShrink: 0 }}>{score}</span>
+        // fontVariantNumeric: 'tabular-nums' -- same fix LiveCarousel.jsx's
+        // own ClubRow already has. User-reported: without it, home/away
+        // scores didn't line up right-aligned even though both spans sit
+        // flush against the identical right edge (justify-content:
+        // 'space-between' on the row above) -- a proportional font gives
+        // narrow digits like "1" less ink-width than "2"/"8", so the
+        // VISIBLE glyph looked shifted relative to the row below it even
+        // though the CSS box itself was correctly aligned. Uniform digit
+        // width removes that mismatch.
+        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+          {score}
+        </span>
       )}
     </div>
   );

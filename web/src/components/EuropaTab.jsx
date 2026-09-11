@@ -132,7 +132,12 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
         </span>
       </div>
       {score != null && (
-        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, flexShrink: 0 }}>{score}</span>
+        // fontVariantNumeric: 'tabular-nums' -- same fix FixtureRow.jsx
+        // (domestic)'s own TeamRow needed for the same user-reported
+        // issue; see its own comment for why.
+        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+          {score}
+        </span>
       )}
     </div>
   );
