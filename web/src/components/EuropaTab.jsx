@@ -4,7 +4,6 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import { UEFA_COMPETITIONS, adjacentCompetition } from '../lib/leagues.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
-import MatchScore from './MatchScore.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
 
@@ -105,28 +104,65 @@ function TeamBadge({ url, name, size = 20, theme }) {
   );
 }
 
+// One team's badge/name (left) and score (right, only while live or
+// finished -- a scheduled fixture has no score yet). Mirrors FixtureRow.jsx
+// (domestic)'s own TeamRow -- kept as a separate copy rather than a shared
+// import since this one resolves its badge/name straight off the fixture's
+// own home_team_badge/home_team_name fields (no clubs table row exists for
+// European fixtures -- see this file's own useEuropaFixtures.js comment)
+// instead of a clubsById lookup.
+function TeamRow({ badgeUrl, name, theme, score }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        <TeamBadge url={badgeUrl} name={name} theme={theme} size={22} />
+        <span
+          style={{
+            fontSize: '14px',
+            fontWeight: 700,
+            color: theme.text,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {name || '—'}
+        </span>
+      </div>
+      {score != null && (
+        <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text, flexShrink: 0 }}>{score}</span>
+      )}
+    </div>
+  );
+}
+
+// LiveScore-style layout (2026-09-11), same redesign and same reasoning as
+// FixtureRow.jsx (domestic) -- see that file's own top comment for the
+// full writeup. Two full-width stacked team rows instead of one shared
+// "home vs away" row, no "LIVE" text label (the live minute plus its red
+// color, or just the left accent bar absent a minute, are the indicator
+// already).
 function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
   const isLive = fixture.status === 'live';
   const isFinished = fixture.status === 'finished';
+  const showScore = isLive || isFinished;
 
-  let timeLabel;
-  if (isLive) {
+  let statusLabel;
+  if (isFinished) {
+    statusLabel = t.fixtures.finished;
+  } else if (isLive) {
     // live_minute lags status by however long syncLiveEvents.js's WS takes
     // to push a first tick for this match (or never arrives at all --
     // confirmed live 2026-09-10 GOAL API's WS doesn't reliably push for
     // every subscribed match, see syncEuropeanLiveScores.js's own
-    // comment). Falling through to the kickoff-clock-time branch below in
-    // that gap showed the original kickoff time on an already-live match,
-    // reading as "hasn't started yet" -- wrong in the exact way a live
-    // match least affords. A bare "LIVE" label is honest about what's
-    // actually known; same fallback FixtureRow.jsx (domestic) uses.
-    timeLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? 'HT' : `${fixture.live_minute}'`) : t.fixtures.live;
-  } else if (isFinished) {
-    timeLabel = t.fixtures.finished;
+    // comment). Rendering nothing here in that gap (rather than a "LIVE"
+    // word, since that's exactly what this redesign dropped) still reads
+    // as live via the left accent bar's own color.
+    statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : null;
   } else if (fixture.kickoff_confirmed === false) {
-    timeLabel = t.fixtures.kickoffTbd;
+    statusLabel = t.fixtures.kickoffTbd;
   } else {
-    timeLabel = formatTime(fixture.kickoff_at, locale);
+    statusLabel = formatTime(fixture.kickoff_at, locale);
   }
 
   return (
@@ -134,39 +170,34 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
       onClick={() => onSelectFixture?.(fixture)}
       style={{
         background: theme.surfaceRaised,
-        padding: '10px 14px',
         border: `1px solid ${theme.border}`,
         borderRadius: '12px',
         display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
+        alignItems: 'stretch',
+        gap: '10px',
+        padding: '12px 14px',
         cursor: 'pointer',
       }}
     >
-      <span
-        style={{
-          fontSize: '13px',
-          fontWeight: 700,
-          color: isLive ? theme.danger : theme.accent,
-          width: '66px',
-          flex: '0 0 auto',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {timeLabel}
-      </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {fixture.home_team_short_name || fixture.home_team_name || '—'}
+      <span aria-hidden="true" style={{ width: '3px', borderRadius: '2px', background: isLive ? theme.danger : 'transparent', flexShrink: 0 }} />
+      <div style={{ width: '66px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
+          {statusLabel}
         </span>
-        <TeamBadge url={fixture.home_team_badge} name={fixture.home_team_name} theme={theme} />
       </div>
-      <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '11px', color: theme.textMuted, flex: '0 0 auto' }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-        <TeamBadge url={fixture.away_team_badge} name={fixture.away_team_name} theme={theme} />
-        <span style={{ fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {fixture.away_team_short_name || fixture.away_team_name || '—'}
-        </span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
+        <TeamRow
+          badgeUrl={fixture.home_team_badge}
+          name={fixture.home_team_short_name || fixture.home_team_name}
+          theme={theme}
+          score={showScore ? fixture.home_score : null}
+        />
+        <TeamRow
+          badgeUrl={fixture.away_team_badge}
+          name={fixture.away_team_short_name || fixture.away_team_name}
+          theme={theme}
+          score={showScore ? fixture.away_score : null}
+        />
       </div>
     </div>
   );

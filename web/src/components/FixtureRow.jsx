@@ -1,6 +1,5 @@
 import { Star } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
-import MatchScore from './MatchScore.jsx';
 
 // Fixed gold, not theme.accent -- confirmed live that using the theme
 // accent made the favorited indicator blend into the (also accent-colored)
@@ -10,13 +9,51 @@ import MatchScore from './MatchScore.jsx';
 // use their own fixed colors rather than theme tokens.
 const FAVORITE_STAR_COLOR = '#FFC107';
 
-// A permanent tappable star, not swipe-to-reveal (what this replaced) --
-// confirmed live: a row-level horizontal swipe and LeagueCarousel's own
-// full-screen horizontal swipe (switch league) both claimed the same
-// gesture, so a swipe meant to reveal the star often also flipped the
-// league underneath it, or the other way around. A persistent icon needs
-// no drag at all, so there's nothing left for the two gestures to fight
-// over -- same pattern LiveScore uses for exactly this reason.
+// One team's badge/name (left) and score (right, only while live or
+// finished -- a scheduled fixture has no score yet). Split out of the main
+// row body since it's rendered twice, identically, once per side.
+function TeamRow({ club, theme, score }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        <ClubJersey club={club} size={22} theme={theme} />
+        <span
+          style={{
+            fontSize: '14px',
+            fontWeight: 700,
+            color: theme.text,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {club?.short_name || club?.name}
+        </span>
+      </div>
+      {score != null && (
+        <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text, flexShrink: 0 }}>{score}</span>
+      )}
+    </div>
+  );
+}
+
+// LiveScore-style layout (2026-09-11, replacing an earlier single-row
+// "home vs away" side-by-side design): user-reported that layout ran out
+// of room for real club names ("Crystal P..." etc, mid-word truncation) --
+// two full-width stacked rows (home above away, each with its own
+// right-aligned score) give each team name the full card width instead of
+// splitting it between two names sharing one row, matching how LiveScore/
+// most other score apps lay this out. No "LIVE" text label anymore either
+// (same request): the live minute (or, absent one -- see below -- just the
+// left accent bar) plus its red color are already the live indicator, a
+// separate word saying so is redundant. A permanent tappable star, not
+// swipe-to-reveal (what this replaced originally) -- confirmed live: a
+// row-level horizontal swipe and LeagueCarousel's own full-screen
+// horizontal swipe (switch league) both claimed the same gesture, so a
+// swipe meant to reveal the star often also flipped the league underneath
+// it, or the other way around. A persistent icon needs no drag at all, so
+// there's nothing left for the two gestures to fight over -- same pattern
+// LiveScore uses for exactly this reason.
 export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fixture, isFavorite, onSelectFixture, onToggleFavorite }) {
   // A finished match never goes live again, so the live-events pipeline
   // (src/lineups/syncLiveEvents.js) has nothing left to push regardless of
@@ -25,26 +62,72 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
   // keeps the row's other columns aligned with favoritable rows above/below
   // it in the same matchday group instead of shifting everything left.
   const favoritable = fixture.status !== 'finished';
+  const isLive = fixture.status === 'live';
+  const isFinished = fixture.status === 'finished';
+  const showScore = isLive || isFinished;
 
   const handleStarClick = (e) => {
     e.stopPropagation();
     onToggleFavorite(fixture);
   };
 
+  // live_minute lags status by however long syncLiveEvents.js's WS takes to
+  // push a first tick for this match (or never arrives at all -- confirmed
+  // live 2026-09-10 GOAL API's WS doesn't reliably push for every
+  // subscribed match). Rendering nothing here in that gap (rather than
+  // falling back to a "LIVE" word, since that's exactly what this redesign
+  // dropped) still reads as live via the left accent bar's own color --
+  // just without a minute number until one arrives.
+  let statusLabel;
+  if (isFinished) {
+    statusLabel = t.fixtures.finished;
+  } else if (isLive) {
+    statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : null;
+  } else if (fixture.kickoff_confirmed === false) {
+    // Confirmed live: a fixture far enough out that the broadcaster hasn't
+    // announced its kickoff time yet still carries a kickoff_at (football-
+    // data.org's own 00:00:00 UTC placeholder, see syncFixtures.js's own
+    // comment) -- showing that formatted as a real clock time read as a
+    // live time that just happened to be wrong. kickoff_confirmed flips to
+    // true automatically once a scheduled sync re-fetches after the real
+    // time is published, so this resolves itself with no further action
+    // once that happens.
+    statusLabel = t.fixtures.kickoffTbd;
+  } else {
+    statusLabel = formatTime(fixture.kickoff_at, locale);
+  }
+
   return (
     <div
       onClick={() => onSelectFixture(fixture)}
       style={{
         background: theme.surfaceRaised,
-        padding: '10px 14px',
         border: `1px solid ${theme.border}`,
         borderRadius: '12px',
         display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
+        alignItems: 'stretch',
+        gap: '10px',
+        padding: '12px 14px',
         cursor: 'pointer',
       }}
     >
+      <span aria-hidden="true" style={{ width: '3px', borderRadius: '2px', background: isLive ? theme.danger : 'transparent', flexShrink: 0 }} />
+      {/* Fixed width, not minWidth -- confirmed live: the translated
+          "finished" label (e.g. Spanish "Finalizado", 63.6px at this
+          font/weight) is wider than a clock time ("20:45", 33.3px) in
+          every one of the app's 5 languages, so minWidth alone let a
+          finished row's label overflow past a scheduled row's own width.
+          A true fixed width keeps this column identical regardless of
+          which status text a given row happens to show. */}
+      <div style={{ width: '66px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
+          {statusLabel}
+        </span>
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
+        <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} />
+        <TeamRow club={clubsById.get(fixture.away_club_id)} theme={theme} score={showScore ? fixture.away_score : null} />
+      </div>
       {favoritable ? (
         <button
           onClick={handleStarClick}
@@ -61,6 +144,7 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            alignSelf: 'center',
           }}
         >
           <Star size={18} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
@@ -74,59 +158,6 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
         // sat 8px further right on a finished row than on a favoritable one.
         <span style={{ width: '30px', margin: '-4px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
-      {/* Fixed width, not minWidth -- confirmed live: the translated
-          "finished" label (e.g. Spanish "Finalizado", 63.6px at this
-          font/weight) is wider than a clock time ("20:45", 33.3px) in
-          every one of the app's 5 languages, so minWidth alone let a
-          finished row's label overflow past a scheduled row's and shove
-          the club-crest column that follows out of alignment with every
-          other row. A true fixed width keeps that column identical
-          regardless of which status text a given row happens to show. */}
-      <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent, width: '66px', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
-        {fixture.status === 'finished'
-          ? t.fixtures.finished
-          : fixture.status === 'live'
-            ? // live_minute lags status by however long syncLiveEvents.js's
-              // WS takes to push a first tick for this match (or never
-              // arrives at all -- confirmed live 2026-09-10 GOAL API's WS
-              // doesn't reliably push for every subscribed match, see
-              // syncEuropeanLiveScores.js's own comment for the European
-              // side of this). Falling through to formatTime() below in
-              // that gap showed the original kickoff clock time on an
-              // already-live match, reading as "hasn't started yet" --
-              // wrong in the exact way a live match least affords. A bare
-              // "LIVE" label is honest about what's actually known.
-              fixture.live_minute
-              ? fixture.live_minute === 'HT'
-                ? fixture.live_minute
-                : `${fixture.live_minute}'`
-              : t.fixtures.live
-            : // Confirmed live: a fixture far enough out that the
-              // broadcaster hasn't announced its kickoff time yet still
-              // carries a kickoff_at (football-data.org's own 00:00:00 UTC
-              // placeholder, see syncFixtures.js's own comment) -- showing
-              // that formatted as a real clock time read as a live time
-              // that just happened to be wrong. kickoff_confirmed flips to
-              // true automatically once a scheduled sync re-fetches after
-              // the real time is published, so this resolves itself with
-              // no further action once that happens.
-              fixture.kickoff_confirmed === false
-              ? t.fixtures.kickoffTbd
-              : formatTime(fixture.kickoff_at, locale)}
-      </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-        <ClubJersey club={clubsById.get(fixture.home_club_id)} size={20} theme={theme} />
-        <span style={{ fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {clubsById.get(fixture.home_club_id)?.short_name || clubsById.get(fixture.home_club_id)?.name}
-        </span>
-      </div>
-      <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '11px', color: theme.textMuted, flex: '0 0 auto' }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {clubsById.get(fixture.away_club_id)?.short_name || clubsById.get(fixture.away_club_id)?.name}
-        </span>
-        <ClubJersey club={clubsById.get(fixture.away_club_id)} size={20} theme={theme} />
-      </div>
     </div>
   );
 }
