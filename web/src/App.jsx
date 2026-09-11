@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import StandingsTab from './components/StandingsTab.jsx';
@@ -6,6 +6,7 @@ import EuropaTab from './components/EuropaTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
+import ViewportDebugOverlay from './components/ViewportDebugOverlay.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 import { adjacentLeague } from './lib/leagues.js';
@@ -93,6 +94,7 @@ const ACCENT_PALETTES = {
 };
 
 export default function App() {
+  const shellRef = useRef(null);
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
   const [initialFixtureId, setInitialFixtureId] = useState(null);
@@ -262,6 +264,7 @@ export default function App() {
   // plain fixed padding rather than needing a code change here).
   return (
     <div
+      ref={shellRef}
       style={{
         background: theme.bg,
         // User-reported (screenshot, iPhone, both a Safari tab and an
@@ -387,6 +390,7 @@ export default function App() {
         <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
+      <ViewportDebugOverlay shellRef={shellRef} />
     </div>
   );
 }
