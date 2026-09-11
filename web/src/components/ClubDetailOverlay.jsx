@@ -104,10 +104,11 @@ function FixturesTabContent({ theme, t, locale, clubId, leagueSlug }) {
       {fixtures.map((f) => {
         const isHome = f.home_club_id === clubId;
         const opponent = clubsById.get(isHome ? f.away_club_id : f.home_club_id);
+        const isLive = f.status === 'live';
         const scoreOrTime =
           f.status === 'finished'
             ? t.fixtures.finished
-            : f.status === 'live'
+            : isLive
               ? (f.live_minute ? `${f.live_minute}'` : t.fixtures.live)
               : new Date(f.kickoff_at).toLocaleString(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         const score = f.home_score != null && f.away_score != null ? `${f.home_score} : ${f.away_score}` : null;
@@ -119,7 +120,13 @@ function FixturesTabContent({ theme, t, locale, clubId, leagueSlug }) {
             <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {opponent?.short_name || opponent?.name || '–'}
             </span>
-            <span style={{ fontSize: '12.5px', color: theme.textMuted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+            {/* Red while live -- same "the score itself should read as live
+                too" request already applied to FixtureRow.jsx/EuropaTab.jsx/
+                LiveCarousel.jsx. score (not scoreOrTime) is the part that
+                actually needs it; scoreOrTime alone (no score yet) still
+                just shows the live minute in its normal muted color here,
+                matching how a scheduled kickoff time looks. */}
+            <span style={{ fontSize: '12.5px', color: score && isLive ? theme.danger : theme.textMuted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
               {score ?? scoreOrTime}
             </span>
           </div>

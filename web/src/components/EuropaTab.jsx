@@ -111,7 +111,9 @@ function TeamBadge({ url, name, size = 20, theme }) {
 // own home_team_badge/home_team_name fields (no clubs table row exists for
 // European fixtures -- see this file's own useEuropaFixtures.js comment)
 // instead of a clubsById lookup.
-function TeamRow({ badgeUrl, name, theme, score }) {
+// Score turns red while live -- same reasoning as FixtureRow.jsx (domestic)'s
+// own TeamRow.
+function TeamRow({ badgeUrl, name, theme, score, isLive }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -130,7 +132,7 @@ function TeamRow({ badgeUrl, name, theme, score }) {
         </span>
       </div>
       {score != null && (
-        <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text, flexShrink: 0 }}>{score}</span>
+        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, flexShrink: 0 }}>{score}</span>
       )}
     </div>
   );
@@ -191,12 +193,14 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
           name={fixture.home_team_short_name || fixture.home_team_name}
           theme={theme}
           score={showScore ? fixture.home_score : null}
+          isLive={isLive}
         />
         <TeamRow
           badgeUrl={fixture.away_team_badge}
           name={fixture.away_team_short_name || fixture.away_team_name}
           theme={theme}
           score={showScore ? fixture.away_score : null}
+          isLive={isLive}
         />
       </div>
     </div>

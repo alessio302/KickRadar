@@ -24,6 +24,9 @@ import { useLiveFixtures } from '../hooks/useLiveFixtures.js';
 // fixture's own league instead of whichever league is currently active.
 const CARD_WIDTH = 220;
 
+// Score is red -- every fixture in this carousel is live by definition
+// (useLiveFixtures only ever returns live ones), so unlike FixtureRow.jsx/
+// EuropaTab.jsx's own TeamRow this needs no isLive check of its own.
 function ClubRow({ theme, club, score }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
@@ -31,7 +34,7 @@ function ClubRow({ theme, club, score }) {
       <span style={{ flex: 1, minWidth: 0, fontSize: '14px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {club?.short_name || club?.name}
       </span>
-      <span style={{ fontSize: '14px', fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{score}</span>
+      <span style={{ fontSize: '14px', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: theme.danger, flexShrink: 0 }}>{score}</span>
     </div>
   );
 }

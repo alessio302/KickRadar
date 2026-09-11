@@ -11,8 +11,12 @@ const FAVORITE_STAR_COLOR = '#FFC107';
 
 // One team's badge/name (left) and score (right, only while live or
 // finished -- a scheduled fixture has no score yet). Split out of the main
-// row body since it's rendered twice, identically, once per side.
-function TeamRow({ club, theme, score }) {
+// row body since it's rendered twice, identically, once per side. The
+// score (not the name) turns red while live -- user-reported the row's
+// only live indicator being the left accent bar and the status-column
+// minute wasn't enough, the number itself should read as live too, same
+// as LiveCarousel.jsx/MatchScore.jsx already do elsewhere.
+function TeamRow({ club, theme, score, isLive }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -31,7 +35,7 @@ function TeamRow({ club, theme, score }) {
         </span>
       </div>
       {score != null && (
-        <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text, flexShrink: 0 }}>{score}</span>
+        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, flexShrink: 0 }}>{score}</span>
       )}
     </div>
   );
@@ -125,8 +129,8 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
-        <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} />
-        <TeamRow club={clubsById.get(fixture.away_club_id)} theme={theme} score={showScore ? fixture.away_score : null} />
+        <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} isLive={isLive} />
+        <TeamRow club={clubsById.get(fixture.away_club_id)} theme={theme} score={showScore ? fixture.away_score : null} isLive={isLive} />
       </div>
       {favoritable ? (
         <button
