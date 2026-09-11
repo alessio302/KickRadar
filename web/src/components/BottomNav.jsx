@@ -13,8 +13,8 @@ const TABS = [
   ['einstellungen', (t) => t.nav.settings, Settings],
 ];
 
-// theme.surface is a plain hex string -- needed as rgba() for the pill's
-// translucency below, not just a flat opaque fill.
+// theme.surface is a plain hex string -- needed as rgba() for the bar's
+// own translucency below, not just a flat opaque fill.
 function hexToRgba(hex, alpha) {
   const n = parseInt(hex.replace('#', ''), 16);
   const r = (n >> 16) & 255;
@@ -23,32 +23,21 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Floating pill instead of a full-width bar flush with the screen edges --
-// per explicit request, after the investigation into the strip of
-// unreachable space at the very bottom of the screen (confirmed live: an
-// iOS platform reservation outside what any web content can address,
-// independent of this app's own CSS) concluded that strip isn't going
-// away. Embracing it as outer margin instead of fighting it: the pill
-// floats inset from the two side edges, with its own translucent,
-// blurred background reading as "elevated" above whatever shows through
-// beneath/around it, rather than looking like a bar that stops short of
-// the edge by mistake.
-//
-// User-reported (side-by-side screenshot against an older build): the
-// visible area below the nav grew noticeably once this shipped. Root
-// cause was this file, not the platform reservation it was built to
-// live with -- the old flush, edge-to-edge bar had no bottom margin of
-// its own at all, so the (small, unavoidable) platform strip was all
-// that ever showed beneath it. Adding a decorative bottom margin here
-// on top of that stacked an avoidable gap onto an unavoidable one.
-// Bottom inset is back to exactly env(safe-area-inset-bottom) -- no
-// added padding -- so the pill again reaches as far down as the old bar
-// did; only the sides and corners stay "floating". A 2026-09-11
-// experiment dropped viewport-fit=cover in index.html, which zeroes this
-// env() call -- confirmed live that made the pill's own rounded corners
-// render flush against the unreachable-zone boundary with no breathing
-// room, on top of not fixing the underlying gap at all. Reverted (see
-// index.html's own comment); this value is load-bearing again.
+// Back to a flush, edge-to-edge bar (2026-09-11), reverting an earlier
+// floating-pill redesign (see git history) that inset the bar from the
+// two side edges with its own rounded corners and translucent "elevated"
+// card look. That shape was built specifically to live with the
+// unreachable strip at the very bottom of an iOS standalone PWA's screen
+// (confirmed live: a platform reservation outside what any web content
+// can address, independent of this app's own CSS -- see index.html's own
+// comment on the viewport-fit=cover investigation this session ran
+// through) -- but it's the same strip either way, this shape just
+// doesn't rely on env(safe-area-inset-bottom) padding to keep its own
+// rounded corners from rendering flush against it, since a plain
+// rectangular bar has no corner curve to clip into in the first place.
+// No env(safe-area-inset-bottom) call needed here anymore for that
+// reason -- index.html doesn't set viewport-fit=cover as of this
+// revision, so that value would resolve to 0px regardless.
 //
 // Deliberately NOT position: fixed -- this file's own git history already
 // tried that for a floating bar and reverted it: it intermittently
@@ -61,42 +50,34 @@ export default function BottomNav({ tab, onSelectTab, theme, t }) {
   return (
     <div
       style={{
-        padding: '0 12px env(safe-area-inset-bottom)',
+        display: 'flex',
+        justifyContent: 'space-around',
+        padding: '10px 4px',
+        background: hexToRgba(theme.surface, 0.92),
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderTop: `1px solid ${theme.border}`,
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-around',
-          padding: '10px 4px',
-          borderRadius: '22px',
-          background: hexToRgba(theme.surface, 0.82),
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: `1px solid ${theme.border}`,
-          boxShadow: theme.isDark ? '0 8px 24px rgba(0, 0, 0, 0.45)' : '0 8px 24px rgba(0, 0, 0, 0.12)',
-        }}
-      >
-        {TABS.map(([id, getLabel, Icon]) => (
-          <button
-            key={id}
-            onClick={() => onSelectTab(id)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '3px',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: tab === id ? theme.accent : theme.textMuted,
-            }}
-          >
-            <Icon size={20} />
-            <span style={{ fontSize: '10px', fontWeight: 600 }}>{getLabel(t)}</span>
-          </button>
-        ))}
-      </div>
+      {TABS.map(([id, getLabel, Icon]) => (
+        <button
+          key={id}
+          onClick={() => onSelectTab(id)}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '3px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: tab === id ? theme.accent : theme.textMuted,
+          }}
+        >
+          <Icon size={20} />
+          <span style={{ fontSize: '10px', fontWeight: 600 }}>{getLabel(t)}</span>
+        </button>
+      ))}
     </div>
   );
 }

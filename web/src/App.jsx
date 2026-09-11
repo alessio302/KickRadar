@@ -253,15 +253,14 @@ export default function App() {
   // child with fixed (shrink-proof) height, so there's nothing for scroll
   // position to affect it at all, no padding math needed to keep content
   // from sliding under it, and no viewport-resize interaction to account
-  // for. env(safe-area-inset-*): the outer container's paddingTop clears
-  // the notch/Dynamic Island, and the nav clears the home indicator
-  // otherwise (viewport-fit=cover in index.html opts into content
-  // extending under both). A 2026-09-11 experiment tried dropping
-  // viewport-fit=cover entirely (see index.html's own comment for the
-  // full writeup) -- measured live to make zero difference to the
-  // underlying gap, while incidentally zeroing this env() call and making
-  // the bottom nav pill's rounded corners render flush against the hard
-  // edge. Reverted; this is the known-clean baseline.
+  // for. env(safe-area-inset-top) clears the notch/Dynamic Island up here
+  // regardless of viewport-fit -- index.html doesn't set viewport-fit=
+  // cover as of 2026-09-11 (see its own comment for the measured-live
+  // writeup on why, and BottomNav.jsx's own comment for why that's fine
+  // now that it's a flush edge-to-edge bar rather than a floating pill
+  // with rounded corners to clip into), so this resolves to 0px in
+  // practice -- degrades to the plain 18px base padding, no code change
+  // needed here either way.
   return (
     <div
       style={{

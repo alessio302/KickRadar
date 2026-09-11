@@ -2,36 +2,22 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <!-- Tried dropping viewport-fit=cover, 2026-09-11 (reverted same day --
-         see git history): a colleague's own working standalone-PWA had no
-         env(safe-area-inset-*) code at all, on the theory that WITHOUT
-         viewport-fit=cover, WebKit constrains the layout viewport itself to
-         the safe area instead of the page extending full-screen and
-         needing env()-padding around the notch/home indicator -- a
-         genuinely different mechanism from this file's own prior
-         investigation (100dvh -> 100svh -> 100%), which only ever varied
-         the height unit *inside* an already-cover viewport. Measured live
-         via ViewportDebugOverlay with viewport-fit dropped: window.
-         innerHeight/visualViewport.height/the shell's own rect stayed
-         EXACTLY 797px, window.screen.height stayed EXACTLY 844px -- the
-         identical 47px gap as every single measurement all session,
-         cover or not. The layout viewport never actually shrank to the
-         safe area in this app's case, so the colleague's own mechanism
-         plainly doesn't apply here (this app's standalone PWA config,
-         iOS version, or something else differs from theirs in a way that
-         changes this). Actively made the bottom nav pill's rounded
-         corners look clipped as a side effect: dropping cover also zeroes
-         env(safe-area-inset-bottom), which was quietly giving the pill a
-         few px of breathing room before hitting the unreachable zone --
-         removing that made the pill sit flush against the hard edge with
-         nothing to round into. Back to viewport-fit=cover + env() padding,
-         the known-clean baseline. This is now the fourth confirmed-live
-         dead end this session (100svh, 100%, no-cover, plus the native-
-         screen.height ceiling itself) -- the only remaining path that
-         could actually eliminate this reservation is a native wrapper
-         (Capacitor or similar), already sketched out separately; nothing
-         left to try at the CSS/meta-tag layer. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- No viewport-fit=cover, 2026-09-11 -- re-applied deliberately despite
+         its own earlier round-trip in this file's git history measuring
+         ZERO effect on the underlying 47px unreachable-zone gap
+         (window.innerHeight/visualViewport.height/screen.height all stayed
+         exactly what they were with cover set too, confirmed live via a
+         temporary ViewportDebugOverlay). Kept off anyway per explicit
+         request, alongside switching BottomNav.jsx back to a flush,
+         edge-to-edge bar (no floating pill, no rounded corners) -- that
+         shape has nothing for the lack of env(safe-area-inset-bottom)
+         padding to visibly clip into the way the pill's own rounded
+         corners did, so the earlier regression that came from dropping
+         cover doesn't apply to this shape. Re-adding
+         `, viewport-fit=cover` here is still safe/reversible if a future
+         change (rounded corners, inset margins) brings that class of
+         clipping back. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0B0D10" />
     <!-- Confirmed live: without these two, iOS draws the status bar area
          as its own opaque white bar instead of letting the app's own
