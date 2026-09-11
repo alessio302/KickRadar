@@ -140,7 +140,17 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
             flex: '0 0 auto',
             width: '30px',
             height: '30px',
-            margin: '-4px',
+            // Horizontal-only negative margin -- confirmed live: the
+            // original uniform '-4px' (all four sides) dates from when this
+            // was a single-line row, where a vertical overhang had nothing
+            // above/below to intrude on. In the stacked two-team-row layout,
+            // alignSelf: 'center' already puts this button right at the
+            // vertical midpoint between the two score numbers -- a
+            // negative TOP/BOTTOM margin on top of that rendered the star's
+            // enlarged tap target directly over them. Only the sides still
+            // need the pull-in (see the spacer's own matching comment
+            // below for why).
+            margin: '0 -4px',
             border: 'none',
             background: 'transparent',
             padding: 0,
@@ -154,13 +164,14 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           <Star size={18} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
         </button>
       ) : (
-        // margin: '-4px' matches the star button's own negative margin above
-        // (there to enlarge its tap target without widening its layout
-        // footprint) -- confirmed live: without it, this plain spacer took
-        // up a genuine 30px while the button's negative margin shrank its
-        // own effective footprint by 8px, so every column after this one
-        // sat 8px further right on a finished row than on a favoritable one.
-        <span style={{ width: '30px', margin: '-4px', flex: '0 0 auto' }} aria-hidden="true" />
+        // margin matches the star button's own (horizontal-only, see its
+        // comment above) negative margin -- there to enlarge its tap target
+        // without widening its layout footprint. Confirmed live: without
+        // this, this plain spacer took up a genuine 30px while the button's
+        // negative margin shrank its own effective footprint by 8px, so
+        // every column after this one sat 8px further right on a finished
+        // row than on a favoritable one.
+        <span style={{ width: '30px', margin: '0 -4px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
     </div>
   );
