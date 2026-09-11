@@ -2,16 +2,44 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Experiment, 2026-09-11 (reversible -- see git history for the
+         viewport-fit=cover version this replaces): dropped viewport-fit=
+         cover after a second project's own working PWA turned out to have
+         NONE of the env(safe-area-inset-*) code this file/App.jsx/
+         BottomNav.jsx use, on purpose. Per WebKit's own documented
+         behavior, viewport-fit's default (effectively "contain" when
+         omitted) constrains the LAYOUT VIEWPORT ITSELF to the safe area,
+         rather than the page opting into extending full-screen and then
+         being responsible for env()-padding around the notch/home
+         indicator itself. That's a genuinely different mechanism from
+         anything tried in this file's own prior investigation (100dvh ->
+         100svh -> 100%), all of which only ever varied the height unit
+         *inside* an already-full-screen (cover) viewport -- none of them
+         could have reached this. Every env(safe-area-inset-*) call already
+         in this codebase (App.jsx's top spacer, BottomNav.jsx's bottom
+         padding) needs no code change either way: per spec those all
+         resolve to 0px once viewport-fit isn't "cover", so they degrade to
+         plain fixed padding for free instead of double-counting.
+         Real tradeoff worth watching for on the live retest, not just the
+         home-indicator gap: black-translucent below relies on page content
+         actually extending under the status bar to have anything to show
+         through -- without cover, that may revert to iOS's own default
+         (opaque) status bar rendering regardless of this meta tag's own
+         value, since there's no longer any content back there for
+         "translucent" to blend with. Revert this one line (add back
+         `, viewport-fit=cover`) if the bottom fix isn't worth losing that. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0B0D10" />
-    <!-- Confirmed live: without these two, iOS draws the status bar area
-         as its own opaque white bar instead of letting the app's own
-         background (App.jsx already pads for env(safe-area-inset-top),
-         exactly anticipating this) show through underneath it.
-         black-translucent makes it transparent with light system icons/
-         text -- App.jsx flips this to "default" (opaque, dark icons) at
-         runtime when the resolved theme is light, since translucent would
-         otherwise put white status-bar text on a light background. -->
+    <!-- Confirmed live (pre-experiment): without these two, iOS draws the
+         status bar area as its own opaque white bar instead of letting the
+         app's own background (App.jsx already pads for
+         env(safe-area-inset-top), exactly anticipating this) show through
+         underneath it. black-translucent makes it transparent with light
+         system icons/text -- App.jsx flips this to "default" (opaque, dark
+         icons) at runtime when the resolved theme is light, since
+         translucent would otherwise put white status-bar text on a light
+         background. See this file's own viewport-fit comment above for why
+         this effect specifically may no longer apply now. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

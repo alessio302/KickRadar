@@ -255,8 +255,11 @@ export default function App() {
   // from sliding under it, and no viewport-resize interaction to account
   // for. env(safe-area-inset-*): the outer container's paddingTop clears
   // the notch/Dynamic Island, and the nav clears the home indicator
-  // otherwise (viewport-fit=cover in index.html opts into content
-  // extending under both).
+  // otherwise -- pre-2026-09-11 that relied on viewport-fit=cover in
+  // index.html opting into content extending under both; see that file's
+  // own comment for why this experiment dropped it (per spec, both
+  // env(safe-area-inset-*) calls just resolve to 0px now, degrading to
+  // plain fixed padding rather than needing a code change here).
   return (
     <div
       style={{

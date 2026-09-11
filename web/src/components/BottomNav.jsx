@@ -43,7 +43,12 @@ function hexToRgba(hex, alpha) {
 // on top of that stacked an avoidable gap onto an unavoidable one.
 // Bottom inset is back to exactly env(safe-area-inset-bottom) -- no
 // added padding -- so the pill again reaches as far down as the old bar
-// did; only the sides and corners stay "floating".
+// did; only the sides and corners stay "floating". Since the 2026-09-11
+// viewport-fit=cover experiment (see index.html's own comment),
+// env(safe-area-inset-bottom) resolves to 0px here regardless -- left
+// as-is rather than removed, since it costs nothing and reverting that
+// experiment makes it load-bearing again immediately, no second change
+// needed in this file either way.
 //
 // Deliberately NOT position: fixed -- this file's own git history already
 // tried that for a floating bar and reverted it: it intermittently
