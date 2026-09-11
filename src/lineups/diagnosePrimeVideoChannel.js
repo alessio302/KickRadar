@@ -21,6 +21,13 @@ async function main() {
   const oldId = 'UCK2izXoHvraUFaPMU5B7vMQ';
   const oldFeedRes = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${oldId}`);
   console.log('Old channel_id feed status:', oldFeedRes.status, oldFeedRes.statusText);
+  if (oldFeedRes.ok) {
+    const xml = await oldFeedRes.text();
+    const titles = [...xml.matchAll(/<title>([^<]+)<\/title>/g)].map((m) => m[1]);
+    console.log('Old channel_id feed titles:', JSON.stringify(titles, null, 2));
+    const published = [...xml.matchAll(/<published>([^<]+)<\/published>/g)].map((m) => m[1]);
+    console.log('Old channel_id feed published dates:', JSON.stringify(published));
+  }
 
   for (const id of idMatches) {
     const feedRes = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${id}`);
