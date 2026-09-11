@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
 import FixturesTab from './components/FixturesTab.jsx';
 import StandingsTab from './components/StandingsTab.jsx';
@@ -6,7 +6,6 @@ import EuropaTab from './components/EuropaTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
-import ViewportDebugOverlay from './components/ViewportDebugOverlay.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 import { adjacentLeague } from './lib/leagues.js';
@@ -94,7 +93,6 @@ const ACCENT_PALETTES = {
 };
 
 export default function App() {
-  const shellRef = useRef(null);
   const [tab, setTab] = useState('transfers');
   const [league, setLeague] = usePersistedState('kickradar.league', 'serie-a');
   const [initialFixtureId, setInitialFixtureId] = useState(null);
@@ -257,14 +255,15 @@ export default function App() {
   // from sliding under it, and no viewport-resize interaction to account
   // for. env(safe-area-inset-*): the outer container's paddingTop clears
   // the notch/Dynamic Island, and the nav clears the home indicator
-  // otherwise -- pre-2026-09-11 that relied on viewport-fit=cover in
-  // index.html opting into content extending under both; see that file's
-  // own comment for why this experiment dropped it (per spec, both
-  // env(safe-area-inset-*) calls just resolve to 0px now, degrading to
-  // plain fixed padding rather than needing a code change here).
+  // otherwise (viewport-fit=cover in index.html opts into content
+  // extending under both). A 2026-09-11 experiment tried dropping
+  // viewport-fit=cover entirely (see index.html's own comment for the
+  // full writeup) -- measured live to make zero difference to the
+  // underlying gap, while incidentally zeroing this env() call and making
+  // the bottom nav pill's rounded corners render flush against the hard
+  // edge. Reverted; this is the known-clean baseline.
   return (
     <div
-      ref={shellRef}
       style={{
         background: theme.bg,
         // User-reported (screenshot, iPhone, both a Safari tab and an
@@ -390,7 +389,6 @@ export default function App() {
         <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
         <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
       </div>
-      <ViewportDebugOverlay shellRef={shellRef} />
     </div>
   );
 }
