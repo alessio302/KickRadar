@@ -46,6 +46,12 @@ function hexToRgba(hex, alpha) {
 // (App.jsx's flex column, last item) sidesteps that failure mode entirely
 // -- it's already proven stable there through everything else this
 // session tested.
+//
+// Confirmed live 2026-09-11 (real device, standalone iOS PWA, both the
+// flush-bar shape and the taller padding below): top status bar and
+// bottom nav both render cleanly, user-approved -- this combination
+// (flush bar + no viewport-fit=cover + this padding) is the settled
+// state, not still an open experiment.
 export default function BottomNav({ tab, onSelectTab, theme, t }) {
   return (
     <div
@@ -57,7 +63,9 @@ export default function BottomNav({ tab, onSelectTab, theme, t }) {
         // the bottom edge now that there's no safe-area padding or margin
         // giving it room to breathe. More padding top AND bottom, not just
         // bottom -- a taller bar overall reads as an intentional design,
-        // not just extra dead space stacked under the icons.
+        // not just extra dead space stacked under the icons. Confirmed
+        // live this fixed it -- user-approved, see this file's own closing
+        // comment below.
         padding: '16px 4px 20px',
         background: hexToRgba(theme.surface, 0.92),
         backdropFilter: 'blur(16px)',

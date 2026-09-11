@@ -16,7 +16,10 @@
          cover doesn't apply to this shape. Re-adding
          `, viewport-fit=cover` here is still safe/reversible if a future
          change (rounded corners, inset margins) brings that class of
-         clipping back. -->
+         clipping back. Confirmed live 2026-09-11 (real device, standalone
+         iOS PWA): both the status bar up top and the flush bottom nav
+         render cleanly this way, user-approved -- settled state, not an
+         open experiment. -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0B0D10" />
     <!-- Confirmed live: without these two, iOS draws the status bar area
