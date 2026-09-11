@@ -52,7 +52,13 @@ export default function BottomNav({ tab, onSelectTab, theme, t }) {
       style={{
         display: 'flex',
         justifyContent: 'space-around',
-        padding: '10px 4px',
+        // Taller than the pill version's own 10px/10px -- user-reported
+        // (live, post flush-bar switch) the bar read as "squeezed" against
+        // the bottom edge now that there's no safe-area padding or margin
+        // giving it room to breathe. More padding top AND bottom, not just
+        // bottom -- a taller bar overall reads as an intentional design,
+        // not just extra dead space stacked under the icons.
+        padding: '16px 4px 20px',
         background: hexToRgba(theme.surface, 0.92),
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
