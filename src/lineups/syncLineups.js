@@ -7,7 +7,8 @@ import { resolveClub } from '../news/clubMatch.js';
 import { normalize } from '../util/normalize.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
-import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
+import { buildEventRowsFromRest } from './eventRows.js';
+import { reconcileMatchEvents } from './matchEventsReconciler.js';
 
 // Confirmed live (Kazakhstan Premier League, 2026-08-25, still true after
 // switching providers from Highlightly to GOAL API): a real lineup becomes
@@ -61,71 +62,6 @@ function toDateString(date) {
 
 function confirmedKey(fixtureId, clubId) {
   return `${fixtureId}:${clubId}`;
-}
-
-// Normalizes GOAL API's 3 separate endpoints (events=goals only, cards,
-// substitutions -- confirmed live there's no single call that returns all
-// three) into this app's existing match_events row shape, unchanged since
-// the Highlightly era so the frontend (FixtureDetailOverlay.jsx) needs no
-// changes for the provider swap. event_key uses GOAL API's own row id
-// (stable, confirmed live) rather than reconstructing a synthetic key from
-// field values.
-function buildEventRows(fixtureId, homeClubId, awayClubId, { goals, cards, substitutions }) {
-  const rows = [];
-
-  for (const g of goals) {
-    if (g.type !== 'GOAL') continue;
-    const isHomeField = g.homeScorer != null;
-    const rawName = isHomeField ? g.homeScorer : g.awayScorer;
-    const assist = isHomeField ? g.homeAssist : g.awayAssist;
-    if (!rawName) continue;
-    const isOwnGoal = /\(o\.g\.\)/i.test(rawName);
-    rows.push({
-      fixture_id: fixtureId,
-      club_id: isHomeField ? homeClubId : awayClubId,
-      type: isOwnGoal ? 'Own Goal' : 'Goal',
-      minute: String(g.time ?? ''),
-      player: rawName,
-      assist: assist || null,
-      substituted: null,
-      event_key: `goal:${g.id}`,
-    });
-  }
-
-  for (const c of cards) {
-    const isHomeField = c.homeFault != null;
-    const player = isHomeField ? c.homeFault : c.awayFault;
-    if (!player) continue;
-    rows.push({
-      fixture_id: fixtureId,
-      club_id: isHomeField ? homeClubId : awayClubId,
-      type: /red/i.test(c.card || '') ? 'Red Card' : 'Yellow Card',
-      minute: String(c.time ?? ''),
-      player,
-      assist: null,
-      substituted: null,
-      event_key: `card:${c.id}`,
-    });
-  }
-
-  for (const s of substitutions) {
-    // "OUT | IN" per GOAL API's own docs -- confirmed live
-    // (substitution: "N. Brown | I. Saibari").
-    const [outName, inName] = (s.substitution || '').split('|').map((p) => p.trim());
-    if (!inName) continue;
-    rows.push({
-      fixture_id: fixtureId,
-      club_id: s.team === 'home' ? homeClubId : awayClubId,
-      type: 'Substitution',
-      minute: String(s.time ?? ''),
-      player: inName,
-      assist: null,
-      substituted: outName || null,
-      event_key: `sub:${s.id}`,
-    });
-  }
-
-  return rows;
 }
 
 export async function syncLineups() {
@@ -380,43 +316,21 @@ export async function syncLineups() {
         }
 
         if (goals) {
-          const rows = buildEventRows(f.id, homeClub.id, awayClub.id, { goals, cards, substitutions });
-          // Full replace, not merge: src/lineups/syncLiveEvents.js may have
-          // already written rows for this fixture while it was live, keyed
-          // by content (its WS payload has no stable per-event id, unlike
-          // these REST endpoints) -- clearing first guarantees the row set
-          // ends up exactly matching GOAL API's own REST data, with no
-          // leftover WS-only duplicates sitting alongside it. Runs on every
-          // tick for a still-'live' fixture now (see eventsNeeded() above),
-          // not just once at full-time -- each pass is a clean, independent
-          // "replace with current REST truth", so repeating it mid-match is
-          // exactly as safe as the original once-at-finish call, just more
-          // frequent.
-          const { error: deleteErr } = await supabase.from('match_events').delete().eq('fixture_id', f.id);
-          if (deleteErr) console.error(`Failed to clear existing events for fixture ${f.id}:`, deleteErr.message);
-          if (rows.length > 0) {
-            const { error: eventsErr } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
-            if (eventsErr) console.error(`Failed to store events for fixture ${f.id}:`, eventsErr.message);
-            else {
-              // Now safe to call from here (previously deliberately never
-              // was, see matchEventNotifier.js's own comment on why): that
-              // restriction only existed because a domestic fixture's live
-              // goals could still be sitting in match_events under
-              // syncLiveEvents.js's own different event_key scheme, so
-              // notifying again here with these rows' own keys would have
-              // re-notified everything a second time right as the match
-              // ended. Domestic fixtures have exactly one match_events
-              // writer now -- this one, live or finished alike -- so
-              // notified_match_events' own (fixture_id, event_key)
-              // insert-as-claim naturally covers both without ever
-              // double-notifying the same real event.
-              try {
-                await notifyFavoritedFixtureEvents(supabase, f.id, league.slug, rows);
-              } catch (err) {
-                console.error(`Failed to notify favorited-fixture events for fixture ${f.id}:`, err.message);
-              }
-            }
-          }
+          const sideRef = (isHomeField) => ({ club_id: isHomeField ? homeClub.id : awayClub.id });
+          const rows = buildEventRowsFromRest(f.id, sideRef, { goals, cards, substitutions });
+          // reconcileMatchEvents (not a blind delete+insert): this REST
+          // fetch is authoritative and safe to reconcile fully against --
+          // insert anything genuinely new, delete anything GOAL API no
+          // longer reports (a real retraction) -- but syncLiveEvents.js's
+          // WS may ALSO be writing this same fixture's events concurrently
+          // (still 'live'), under its own different event_key scheme.
+          // reconcileMatchEvents() matches by CONTENT (type/minute/player),
+          // not by key, so a goal the WS already wrote is recognized as
+          // already-covered and left alone rather than duplicated under a
+          // second key -- see that module's own comment for why content,
+          // not key, is the right thing to match on across two writers
+          // that can't agree on a key format.
+          await reconcileMatchEvents(supabase, f.id, league.slug, rows);
           // events_synced_at is a permanent "this fixture is fully and
           // finally done, never fetch again" flag (see this file's own top
           // comment on LINEUP_GIVE_UP_MIN/PAST_WINDOW_DAYS) -- eventsNeeded()

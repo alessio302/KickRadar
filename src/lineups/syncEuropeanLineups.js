@@ -4,11 +4,21 @@
 // kept as a separate job rather than folded into syncLineups.js because
 // the matching key is different throughout: these fixtures have no
 // clubs table row (home_club_id/away_club_id are always null -- see
-// syncEuropeanFixtures.js's own comment), so lineups are stored and read
-// back keyed by team_name (sql/051_lineups_team_name.sql) instead of
-// club_id. No match-events/push-notification sync here -- out of scope
-// for a first cut, unlike syncLineups.js which also owns those for the 5
-// domestic leagues.
+// syncEuropeanFixtures.js's own comment), so lineups (and, as of
+// 2026-09-12, match_events too) are stored and read back keyed by
+// team_name (sql/051_lineups_team_name.sql, sql/054_match_events_team_name.sql)
+// instead of club_id.
+//
+// Match-events sync mirrors syncLineups.js's own exactly -- see that
+// file's own comment on why a still-'live' fixture gets refreshed on
+// every run now, not just once after it finishes, and
+// matchEventsReconciler.js's own comment on how that coexists with
+// syncLiveEvents.js's own WebSocket connection (still this app's fast
+// path for every league, domestic and European alike) without either
+// duplicating the other. Originally out of scope for this file's own
+// first cut (a plain "no match-events sync here yet") -- brought in line
+// with the domestic side rather than left as a permanent asymmetry once
+// that side got its own REST backstop.
 //
 // EL/UECL fixtures already carry goal_api_id directly from
 // syncEuropeanFixtures.js (GOAL API is their fixture source). UCL comes
@@ -20,9 +30,11 @@
 // clubs like Real Madrid aren't in that table either.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getLeagueFixtures, getFixtureLineups } from './goalApiClient.js';
+import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { normalize } from '../util/normalize.js';
+import { buildEventRowsFromRest } from './eventRows.js';
+import { reconcileMatchEvents } from './matchEventsReconciler.js';
 
 const LOOKAHEAD_MIN = 45;
 const LOOKBACK_MIN = 90;
@@ -74,13 +86,13 @@ export async function syncEuropeanLineups() {
     .select('id, slug')
     .in('slug', UEFA_COMPETITIONS.map((c) => c.slug));
   if (leaguesErr) throw leaguesErr;
-  if (dbLeagues.length === 0) return { checked: 0, confirmed: 0 };
+  if (dbLeagues.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
   const compBySlug = new Map(UEFA_COMPETITIONS.map((c) => [c.slug, c]));
   const compByLeagueId = new Map(dbLeagues.map((l) => [l.id, compBySlug.get(l.slug)]));
   const leagueIds = dbLeagues.map((l) => l.id);
 
-  const selectCols = 'id, league_id, home_team_name, away_team_name, kickoff_at, status, goal_api_id';
+  const selectCols = 'id, league_id, home_team_name, away_team_name, kickoff_at, status, events_synced_at, goal_api_id';
   const { data: nearKickoff, error: nkErr } = await supabase
     .from('fixtures')
     .select(selectCols)
@@ -97,10 +109,22 @@ export async function syncEuropeanLineups() {
     .gte('kickoff_at', pastCutoff);
   if (frErr) throw frErr;
 
+  // Separate from nearKickoff above, same rationale as syncLineups.js's own
+  // identical addition: that window is sized for lineup confirmation, not
+  // for covering a whole match, so a fixture deep into extra time or one
+  // this job hasn't run for in a while could already have drifted outside
+  // it while still genuinely 'live'.
+  const { data: currentlyLive, error: liveErr } = await supabase
+    .from('fixtures')
+    .select(selectCols)
+    .in('league_id', leagueIds)
+    .eq('status', 'live');
+  if (liveErr) throw liveErr;
+
   const fixturesById = new Map();
-  for (const f of [...nearKickoff, ...finishedRecent]) fixturesById.set(f.id, f);
+  for (const f of [...nearKickoff, ...finishedRecent, ...currentlyLive]) fixturesById.set(f.id, f);
   const candidates = [...fixturesById.values()];
-  if (candidates.length === 0) return { checked: 0, confirmed: 0 };
+  if (candidates.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
   const { data: existingLineups, error: existingErr } = await supabase
     .from('lineups')
@@ -119,8 +143,13 @@ export async function syncEuropeanLineups() {
     const minutesSinceKickoff = (now.getTime() - new Date(f.kickoff_at).getTime()) / 60000;
     return minutesSinceKickoff <= LINEUP_GIVE_UP_MIN;
   };
+  // Same shape as syncLineups.js's own eventsNeeded() -- see that file's
+  // comment for the full rationale (a 'live' fixture refreshed every run,
+  // unconditionally, since there's no cheap signal to know in advance
+  // whether anything changed for a match still being played).
+  const eventsNeeded = (f) => f.status === 'live' || (f.status === 'finished' && !f.events_synced_at);
 
-  const pending = candidates.filter(lineupNeeded);
+  const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
   // checked: 0, not candidates.length -- see syncLineups.js's own comment
   // on the identical line: candidates is the raw DB query result before
   // the lineupNeeded filter, none of which costs a GOAL API call by
@@ -129,7 +158,7 @@ export async function syncEuropeanLineups() {
   // calls, which looked like real request volume during a diagnosis of
   // this account's daily usage and cost real investigation time to rule
   // out.
-  if (pending.length === 0) return { checked: 0, confirmed: 0 };
+  if (pending.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
   // Group by (competition, date) -- one getLeagueFixtures() call covers
   // every pending fixture for that competition on that date, same
@@ -146,6 +175,7 @@ export async function syncEuropeanLineups() {
 
   let checked = 0;
   let confirmedCount = 0;
+  let eventsFetched = 0;
 
   for (const { comp, dateStr, fixtures: groupFixtures } of groups.values()) {
     const needsResolution = groupFixtures.some((f) => !f.goal_api_id);
@@ -175,46 +205,88 @@ export async function syncEuropeanLineups() {
 
       checked += 1;
 
-      let lineups;
-      try {
-        lineups = await getFixtureLineups(goalApiId);
-      } catch (err) {
-        console.error(`GOAL API lineups failed for match ${goalApiId}:`, err.message);
-        continue;
-      }
-      if (!lineups?.hasLineups) continue;
-
-      const homeTeam = buildLineupTeam(lineups.home, lineups.homeFormation);
-      const awayTeam = buildLineupTeam(lineups.away, lineups.awayFormation);
-      if (homeTeam) homeTeam.formation = lineups.homeFormation || null;
-      if (awayTeam) awayTeam.formation = lineups.awayFormation || null;
-
-      for (const { teamName, team } of [
-        { teamName: f.home_team_name, team: homeTeam },
-        { teamName: f.away_team_name, team: awayTeam },
-      ]) {
-        if (!teamIsPopulated(team)) continue;
-        const { error: upsertErr } = await supabase.from('lineups').upsert(
-          {
-            fixture_id: f.id,
-            team_name: teamName,
-            confirmed: true,
-            formation: team.formation,
-            players: { initialLineup: team.initialLineup, substitutes: team.substitutes, coach: team.coach },
-            published_at: new Date().toISOString(),
-          },
-          { onConflict: 'fixture_id,team_name' }
-        );
-        if (upsertErr) {
-          console.error(`Failed to store lineup for fixture ${f.id} team ${teamName}:`, upsertErr.message);
-          continue;
+      if (lineupNeeded(f)) {
+        let lineups;
+        try {
+          lineups = await getFixtureLineups(goalApiId);
+        } catch (err) {
+          console.error(`GOAL API lineups failed for match ${goalApiId}:`, err.message);
+          lineups = null;
         }
-        confirmedCount += 1;
+
+        if (lineups?.hasLineups) {
+          const homeTeam = buildLineupTeam(lineups.home, lineups.homeFormation);
+          const awayTeam = buildLineupTeam(lineups.away, lineups.awayFormation);
+          if (homeTeam) homeTeam.formation = lineups.homeFormation || null;
+          if (awayTeam) awayTeam.formation = lineups.awayFormation || null;
+
+          for (const { teamName, team } of [
+            { teamName: f.home_team_name, team: homeTeam },
+            { teamName: f.away_team_name, team: awayTeam },
+          ]) {
+            if (!teamIsPopulated(team)) continue;
+            const { error: upsertErr } = await supabase.from('lineups').upsert(
+              {
+                fixture_id: f.id,
+                team_name: teamName,
+                confirmed: true,
+                formation: team.formation,
+                players: { initialLineup: team.initialLineup, substitutes: team.substitutes, coach: team.coach },
+                published_at: new Date().toISOString(),
+              },
+              { onConflict: 'fixture_id,team_name' }
+            );
+            if (upsertErr) {
+              console.error(`Failed to store lineup for fixture ${f.id} team ${teamName}:`, upsertErr.message);
+              continue;
+            }
+            confirmedCount += 1;
+          }
+        }
+      }
+
+      // Same shape as syncLineups.js's own events block -- see that file's
+      // comment for the full rationale (reconcileMatchEvents() instead of a
+      // blind delete+insert, so this coexists safely with syncLiveEvents.js's
+      // own WebSocket connection, still this app's fast path for these
+      // fixtures too).
+      if (eventsNeeded(f)) {
+        let goals, cards, substitutions;
+        try {
+          [goals, cards, substitutions] = await Promise.all([
+            getFixtureEvents(goalApiId),
+            getFixtureCards(goalApiId),
+            getFixtureSubstitutions(goalApiId),
+          ]);
+        } catch (err) {
+          console.error(`GOAL API events/cards/substitutions failed for match ${goalApiId}:`, err.message);
+          goals = null;
+        }
+
+        if (goals) {
+          const sideRef = (isHomeField) => ({ team_name: isHomeField ? f.home_team_name : f.away_team_name });
+          const rows = buildEventRowsFromRest(f.id, sideRef, { goals, cards, substitutions });
+          await reconcileMatchEvents(supabase, f.id, comp.slug, rows);
+
+          // events_synced_at is a permanent "fully done" flag -- see
+          // syncLineups.js's own identical comment on why this only ever
+          // gets set once the fixture has actually finished.
+          if (f.status === 'finished') {
+            const { error: markErr } = await supabase
+              .from('fixtures')
+              .update({ events_synced_at: new Date().toISOString() })
+              .eq('id', f.id);
+            if (markErr) console.error(`Failed to mark events_synced_at for fixture ${f.id}:`, markErr.message);
+            else eventsFetched += 1;
+          } else {
+            eventsFetched += 1;
+          }
+        }
       }
     }
   }
 
-  return { checked, confirmed: confirmedCount };
+  return { checked, confirmed: confirmedCount, eventsFetched };
 }
 
 const isMain = process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href;

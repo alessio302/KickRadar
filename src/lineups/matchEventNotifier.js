@@ -5,21 +5,18 @@
 // git history "Revert favorite-fixtures / match-event push feature", which
 // fetched Highlightly's /events endpoint itself per favorited fixture).
 //
-// Two callers as of 2026-09-12, split by league type:
-// - syncLineups.js, right after it upserts a domestic fixture's own REST-
-//   fetched events (both for a still-'live' fixture, refreshed on every
-//   run, and once more when it finishes) -- domestic match_events has
-//   exactly one writer now, so this is the only place that needs to call
-//   it for those leagues.
-// - syncLiveEvents.js, right after it upserts a batch of live event rows
-//   for a EUROPEAN fixture -- still that WS connection's sole source (see
-//   its own top comment), so still notified from there.
-// notified_match_events' own (fixture_id, event_key) insert-as-claim is
-// what keeps either caller from double-notifying the same real event
-// across repeated calls, not any coordination between the two files --
-// each event's own event_key only ever comes from ONE of them for a given
-// fixture (whichever league it belongs to), so there's no cross-file key
-// collision to worry about either.
+// Three callers as of 2026-09-12, all going through matchEventsReconciler.js
+// (syncLineups.js/syncEuropeanLineups.js's own REST-based reconcileMatchEvents(),
+// on their own ~15min cadence, live fixtures included -- see that module's
+// own comment) except syncLiveEvents.js, which calls
+// insertNewMatchEvents() directly right after upserting a batch of fast-
+// path WebSocket rows. notified_match_events' own (fixture_id, event_key)
+// insert-as-claim is what keeps any of the three from double-notifying the
+// same real event -- and since matchEventsReconciler.js's own content-based
+// matching (not event_key) is what stops the WS and REST paths from ever
+// storing two rows for the same real event in the first place, there's
+// only ever one row (and one event_key) to claim per event regardless of
+// which of the three call sites got there first.
 import { sendPushToFixtureFavoriters } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 

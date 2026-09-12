@@ -1,24 +1,33 @@
 // Live in-play events (goals/cards/substitutions) via GOAL API's WebSocket
-// feed. Historically this connection's own match_events write for every
-// tracked fixture, domestic and European alike -- as of 2026-09-12 it's
-// down to European (UEFA_COMPETITIONS) fixtures only, still as their sole
-// source (syncEuropeanLineups.js has no REST-based events backfill of its
-// own yet, unlike its domestic counterpart -- see below). Domestic
-// fixtures' match_events now come exclusively from syncLineups.js's own
-// REST fetch (getFixtureEvents/getFixtureCards/getFixtureSubstitutions),
-// which now refreshes a still-'live' fixture on every one of that job's
-// ~15min runs, not just once after it finishes. Confirmed live the two
-// writers side by side produced real duplicates (the same goal stored
-// twice, once under each path's own incompatible event_key scheme -- this
-// file's is a synthetic content-based key, since the WS payload has no
-// stable per-event id the way the REST endpoints do) the moment the REST
-// side started covering live fixtures too, so this file backed off rather
-// than the two trying to reconcile keys that can't reliably match. This
-// also means domestic match_events staleness, however it happens (a dead
-// connection, a silently stalled one, one specific match going quiet, a
-// dropped message, or anything not yet seen), self-heals within that
-// job's own cadence instead of needing a dedicated fix here for each new
-// way this WS can misbehave.
+// feed -- the fast path for every league, domestic and European alike.
+// A slower, authoritative REST fetch (syncLineups.js for the 5 domestic
+// leagues, syncEuropeanLineups.js for the three UEFA competitions) now
+// backs it up on each of those jobs' own ~15min runs, refreshing a
+// still-'live' fixture's events too, not just a freshly-finished one.
+//
+// The two writers coexist deliberately, not by accident: this file's own
+// buildLiveEventRows() keys its rows by CONTENT (GOAL API's live
+// match_update payload has no stable per-event id the way its REST
+// endpoints do), while the REST side keys by GOAL API's own real id.
+// Rather than trying to make the two schemes match (confirmed live,
+// 2026-09-12: works for goals, whose REST fields happen to line up with
+// this file's own key formula, but isn't guaranteed for cards/subs, and
+// produced real duplicates once REST started covering live fixtures too)
+// matchEventsReconciler.js matches on content instead -- so this file
+// calls its own insertNewMatchEvents() (insert-only-if-not-already-there-
+// by-content, never delete: a live snapshot can be momentarily incomplete,
+// confirmed live an earlier version that deleted on a single missing
+// observation wiped out real goals mid-match), while the REST side calls
+// reconcileMatchEvents() (the same insert, plus deletion of anything GOAL
+// API's own current REST response no longer reports -- safe there because
+// REST actually is a trustworthy complete snapshot). A goal either side
+// writes first is recognized as already-covered by the other, so nothing
+// is ever duplicated regardless of which one gets there first. Whatever
+// this connection misses for any reason (a dead connection, a silently
+// stalled one, one specific match going quiet, a dropped message, or
+// anything not yet seen) self-heals within the REST side's own cadence,
+// without needing a dedicated watchdog fix here for each new way this WS
+// can misbehave.
 //
 // Deliberately never touches DOMESTIC fixtures' status/home_score/
 // away_score -- syncLiveScores.js (football-data.org) already owns that,
@@ -35,9 +44,7 @@
 // stuck on 'scheduled' for the rest of the match despite GOAL API's own
 // REST snapshot already showing the correct live score). That file is a
 // REST poll backstop for status/home_score/away_score alone -- this
-// connection stays the only writer for live_minute (all leagues) and
-// match_events (European only, per above), neither of which has a REST
-// equivalent it can fall back to yet.
+// connection stays the only writer for live_minute (all leagues).
 //
 // One WS connection total, tracking BOTH domestic and European matches at
 // once -- GOAL API's FREE plan caps maxConnections at 1 (confirmed live,
@@ -53,7 +60,7 @@ import { LEAGUES, UEFA_COMPETITIONS } from '../config/leagues.js';
 import { getLeagueFixtures, getWsToken, GOAL_API_WS_URL } from './goalApiClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
-import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
+import { insertNewMatchEvents } from './matchEventsReconciler.js';
 
 // Same anti-regression guard syncFixtures.js/syncEuropeanFixtures.js/
 // syncLiveScores.js already use everywhere else a fixture's status gets
@@ -92,19 +99,18 @@ function sleep(ms) {
 // schedule's cadence (also 15min), same reasoning as syncLiveScores.js's own
 // JOB_BUDGET_MS -- this file also holds one long-lived WS connection for the
 // whole run, which needs to close cleanly before GitHub Actions would kill
-// it. User-reported (2026-09-12, before match_events moved to
-// syncLineups.js's own REST refresh for domestic fixtures -- see this
-// file's top comment): goals/cards/subs sometimes took minutes to show up
-// even across several overlay close/reopen cycles, confirmed upstream of
-// the frontend entirely, and part of it was structural: at the old 13min,
-// every single 15-min cycle had a guaranteed ~2min window where nothing
-// was listening at all, whether or not GOAL API's own feed was behaving.
-// Bumped to 14 -- checkout/npm ci before this script even starts already
-// eats some of the workflow's 15min hard timeout, so this still leaves
-// comfortable headroom rather than pushing right up against it, while
-// shrinking the guaranteed gap to ~1min. Still relevant for live_minute
-// (every league) and match_events (European only) even now that domestic
-// match_events has its own independent backstop.
+// it. User-reported (2026-09-12): goals/cards/subs sometimes took minutes
+// to show up even across several overlay close/reopen cycles, confirmed
+// upstream of the frontend entirely, and part of it was structural: at the
+// old 13min, every single 15-min cycle had a guaranteed ~2min window where
+// nothing was listening at all, whether or not GOAL API's own feed was
+// behaving. Bumped to 14 -- checkout/npm ci before this script even starts
+// already eats some of the workflow's 15min hard timeout, so this still
+// leaves comfortable headroom rather than pushing right up against it,
+// while shrinking the guaranteed gap to ~1min. This file's top comment
+// covers the rest of that fix: a REST-based backstop, on every league's
+// own separate lineups-sync job, for whatever this connection still
+// misses within that gap or any other way.
 const JOB_BUDGET_MS = 14 * 60 * 1000;
 
 // A connected socket that's gone quiet for this long, after having already
@@ -447,14 +453,14 @@ function countLiveEvents(data) {
 // connection closes for any other reason (GOAL API bouncing it, a network
 // blip, an auth failure -- resolves reachedDeadline: false so the caller
 // reconnects instead of treating the whole run as done). byGoalApiId,
-// lastCounts, lastMinutes, lastEuropeanState and pendingRemovals are the
-// same Maps across every reconnect attempt within one run (mutated in
-// place, never recreated here), so a fresh connection picks up exactly
-// where a dropped one left off -- already-known matches, minutes, event
-// counts and European status/score don't need rediscovering, and a
-// reconnect's own auth_success re-subscribes to all of them in one go,
-// same as the very first connection did.
-async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, lastEuropeanState, pendingRemovals, confirmedRetractions, counts }) {
+// lastCounts, lastMinutes and lastEuropeanState are the same Maps across
+// every reconnect attempt within one run (mutated in place, never
+// recreated here), so a fresh connection picks up exactly where a dropped
+// one left off -- already-known matches, minutes, event counts and
+// European status/score don't need rediscovering, and a reconnect's own
+// auth_success re-subscribes to all of them in one go, same as the very
+// first connection did.
+async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, lastEuropeanState, counts }) {
   const { token } = await getWsToken();
 
   return new Promise((resolve, reject) => {
@@ -517,19 +523,12 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       }
 
       // GOAL API signals a score correction (VAR disallowed goal, data fix)
-      // without a new match_update by sending score.changed. The affected
-      // goal will be absent from the next match_update's goalscorer array, but
-      // our normal 2-miss threshold would wait for a second absent observation
-      // before deleting it -- unnecessarily slow when the server has already
-      // told us a retraction happened. Mark the match so the next
-      // match_update's first miss is treated as confirmed-stale immediately.
-      if (msg.type === 'score.changed') {
-        const goalApiId = String(msg.data?.id ?? msg.matchId ?? '');
-        if (goalApiId && byGoalApiId.has(goalApiId)) {
-          confirmedRetractions.add(goalApiId);
-        }
-        return;
-      }
+      // without a new match_update by sending score.changed -- no longer
+      // acted on here (2026-09-12): the retraction it announces is exactly
+      // what reconcileMatchEvents()'s own periodic REST comparison already
+      // catches on its own, without needing this connection to notice a
+      // separate signal for it. Left unhandled rather than removed from
+      // GOAL API's own message vocabulary, so an unmatched type below.
 
       if (msg.type === 'auth_success') {
         for (const goalApiId of byGoalApiId.keys()) subscribeTo(goalApiId);
@@ -618,136 +617,22 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
         }
       }
 
-      // Domestic fixtures no longer get match_events written from here at
-      // all (2026-09-12) -- confirmed live this WS payload's lack of a
-      // stable per-event id (see this file's own top comment) meant the
-      // only way to reconcile a retraction or a one-off incomplete
-      // snapshot was this increasingly elaborate two-strikes/score.changed
-      // machinery below, and it still had a gap no version of it could
-      // close: one specific subscribed match going silent while the
-      // connection and every other match on it stayed healthy (confirmed
-      // live, Real Madrid vs Rayo Vallecano) -- a failure shape this
-      // per-match logic can't detect by construction, since it only ever
-      // reacts to a match_update that arrives, never to one that doesn't.
-      // Worse, running this *alongside* syncLineups.js's own REST-based
-      // events refresh (now extended to still-'live' domestic fixtures,
-      // not just finished ones, specifically to close that gap) produced
-      // real, immediate duplicates: both paths wrote the same real goal
-      // under their own different key scheme (this file's synthetic
-      // content-based one, that file's real GOAL API id), so both stuck
-      // around side by side. Domestic fixtures now have exactly one
-      // match_events writer -- syncLineups.js's REST fetch, bounded to
-      // that job's own ~15min cadence -- with this WS connection staying
-      // domestic fixtures' fast path for live_minute alone.
-      //
-      // Still the only writer for European fixtures below, unchanged:
-      // syncEuropeanLineups.js has no equivalent REST backfill yet (a
-      // natural next step, not done here to keep this fix scoped to the
-      // domestic bug actually reported).
-      if (info.kind !== 'european') return;
-
+      // lastCounts is a cheap pre-filter, not the source of truth for
+      // dedup anymore -- skips the Supabase round-trip in
+      // insertNewMatchEvents() below on the common tick where nothing
+      // about this match's events has changed, without it being load-
+      // bearing for correctness the way it partly used to be (see this
+      // file's own top comment on why content, not a count or a key,
+      // is what actually decides "is this new").
       const count = countLiveEvents(data);
       if (lastCounts.get(goalApiId) === count) return; // no new goal/card/sub since last push
       lastCounts.set(goalApiId, count);
 
       const rows = buildLiveEventRows(info.fixtureId, info, data);
-
-      // GOAL API's own payload can retract an event after this file already
-      // wrote it -- a goal disallowed on VAR review (or, less commonly, a
-      // card rescinded) simply disappears from data.goalscorer/cards/
-      // substitutions on a later match_update, with no dedicated type or
-      // other signal marking it as a retraction rather than a regular
-      // update. rows above is always the FULL current set (buildLiveEventRows
-      // rebuilds it from scratch every time, not incrementally), so in
-      // principle anything already stored under this fixture's own 'live-'
-      // event_keys that ISN'T in that current set has fallen out.
-      //
-      // Confirmed live this can't be trusted on a single observation,
-      // though: a first version of this deleted on the spot and it wiped
-      // out real goals mid-match -- GOAL API's own WS push can hand back a
-      // momentarily incomplete snapshot (e.g. right after this file's own
-      // reconnect logic re-subscribes), which looks identical to a
-      // retraction from here. Requiring the SAME key to be missing on two
-      // separate match_updates in a row (pendingRemovals, per goalApiId)
-      // absorbs exactly that: a one-off incomplete snapshot self-heals the
-      // moment the next update reports the goal again, before ever reaching
-      // the two-strikes threshold, while a genuine retraction stays missing
-      // on every subsequent update and gets deleted on the second one.
-      const currentKeys = new Set(rows.map((r) => r.event_key));
-      const { data: existingLiveRows, error: existingErr } = await supabase
-        .from('match_events')
-        .select('event_key')
-        .eq('fixture_id', info.fixtureId)
-        .like('event_key', 'live-%');
-      if (existingErr) {
-        console.error(`Failed to read existing live events for fixture ${info.fixtureId}:`, existingErr.message);
-      } else {
-        const missingNow = existingLiveRows.map((r) => r.event_key).filter((k) => !currentKeys.has(k));
-        const previouslyMissing = pendingRemovals.get(goalApiId) ?? new Set();
-        // In-memory signal: score.changed arrived on this WS connection.
-        const scoreChangedPending = confirmedRetractions.delete(goalApiId);
-
-        // DB-backed signal: score.changed arrived at the webhook while this
-        // connection was absent (2-min gap between GitHub Actions runs, or a
-        // reconnect at that exact moment). Only check the DB when there are
-        // actually missing keys and the in-memory flag isn't already set --
-        // avoids an extra round-trip on every match_update for the common
-        // no-missing-events case.
-        let dbFlagPending = false;
-        if (!scoreChangedPending && missingNow.length > 0) {
-          const { data: fixtureFlag, error: flagErr } = await supabase
-            .from('fixtures')
-            .select('score_correction_pending')
-            .eq('id', info.fixtureId)
-            .single();
-          if (flagErr) {
-            console.error(`Failed to read score_correction_pending for fixture ${info.fixtureId}:`, flagErr.message);
-          } else if (fixtureFlag?.score_correction_pending) {
-            dbFlagPending = true;
-            const { error: clearErr } = await supabase
-              .from('fixtures')
-              .update({ score_correction_pending: false })
-              .eq('id', info.fixtureId);
-            if (clearErr) console.error(`Failed to clear score_correction_pending for fixture ${info.fixtureId}:`, clearErr.message);
-          }
-        }
-
-        const confirmedStale = (scoreChangedPending || dbFlagPending)
-          ? missingNow
-          : missingNow.filter((k) => previouslyMissing.has(k));
-
-        if (confirmedStale.length > 0) {
-          const { error: deleteErr } = await supabase
-            .from('match_events')
-            .delete()
-            .eq('fixture_id', info.fixtureId)
-            .in('event_key', confirmedStale);
-          if (deleteErr) console.error(`Failed to delete retracted events for fixture ${info.fixtureId}:`, deleteErr.message);
-          else counts.rowsDeleted += confirmedStale.length;
-        }
-
-        // Baseline for the next check: exactly what's missing right now
-        // (whether newly-noticed or just-confirmed-and-deleted) -- a key
-        // that reappears in the meantime simply won't be in missingNow next
-        // time and drops out of this set on its own, no separate clearing
-        // needed.
-        pendingRemovals.set(goalApiId, new Set(missingNow));
-      }
-
       if (rows.length === 0) return;
 
-      const { error } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
-      if (error) {
-        console.error(`Failed to store live events for fixture ${info.fixtureId}:`, error.message);
-        return;
-      }
-      counts.rowsWritten += rows.length;
-
-      try {
-        await notifyFavoritedFixtureEvents(supabase, info.fixtureId, info.leagueSlug, rows);
-      } catch (err) {
-        console.error(`Failed to notify favorited-fixture events for fixture ${info.fixtureId}:`, err.message);
-      }
+      const { inserted } = await insertNewMatchEvents(supabase, info.fixtureId, info.leagueSlug, rows);
+      counts.rowsWritten += inserted;
     });
 
     ws.addEventListener('close', () => finish(false));
@@ -760,10 +645,10 @@ export async function syncLiveEvents() {
   const deadline = Date.now() + JOB_BUDGET_MS;
 
   const candidates = await findCandidateFixtures(supabase);
-  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: 0, reconnects: 0 };
+  if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
 
   const resolved = await resolveGoalApiIds(supabase, candidates);
-  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: 0, reconnects: 0 };
+  if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
 
   // goalApiId -> { fixtureId, leagueSlug, kind, ...(homeClubId/awayClubId | homeTeamName/awayTeamName) }
   const byGoalApiId = new Map();
@@ -784,9 +669,7 @@ export async function syncLiveEvents() {
   const lastCounts = new Map(); // goalApiId -> last-seen total event count, to skip no-op writes
   const lastMinutes = new Map(); // goalApiId -> last-written live minute, to skip no-op writes
   const lastEuropeanState = new Map(); // goalApiId -> last-written {status, home, away} for a European fixture, to skip no-op writes and guard against regression
-  const pendingRemovals = new Map(); // goalApiId -> event_keys missing on the immediately-preceding check, awaiting a second miss to confirm
-  const confirmedRetractions = new Set(); // goalApiIds where score.changed arrived -- next match_update's first miss triggers immediate deletion
-  const counts = { updatesHandled: 0, rowsWritten: 0, rowsDeleted: 0, droppedForCapacity: droppedAtStart };
+  const counts = { updatesHandled: 0, rowsWritten: 0, droppedForCapacity: droppedAtStart };
   let reconnects = 0;
 
   // Keeps reconnecting on an early/unexpected close until the deadline
@@ -798,7 +681,7 @@ export async function syncLiveEvents() {
   while (Date.now() < deadline) {
     let reachedDeadline;
     try {
-      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, lastEuropeanState, pendingRemovals, confirmedRetractions, counts });
+      reachedDeadline = await connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, lastMinutes, lastEuropeanState, counts });
     } catch (err) {
       console.error('Live events connection attempt failed:', err.message);
       reachedDeadline = false;
@@ -818,7 +701,6 @@ export async function syncLiveEvents() {
     subscribed: byGoalApiId.size,
     updatesHandled: counts.updatesHandled,
     rowsWritten: counts.rowsWritten,
-    rowsDeleted: counts.rowsDeleted,
     droppedForCapacity: counts.droppedForCapacity,
     reconnects,
   };

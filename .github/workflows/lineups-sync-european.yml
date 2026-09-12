@@ -28,3 +28,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
+          # Added 2026-09-12 alongside this file's own new match-events sync
+          # (brought in line with lineups-sync.yml, which already had these):
+          # without them, notifyFavoritedFixtureEvents()'s own push attempt
+          # for a European goal/card/sub throws "Missing VAPID_PUBLIC_KEY/
+          # VAPID_PRIVATE_KEY env vars" on every single call -- caught and
+          # logged, not fatal to the run, but push notifications for
+          # UCL/UEL/UECL match events would otherwise never actually work.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
