@@ -20,7 +20,15 @@ name: Schedule watchdog
 # added here -- confirmed live it went completely dark for well over an
 # hour spanning a real match's kickoff, with nothing catching it, since it
 # was relying solely on GitHub's own unreliable scheduler with no safety
-# net. Same threshold as lineups-sync.yml below: same 15-min native cadence.
+# net. Originally given lineups-sync.yml's own 25min/15min-cadence
+# threshold, which turned out to be the wrong template: like live-scores.yml
+# below, this job self-loops for ~14 minutes straight while a match is live
+# (see JOB_BUDGET_MS in syncLiveEvents.js) rather than running once and
+# exiting, so it needed live-scores.yml's tighter "just over its own
+# self-loop duration" threshold instead -- confirmed live 2026-09-12 that
+# 25min let a real match go 16+ minutes with zero WS coverage (a missed
+# goal, a frozen live minute) after one run ended, well before either
+# GitHub's scheduler or this watchdog's own next hourly tick caught it.
 #
 # live-scores-european.yml (added 2026-09-10, same outage this whole
 # comment documents) had the exact same gap: confirmed live it fired
@@ -113,7 +121,7 @@ jobs:
           # aggressively.
           check_and_trigger news-scraper.yml 50     # cadence 30 min
           check_and_trigger lineups-sync.yml 25     # cadence 15 min
-          check_and_trigger live-events.yml 25      # cadence 15 min
+          check_and_trigger live-events.yml 15      # self-loops ~14 min while live -- see this file's own top comment
           check_and_trigger live-scores.yml 14      # self-loops ~13 min while live; see comment above
           check_and_trigger live-scores-european.yml 14  # same self-loop shape as live-scores.yml
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
