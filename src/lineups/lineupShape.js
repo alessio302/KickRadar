@@ -23,12 +23,30 @@ const POSITION_SINGULAR = {
 };
 const ROW_ORDER = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
 
-function normalizePlayer(entry) {
+// resolvePosition(entry) is an optional caller-supplied lookup returning
+// this player's authoritative position (players.position, sourced from
+// football-data.org -- see syncPlayerProfiles.js's own comment on why
+// that wins over whatever GOAL API's lineup/squad data says), falling
+// back to GOAL API's own per-match lineup tag when it returns nothing
+// (a player never resolved into `players`, or the caller doesn't have a
+// players table to resolve against at all -- syncEuropeanLineups.js's
+// UEFA clubs aren't in our clubs table, so it never passes one).
+//
+// Confirmed live (2026-09-12, user report): showing GOAL API's own
+// per-match tag here instead produced real, visible disagreements with
+// the same player's profile card for a versatile player GOAL API
+// categorizes differently for one specific match (e.g. a nominal
+// defender fielded that game and tagged "Midfielder"). Using the same
+// authoritative source everywhere a player's position is shown avoids
+// that -- two labels for the same person reading differently looks like
+// a bug even when each individually reflects its own source correctly.
+function normalizePlayer(entry, resolvePosition) {
+  const fallback = POSITION_SINGULAR[entry.playerPosition] || entry.playerPosition || null;
   return {
     id: entry.playerId,
     name: entry.lineupPlayer,
     number: entry.lineupNumber ? Number(entry.lineupNumber) : null,
-    position: POSITION_SINGULAR[entry.playerPosition] || entry.playerPosition || null,
+    position: (resolvePosition && resolvePosition(entry)) || fallback,
     // Confirmed live: every lineup entry already carries this (GOAL API's
     // own CDN, e.g. https://media.goal-api.com/badges/players/96401_j-garcia.jpg)
     // -- no separate /players/:id call needed per player the way
@@ -59,11 +77,11 @@ function normalizePlayer(entry) {
 // API not fully reporting the lineup that run) -- both make the exact
 // row split unverifiable, so this degrades to "correct membership, not
 // necessarily the exact tactical shape" rather than guessing.
-export function groupByFormationRows(entries, formation) {
+export function groupByFormationRows(entries, formation, resolvePosition) {
   const sorted = (entries ?? [])
     .slice()
     .sort((a, b) => Number(a.lineupPosition) - Number(b.lineupPosition))
-    .map(normalizePlayer);
+    .map((entry) => normalizePlayer(entry, resolvePosition));
 
   const rowSizes = (formation || '')
     .split('-')
@@ -104,12 +122,12 @@ function normalizeCoach(coach) {
   return { name, photo: entry.playerImage || null };
 }
 
-export function buildLineupTeam(section, formation) {
+export function buildLineupTeam(section, formation, resolvePosition) {
   if (!section) return null;
   return {
     formation: null, // set by the caller from homeFormation/awayFormation, shared per fixture not per section
-    initialLineup: groupByFormationRows(section.startingLineups, formation),
-    substitutes: (section.substitutes ?? []).map(normalizePlayer),
+    initialLineup: groupByFormationRows(section.startingLineups, formation, resolvePosition),
+    substitutes: (section.substitutes ?? []).map((entry) => normalizePlayer(entry, resolvePosition)),
     coach: normalizeCoach(section.coach),
   };
 }
