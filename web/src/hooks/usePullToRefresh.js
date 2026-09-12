@@ -77,9 +77,8 @@ export function usePullToRefresh(onRefresh, gestureRef) {
   onRefreshRef.current = onRefresh;
 
   useEffect(() => {
-    const contentEl = scrollRef.current;
-    const el = gestureRef?.current ?? contentEl;
-    if (!el || !contentEl) return;
+    const el = gestureRef?.current ?? scrollRef.current;
+    if (!el) return;
 
     let startX = null;
     let startY = null;
@@ -88,7 +87,8 @@ export function usePullToRefresh(onRefresh, gestureRef) {
     let moveAttached = false;
 
     const handleTouchMove = (e) => {
-      if (startY == null || vertical === false) return;
+      const contentEl = scrollRef.current;
+      if (startY == null || vertical === false || !contentEl) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
 
@@ -136,8 +136,23 @@ export function usePullToRefresh(onRefresh, gestureRef) {
     // scrollTop <= 0 (a genuine pull candidate) keeps the browser's fast
     // path fully available for every other touch, which is the vast
     // majority of scrolling in anything long enough to need it.
+    //
+    // scrollRef.current is read fresh here (and in handleTouchMove above),
+    // not captured once when this effect ran -- confirmed live: switching
+    // league re-keys FixturesList/EuropaTab's own list component (see
+    // LeagueCarousel.jsx's own comment on why), which swaps in a whole new
+    // scrolling DOM node under the same scrollRef. This effect's dependency
+    // array is just `[gestureRef]` (gestureRef -- the outer tab wrapper --
+    // never itself remounts on a league switch, so re-running the effect
+    // isn't the fix); a `const contentEl = scrollRef.current` captured once
+    // up here would keep pointing at the OLD league's now-detached list
+    // forever, frozen at whatever scrollTop it happened to have -- usually
+    // 0, which read as "always at the top" regardless of the new list's
+    // real scroll position, letting a pull-down anywhere hijack what should
+    // have been a normal scroll-back-up.
     const handleTouchStart = (e) => {
-      if (contentEl.scrollTop <= 0) {
+      const contentEl = scrollRef.current;
+      if (contentEl && contentEl.scrollTop <= 0) {
         startX = e.touches[0].clientX;
         startY = e.touches[0].clientY;
         vertical = null;
