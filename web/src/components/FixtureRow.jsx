@@ -19,11 +19,11 @@ const FAVORITE_STAR_COLOR = '#FFC107';
 function TeamRow({ club, theme, score, isLive }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-        <ClubJersey club={club} size={22} theme={theme} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+        <ClubJersey club={club} size={15} theme={theme} />
         <span
           style={{
-            fontSize: '14px',
+            fontSize: '11.5px',
             fontWeight: 700,
             color: theme.text,
             overflow: 'hidden',
@@ -44,7 +44,7 @@ function TeamRow({ club, theme, score, isLive }) {
         // VISIBLE glyph looked shifted relative to the row below it even
         // though the CSS box itself was correctly aligned. Uniform digit
         // width removes that mismatch.
-        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+        <span style={{ fontSize: '11.5px', fontWeight: 700, color: isLive ? theme.danger : theme.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
           {score}
         </span>
       )}
@@ -122,11 +122,11 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
       style={{
         background: theme.surfaceRaised,
         border: `1px solid ${theme.border}`,
-        borderRadius: '12px',
+        borderRadius: '9px',
         display: 'flex',
         alignItems: 'stretch',
-        gap: '10px',
-        padding: '12px 14px',
+        gap: '7px',
+        padding: '6px 10px',
         cursor: 'pointer',
       }}
     >
@@ -137,13 +137,14 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           every one of the app's 5 languages, so minWidth alone let a
           finished row's label overflow past a scheduled row's own width.
           A true fixed width keeps this column identical regardless of
-          which status text a given row happens to show. */}
-      <div style={{ width: '66px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: '13px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
+          which status text a given row happens to show. Width scaled down
+          from 66px alongside the 13px->10px font shrink. */}
+      <div style={{ width: '50px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: '10px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
         <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} isLive={isLive} />
         <TeamRow club={clubsById.get(fixture.away_club_id)} theme={theme} score={showScore ? fixture.away_score : null} isLive={isLive} />
       </div>
@@ -162,9 +163,9 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           aria-label={isFavorite ? t.fixtures.unfavoriteAria : t.fixtures.favoriteAria}
           style={{
             flex: '0 0 auto',
-            width: '30px',
-            height: '30px',
-            margin: '0 -4px',
+            width: '20px',
+            height: '20px',
+            margin: '0 -2px',
             border: 'none',
             background: 'transparent',
             padding: 0,
@@ -175,17 +176,17 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
             alignSelf: 'center',
           }}
         >
-          <Star size={18} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
+          <Star size={14} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
         </button>
       ) : (
         // margin matches the star button's own (horizontal-only) negative
         // margin -- there to enlarge its tap target without widening its
         // layout footprint. Confirmed live: without this, this plain
-        // spacer took up a genuine 30px while the button's negative margin
-        // shrank its own effective footprint by 8px, so every column after
-        // this one sat 8px further right on a finished row than on a
+        // spacer took up a genuine 20px while the button's negative margin
+        // shrank its own effective footprint by 4px, so every column after
+        // this one sat 4px further right on a finished row than on a
         // favoritable one.
-        <span style={{ width: '30px', margin: '0 -4px', flex: '0 0 auto' }} aria-hidden="true" />
+        <span style={{ width: '20px', margin: '0 -2px', flex: '0 0 auto' }} aria-hidden="true" />
       )}
     </div>
   );

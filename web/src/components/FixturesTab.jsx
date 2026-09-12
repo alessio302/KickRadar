@@ -153,7 +153,7 @@ function FixturesList({
                 >
                   {date}
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {dateGames.map((f) => (
                     <FixtureRow
                       key={f.id}
