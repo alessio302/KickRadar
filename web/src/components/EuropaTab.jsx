@@ -7,6 +7,187 @@ import { DATE_LOCALES } from '../i18n/languages.js';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
 
+// Zone thresholds for the UEFA League Phase (all three competitions use
+// an identical 36-team single-table format since 2024/25):
+//   1-8  → direct to knockout round (no playoff)
+//   9-24 → knockout playoff round
+//  25-36 → eliminated
+// Applied regardless of total team count in the data -- if the synced
+// fixtures only partially cover the league phase, the colour gives the
+// best available signal without waiting for a complete dataset.
+const ZONE_COLOR = { direct: '#3D8BFD', playoff: '#F5A623', elim: '#E5484D' };
+
+function europaZone(rank) {
+  if (rank <= 8) return 'direct';
+  if (rank <= 24) return 'playoff';
+  return 'elim';
+}
+
+// Derive a standings table from the already-fetched fixture data.
+// Avoids a separate DB call: useEuropaFixtures already has every finished
+// fixture for this competition, which is all that's needed to compute W/D/L.
+// Team identity comes from home_team_short_name/home_team_name (same fields
+// EuropaFixtureRow uses -- no clubs table exists for UEFA fixtures).
+function computeStandings(fixtures) {
+  const teams = new Map();
+
+  const entry = (name, badge) => {
+    if (!teams.has(name)) {
+      teams.set(name, { name, badge, played: 0, won: 0, draw: 0, lost: 0, gf: 0, ga: 0, points: 0 });
+    }
+    return teams.get(name);
+  };
+
+  for (const f of fixtures) {
+    if (f.status !== 'finished' || f.home_score == null || f.away_score == null) continue;
+    const home = entry(f.home_team_short_name || f.home_team_name, f.home_team_badge);
+    const away = entry(f.away_team_short_name || f.away_team_name, f.away_team_badge);
+    const hs = f.home_score;
+    const as = f.away_score;
+    home.played++; away.played++;
+    home.gf += hs; home.ga += as;
+    away.gf += as; away.ga += hs;
+    if (hs > as) { home.won++; home.points += 3; away.lost++; }
+    else if (hs < as) { away.won++; away.points += 3; home.lost++; }
+    else { home.draw++; home.points++; away.draw++; away.points++; }
+  }
+
+  return [...teams.values()].sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.gf - b.ga - (a.gf - a.ga) ||
+      b.gf - a.gf
+  );
+}
+
+function TeamBadgeSmall({ url, name, size = 18, theme }) {
+  const [failed, setFailed] = useState(false);
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        width={size}
+        height={size}
+        style={{ objectFit: 'contain', flex: '0 0 auto' }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '999px',
+        background: theme.surfaceRaised,
+        border: `1px solid ${theme.border}`,
+        flex: '0 0 auto',
+      }}
+    />
+  );
+}
+
+// Standings table for one UEFA competition, computed client-side from
+// finished fixtures. Same column layout as StandingsTab.jsx (Sp S U N ± Pkt)
+// so the two tables look identical -- reusing its exact NUM_COL_WIDTH constant.
+const NUM_COL_WIDTH = '26px';
+
+function EuropaStandingsPanel({ theme, t, fixtures }) {
+  const rows = useMemo(() => computeStandings(fixtures), [fixtures]);
+
+  if (rows.length === 0) {
+    return (
+      <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 16px' }}>
+        {t.europa.standingsEmpty}
+      </p>
+    );
+  }
+
+  const zoneItems = [
+    [ZONE_COLOR.direct, t.europa.zoneDirectQualify],
+    [ZONE_COLOR.playoff, t.europa.zonePlayoff],
+    [ZONE_COLOR.elim, t.europa.zoneEliminated],
+  ];
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', padding: '8px 16px 14px' }}>
+      {/* Column headers -- mirrors StandingsTab.jsx exactly */}
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid ${theme.border}` }}>
+        <div style={{ width: '3px', flexShrink: 0 }} />
+        <div style={{ width: '28px', flexShrink: 0 }} />
+        <div style={{ flex: 1 }} />
+        {['Sp', 'S', 'U', 'N', '±', t.standings.points].map((h) => (
+          <div
+            key={h}
+            style={{ width: NUM_COL_WIDTH, flexShrink: 0, textAlign: 'center', fontSize: '10px', fontWeight: 600, color: theme.textMuted, letterSpacing: '0.04em' }}
+          >
+            {h}
+          </div>
+        ))}
+      </div>
+
+      {rows.map((row, i) => {
+        const rank = i + 1;
+        const zone = europaZone(rank);
+        const gd = row.gf - row.ga;
+        return (
+          <div
+            key={row.name}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '6px 0',
+              borderBottom: `1px solid ${theme.border}`,
+            }}
+          >
+            {/* Zone bar */}
+            <div style={{ width: '3px', height: '28px', borderRadius: '2px', background: ZONE_COLOR[zone], flexShrink: 0 }} />
+            {/* Position */}
+            <div style={{ width: '28px', flexShrink: 0, textAlign: 'center', fontSize: '11px', fontWeight: 700, color: theme.textMuted, fontVariantNumeric: 'tabular-nums' }}>
+              {rank}
+            </div>
+            {/* Club name + badge */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TeamBadgeSmall url={row.badge} name={row.name} theme={theme} />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.name}
+              </span>
+            </div>
+            {/* Numeric cols */}
+            {[row.played, row.won, row.draw, row.lost, gd > 0 ? `+${gd}` : gd, row.points].map((v, ci) => (
+              <div
+                key={ci}
+                style={{
+                  width: NUM_COL_WIDTH,
+                  flexShrink: 0,
+                  textAlign: 'center',
+                  fontSize: '12.5px',
+                  fontWeight: ci === 5 ? 700 : 500,
+                  color: ci === 5 ? theme.text : theme.textMuted,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {v}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      {/* Zone legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', paddingTop: '12px' }}>
+        {zoneItems.map(([color, label]) => (
+          <div key={color} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+            <span style={{ fontSize: '10.5px', color: theme.textMuted }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const BADGE_SIZE = 56;
 const BADGE_PADDING = 6;
 
@@ -310,6 +491,7 @@ export default function EuropaTab({ theme, t, language }) {
   const { data, loading, refreshing, refetch } = useEuropaFixtures();
   const locale = DATE_LOCALES[language];
   const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
+  const [activeSubTab, setActiveSubTab] = useState('spiele');
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [liveOnly, setLiveOnly] = useState(false);
   // Holds whatever `data` had for the clicked row at click time -- kept
@@ -353,92 +535,131 @@ export default function EuropaTab({ theme, t, language }) {
       <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>
         <CompetitionSelector selected={selectedComp} theme={theme} onSelect={setSelectedComp} />
 
-        {/* Filter bar -- matches FixturesTab layout exactly */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 2px',
-            borderTop: `1px solid ${theme.border}`,
-            borderBottom: `1px solid ${theme.border}`,
-          }}
-        >
-          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.fixtures.currentMatchdayOnly}</span>
-          <button
-            onClick={() => setCurrentMatchdayOnly((v) => !v)}
-            aria-label={t.fixtures.currentMatchdayOnlyToggle}
-            style={{
-              width: '40px',
-              height: '22px',
-              borderRadius: '999px',
-              border: 'none',
-              cursor: 'pointer',
-              background: currentMatchdayOnly ? theme.accent : theme.border,
-              position: 'relative',
-            }}
-          >
+        {/* Sub-navigation: Spiele | Tabelle (change A) */}
+        <div style={{ display: 'flex', borderTop: `1px solid ${theme.border}`, borderBottom: `1px solid ${theme.border}` }}>
+          {[['spiele', t.europa.tabSpiele], ['tabelle', t.europa.tabTabelle]].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setActiveSubTab(id)}
+              style={{
+                flex: 1,
+                height: '38px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                font: 'inherit',
+                fontSize: '13px',
+                fontWeight: 600,
+                background: 'none',
+                border: 'none',
+                borderBottom: `2px solid ${activeSubTab === id ? theme.accent : 'transparent'}`,
+                color: activeSubTab === id ? theme.accent : theme.textMuted,
+                cursor: 'pointer',
+                transition: 'color 0.15s, border-color 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filter bar -- only shown in Spiele sub-tab, matches FixturesTab layout exactly */}
+        {activeSubTab === 'spiele' && (
+          <>
             <div
               style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: theme.surface,
-                position: 'absolute',
-                top: '3px',
-                left: currentMatchdayOnly ? '21px' : '3px',
-                transition: 'left 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 2px',
+                borderBottom: `1px solid ${theme.border}`,
               }}
-            />
-          </button>
-        </div>
+            >
+              <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.fixtures.currentMatchdayOnly}</span>
+              <button
+                onClick={() => setCurrentMatchdayOnly((v) => !v)}
+                aria-label={t.fixtures.currentMatchdayOnlyToggle}
+                style={{
+                  width: '40px',
+                  height: '22px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: currentMatchdayOnly ? theme.accent : theme.border,
+                  position: 'relative',
+                }}
+              >
+                <div
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: theme.surface,
+                    position: 'absolute',
+                    top: '3px',
+                    left: currentMatchdayOnly ? '21px' : '3px',
+                    transition: 'left 0.15s',
+                  }}
+                />
+              </button>
+            </div>
 
-        <div style={{ padding: '10px 2px 4px' }}>
-          <button
-            onClick={() => setLiveOnly((v) => !v)}
-            aria-label={t.fixtures.liveOnlyToggle}
-            aria-pressed={liveOnly}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px 6px 10px',
-              borderRadius: '999px',
-              border: `1.5px solid ${liveOnly ? theme.accent : theme.border}`,
-              background: liveOnly ? `${theme.accent}1a` : 'transparent',
-              color: liveOnly ? theme.accent : theme.textMuted,
-              font: 'inherit',
-              fontSize: '12.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
-            {t.fixtures.live}
-          </button>
-        </div>
+            <div style={{ padding: '10px 2px 4px' }}>
+              <button
+                onClick={() => setLiveOnly((v) => !v)}
+                aria-label={t.fixtures.liveOnlyToggle}
+                aria-pressed={liveOnly}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px 6px 10px',
+                  borderRadius: '999px',
+                  border: `1.5px solid ${liveOnly ? theme.accent : theme.border}`,
+                  background: liveOnly ? `${theme.accent}1a` : 'transparent',
+                  color: liveOnly ? theme.accent : theme.textMuted,
+                  font: 'inherit',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
+                {t.fixtures.live}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      <LeagueCarousel
-        league={selectedComp}
-        onSwitchLeague={swipeComp}
-        adjacent={adjacentCompetition}
-        renderPage={(slug) => (
-          <EuropaFixturesList
-            key={slug}
-            theme={theme}
-            t={t}
-            locale={locale}
-            fixtures={data[slug] ?? []}
-            loading={loading}
-            currentMatchdayOnly={currentMatchdayOnly}
-            liveOnly={liveOnly}
-            refetch={refetch}
-            refreshing={refreshing}
-            onSelectFixture={slug === selectedComp ? setSelectedFixture : undefined}
-          />
-        )}
-      />
+      {activeSubTab === 'spiele' ? (
+        <LeagueCarousel
+          league={selectedComp}
+          onSwitchLeague={swipeComp}
+          adjacent={adjacentCompetition}
+          renderPage={(slug) => (
+            <EuropaFixturesList
+              key={slug}
+              theme={theme}
+              t={t}
+              locale={locale}
+              fixtures={data[slug] ?? []}
+              loading={loading}
+              currentMatchdayOnly={currentMatchdayOnly}
+              liveOnly={liveOnly}
+              refetch={refetch}
+              refreshing={refreshing}
+              onSelectFixture={slug === selectedComp ? setSelectedFixture : undefined}
+            />
+          )}
+        />
+      ) : (
+        <EuropaStandingsPanel
+          theme={theme}
+          t={t}
+          fixtures={data[selectedComp] ?? []}
+        />
+      )}
 
       {liveSelectedFixture && (
         <EuropaFixtureDetailOverlay

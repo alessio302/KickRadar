@@ -52,7 +52,7 @@ function hexToRgba(hex, alpha) {
 // bottom nav both render cleanly, user-approved -- this combination
 // (flush bar + no viewport-fit=cover + this padding) is the settled
 // state, not still an open experiment.
-export default function BottomNav({ tab, onSelectTab, theme, t }) {
+export default function BottomNav({ tab, onSelectTab, theme, t, hasLiveSpiele, hasLiveEuropa }) {
   return (
     <div
       style={{
@@ -73,25 +73,45 @@ export default function BottomNav({ tab, onSelectTab, theme, t }) {
         borderTop: `1px solid ${theme.border}`,
       }}
     >
-      {TABS.map(([id, getLabel, Icon]) => (
-        <button
-          key={id}
-          onClick={() => onSelectTab(id)}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: tab === id ? theme.accent : theme.textMuted,
-          }}
-        >
-          <Icon size={20} />
-          <span style={{ fontSize: '10px', fontWeight: 600 }}>{getLabel(t)}</span>
-        </button>
-      ))}
+      {TABS.map(([id, getLabel, Icon]) => {
+        const showDot = (id === 'spiele' && hasLiveSpiele) || (id === 'europa' && hasLiveEuropa);
+        return (
+          <button
+            key={id}
+            onClick={() => onSelectTab(id)}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '3px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: tab === id ? theme.accent : theme.textMuted,
+            }}
+          >
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <Icon size={20} />
+              {showDot && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: '-1px',
+                    right: '-3px',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: theme.danger,
+                    border: `1.5px solid ${hexToRgba(theme.surface, 0.92)}`,
+                  }}
+                />
+              )}
+            </span>
+            <span style={{ fontSize: '10px', fontWeight: 600 }}>{getLabel(t)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
