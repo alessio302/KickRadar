@@ -26,6 +26,14 @@ host (Vercel, Netlify, Cloudflare Pages -- all free tier, per the
 briefing). `npm run preview` serves the built output locally to sanity-check
 before deploying.
 
+Confirmed live 2026-09-12: a regular (two-parent) merge commit onto this
+branch didn't trigger a Vercel production build at all -- no new
+deployment showed up in the project's history even minutes later, while
+every squash-merge or direct single-parent push always has. Unconfirmed
+whether the commit shape itself is the cause or it was a one-off missed
+webhook; if a merge doesn't show up on Vercel, a plain follow-up commit
+pushed straight to this branch has reliably kicked off a fresh build.
+
 ## What's wired up vs. still mock/placeholder
 
 - **Transfers, fixtures**: real data from Supabase (`transfers`, `fixtures`,
