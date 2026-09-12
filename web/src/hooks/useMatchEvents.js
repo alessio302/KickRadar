@@ -14,6 +14,18 @@ function applyEventChange(events, row) {
   return next;
 }
 
+const SELECT = 'id, club_id, team_name, type, minute, player, assist, substituted, created_at';
+// Same rationale as useLineups.js's own POLL_MS: Realtime alone has already
+// proven unreliable in this app, and this is the one place that absolutely
+// must not silently miss anything (a goal). Also incidentally covers a gap
+// the subscription below doesn't: it only listens for INSERT/UPDATE, not
+// DELETE, so a VAR-retracted goal (syncLiveEvents.js does delete confirmed-
+// stale rows, see that file's own comment) wouldn't disappear from an
+// already-open overlay without this -- load() below does a full resync,
+// not a merge, so a deleted row drops out on the next poll same as it
+// would on a fresh open.
+const POLL_MS = 30000;
+
 export function useMatchEvents(fixtureId) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,23 +33,26 @@ export function useMatchEvents(fixtureId) {
   useEffect(() => {
     if (fixtureId == null) return;
     let cancelled = false;
-    setLoading(true);
 
-    supabase
-      .from('match_events')
-      .select('id, club_id, team_name, type, minute, player, assist, substituted, created_at')
-      .eq('fixture_id', fixtureId)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error('Failed to load match events for fixture', fixtureId, error);
-          setEvents([]);
-          setLoading(false);
-          return;
-        }
-        setEvents(data);
-        setLoading(false);
-      });
+    const load = () =>
+      supabase
+        .from('match_events')
+        .select(SELECT)
+        .eq('fixture_id', fixtureId)
+        .then(({ data, error }) => {
+          if (cancelled) return;
+          if (error) {
+            console.error('Failed to load match events for fixture', fixtureId, error);
+            setEvents([]);
+            return;
+          }
+          setEvents(data);
+        });
+
+    setLoading(true);
+    load().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
 
     // src/lineups/syncLiveEvents.js writes goals/cards/subs here while a
     // match is still live (not just once it's finished, like the older
@@ -63,9 +78,14 @@ export function useMatchEvents(fixtureId) {
       )
       .subscribe();
 
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') load();
+    }, POLL_MS);
+
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [fixtureId]);
 
