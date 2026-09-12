@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
+import { fetchAllRows } from '../db/fetchAllRows.js';
 import { LEAGUES } from '../config/leagues.js';
 import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
@@ -200,8 +201,14 @@ export async function syncLineups() {
   // player, see that file's own comment on why. goal_api_id first since
   // it's a stable id; normalized name as a fallback for a player only
   // ever resolved that way (not every players row has goal_api_id set).
-  const { data: allPlayers, error: playersErr } = await supabase.from('players').select('goal_api_id, normalized_name, position');
-  if (playersErr) throw playersErr;
+  // fetchAllRows(), not a plain .select() -- confirmed live (2026-09-12,
+  // same class of bug as syncPlayerProfiles.js's own fix on 2026-09-06):
+  // players has grown well past PostgREST's default 1000-row response cap,
+  // so an unpaginated select here silently missed most of the table --
+  // this resolvePosition lookup returned nothing for any player outside
+  // whatever arbitrary first page came back, leaving their lineup entry on
+  // GOAL API's own tag instead of being corrected.
+  const allPlayers = await fetchAllRows(supabase, 'players', 'goal_api_id, normalized_name, position');
   const positionByGoalApiId = new Map(allPlayers.filter((p) => p.goal_api_id).map((p) => [p.goal_api_id, p.position]));
   const positionByNormalizedName = new Map(allPlayers.filter((p) => p.position).map((p) => [p.normalized_name, p.position]));
   const resolvePosition = (entry) =>
