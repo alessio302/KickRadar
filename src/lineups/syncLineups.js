@@ -3,6 +3,7 @@ import { LEAGUES } from '../config/leagues.js';
 import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { resolveClub } from '../news/clubMatch.js';
+import { normalize } from '../util/normalize.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
@@ -193,6 +194,21 @@ export async function syncLineups() {
   if (clubsErr) throw clubsErr;
   const clubById = new Map(allClubs.map((c) => [c.id, c]));
 
+  // Backs lineupShape.js's resolvePosition callback -- players.position
+  // (football-data.org, treated as authoritative everywhere else in the
+  // app) overrides GOAL API's own per-match lineup tag for the same
+  // player, see that file's own comment on why. goal_api_id first since
+  // it's a stable id; normalized name as a fallback for a player only
+  // ever resolved that way (not every players row has goal_api_id set).
+  const { data: allPlayers, error: playersErr } = await supabase.from('players').select('goal_api_id, normalized_name, position');
+  if (playersErr) throw playersErr;
+  const positionByGoalApiId = new Map(allPlayers.filter((p) => p.goal_api_id).map((p) => [p.goal_api_id, p.position]));
+  const positionByNormalizedName = new Map(allPlayers.filter((p) => p.position).map((p) => [p.normalized_name, p.position]));
+  const resolvePosition = (entry) =>
+    (entry.playerId && positionByGoalApiId.get(entry.playerId)) ||
+    (entry.lineupPlayer && positionByNormalizedName.get(normalize(entry.lineupPlayer))) ||
+    null;
+
   let checked = 0;
   let confirmedCount = 0;
   let eventsFetched = 0;
@@ -268,8 +284,8 @@ export async function syncLineups() {
         }
 
         if (lineups?.hasLineups) {
-          const homeTeam = buildLineupTeam(lineups.home, lineups.homeFormation);
-          const awayTeam = buildLineupTeam(lineups.away, lineups.awayFormation);
+          const homeTeam = buildLineupTeam(lineups.home, lineups.homeFormation, resolvePosition);
+          const awayTeam = buildLineupTeam(lineups.away, lineups.awayFormation, resolvePosition);
           if (homeTeam) homeTeam.formation = lineups.homeFormation || null;
           if (awayTeam) awayTeam.formation = lineups.awayFormation || null;
 
