@@ -2,11 +2,17 @@ name: Standings sync
 
 on:
   schedule:
-    # Same 4x/day cadence as fixtures-sync -- standings only change once a
-    # match finishes. Offset 20 min off fixtures-sync's own :00 slots to
-    # avoid the scheduler throttling multiple workflows sharing identical
-    # cron minutes (see news-scraper.yml's history for the confirmed cause).
-    - cron: '20 5,11,17,23 * * *'
+    # Down from 4x/day (2026-09-12): syncLiveScores.js now calls this same
+    # sync itself, for exactly the league(s) that just had a fixture reach
+    # 'finished', within its own ~2min poll cadence during a live window --
+    # standings update within minutes of full time, not on the next of this
+    # cron's own fixed windows. That leaves this cron as a pure safety net
+    # for whatever that path misses entirely (the whole live-scores.yml job
+    # failing to run that day, etc.), so once a day is plenty --
+    # syncStandingsForLeague()'s own finished-fixture-count guard means an
+    # already-caught-up league still costs zero football-data.org calls,
+    # just one cheap Supabase count check per league.
+    - cron: '20 5 * * *'
   workflow_dispatch: {}
 
 jobs:

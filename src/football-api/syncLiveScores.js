@@ -3,6 +3,7 @@ import { LEAGUES } from '../config/leagues.js';
 import { getMatches, sleep, STATUS_MAP } from './client.js';
 import { sendPushToFixtureFavoriters } from '../push/sendPush.js';
 import { buildFixtureStatusPayloads } from '../push/fixtureNotifier.js';
+import { syncStandingsForLeague } from './syncStandings.js';
 
 // Confirmed live (Bayern-Stuttgart, 2026-08-28): the global, multi-
 // competition /matches endpoint (getMatchesForDate) silently returned 0
@@ -180,6 +181,15 @@ async function pollOnce(supabase, clubById) {
 
   let updated = 0;
   let stillLive = false;
+  // Slugs of leagues that had a fixture actually reach 'finished' in this
+  // tick -- standings.js's own syncStandingsForLeague() gets called for
+  // exactly these right after the poll loop below, instead of waiting for
+  // standings-sync.yml's own separate once-a-day safety-net cron. Simplest
+  // possible trigger: it doesn't matter whether the webhook or this same
+  // poll is what actually flipped the status to 'finished' (both funnel
+  // through the same `.update()` a few lines down), so this catches either
+  // source within this job's own ~2min poll cadence.
+  const finishedLeagueSlugs = new Set();
 
   for (const m of matches) {
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') stillLive = true;
@@ -233,6 +243,7 @@ async function pollOnce(supabase, clubById) {
       continue;
     }
     updated += 1;
+    if (newStatus === 'finished') finishedLeagueSlugs.add(m._leagueSlug);
 
     const fixtureRow = updatedRows?.[0];
     if (fixtureRow) {
@@ -250,7 +261,28 @@ async function pollOnce(supabase, clubById) {
     // is the 24h backstop for a match that never gets a highlight at all.
   }
 
-  return { updated, stillLive };
+  return { updated, stillLive, finishedLeagueSlugs };
+}
+
+// syncStandingsForLeague() already no-ops (no football-data.org call at
+// all) once a league's standings_finished_count already matches, so
+// calling it here is never redundant work on top of what standings-sync.yml
+// would have done anyway -- it just does that same check right after a
+// finish instead of waiting for the next scheduled window. Isolated
+// per-league (one failure shouldn't cost the others, or this whole poll
+// tick) and rate-limited the same way every other multi-league loop in
+// this file already is.
+async function refreshStandingsFor(supabase, leagueSlugs) {
+  for (const slug of leagueSlugs) {
+    const league = LEAGUES.find((l) => l.slug === slug);
+    if (!league) continue;
+    try {
+      await syncStandingsForLeague(supabase, league);
+    } catch (err) {
+      console.error(`Failed to refresh standings for ${slug}:`, err.message);
+    }
+    await sleep(1500); // stay well under the free tier's 10 req/min
+  }
 }
 
 export async function syncLiveScores() {
@@ -268,9 +300,11 @@ export async function syncLiveScores() {
   let totalUpdated = 0;
 
   while (Date.now() < deadline) {
-    const { updated, stillLive } = await pollOnce(supabase, clubById);
+    const { updated, stillLive, finishedLeagueSlugs } = await pollOnce(supabase, clubById);
     polls += 1;
     totalUpdated += updated;
+
+    if (finishedLeagueSlugs.size > 0) await refreshStandingsFor(supabase, finishedLeagueSlugs);
 
     const keepGoing = stillLive || (await hasFixtureStartingSoon(supabase));
     if (!keepGoing) break;
