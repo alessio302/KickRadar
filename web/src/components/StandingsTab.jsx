@@ -102,7 +102,22 @@ export function StandingsTable({ theme, t, league, onSelectClub, scrollRef, refe
 
       {table.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
-          <div style={{ minWidth: '360px' }}>
+          {/* 300px, not the 360px this used to be -- on a standard-width
+              iPhone (390px, e.g. 13/14) this div's own container is only
+              358px wide (390 minus this file's own 16px+16px padding
+              above), 2px short of a 360px floor. That's enough for this
+              minWidth to force a permanent, invisible horizontal overflow
+              here on most non-Pro-Max/Plus iPhones -- which is exactly what
+              useLeagueCarousel.js's startsInsideHorizontalScroller walks up
+              looking for, unconditionally disabling the league-swipe
+              gesture for any touch starting inside this table. Confirmed:
+              this table's own fixed columns (six 26px numeric + 20px
+              position + a 10px zone bar/margin = 186px) plus a readable
+              name column comfortably fit in 300px, well under every
+              realistic device's available width -- same number
+              TopScorersTable already uses for its own version of this same
+              wrapper. */}
+          <div style={{ minWidth: '300px' }}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 8px', borderBottom: `1px solid ${theme.border}` }}>
               <div style={{ width: '3px', flexShrink: 0, marginRight: '7px' }} />
               <div style={{ width: '20px', flexShrink: 0 }} />
