@@ -19,9 +19,15 @@ import { DATE_LOCALES } from '../i18n/languages.js';
 // club filter is ignored -- see LeagueCarousel.jsx's own comment for why a
 // mid-drag preview represents "what you're about to land on" rather than
 // something meant to be tapped).
-function TransfersList({ theme, t, language, league, officialOnly, activeFilter, onOpenProfile, onOpenSummary, pullContainerRef }) {
-  const { transfers, loading, refreshing, refetch } = useTransfers(league, { officialOnly });
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch, pullContainerRef);
+function TransfersList({ theme, t, language, league, officialOnly, activeFilter, onOpenProfile, onOpenSummary, scrollRef, refetchRef }) {
+  const { transfers, loading, refetch } = useTransfers(league, { officialOnly });
+  // Plain assignment during render, same idiom as usePullToRefresh.js's own
+  // onRefreshRef -- the tab-level hook call (see TransfersTab.jsx) reads
+  // this later, from an event handler, well after this render has
+  // committed, so there's no staleness risk despite not going through an
+  // effect. Only set for the active instance (see call site) -- the
+  // preview one gets no ref to write into.
+  if (refetchRef) refetchRef.current = refetch;
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
@@ -39,7 +45,6 @@ function TransfersList({ theme, t, language, league, officialOnly, activeFilter,
         padding: '12px 16px 14px',
       }}
     >
-      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>
@@ -89,7 +94,18 @@ export default function TransfersTab({
   // Whole-tab pull-to-refresh target (header + list together) -- see
   // usePullToRefresh.js's own `gestureRef` comment for why this needs to
   // be the tab's own outer wrapper rather than just the scrolling list.
+  // The hook itself lives here (not in TransfersList) so
+  // PullToRefreshIndicator can wrap -- and visually push down -- the
+  // header along with the list, per explicit feedback (goal-api.com's own
+  // native pull-to-refresh, referenced as the target look). refetchRef is
+  // how the active TransfersList instance's own refetch (only known
+  // inside it, since it's a per-league data hook) reaches back up here.
   const pullContainerRef = useRef(null);
+  const refetchRef = useRef(() => {});
+  const { scrollRef: pullScrollRef, pullDistance, pulling, refreshing: pullRefreshing } = usePullToRefresh(
+    () => refetchRef.current(),
+    pullContainerRef
+  );
 
   // Immediate placeholder from the already-fetched, possibly-stale
   // `players` join (so the overlay isn't blank while the live call is in
@@ -104,80 +120,83 @@ export default function TransfersTab({
   };
 
   return (
-    <div ref={pullContainerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
-        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
+        <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
+          <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
-        <QuickFilters
-          theme={theme}
-          t={t}
-          clubs={clubs}
-          favoriteClub={favoriteClub}
-          quickFilters={quickFilters}
-          activeFilterId={activeFilter?.id ?? null}
-          onSelectFilter={onSelectFilter}
-          onAddQuickFilter={onAddQuickFilter}
-          onRemoveQuickFilter={onRemoveQuickFilter}
-        />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 2px',
-            borderTop: `1px solid ${theme.border}`,
-            borderBottom: `1px solid ${theme.border}`,
-          }}
-        >
-          <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.transfers.officialOnly}</span>
-          <button
-            onClick={onToggleOfficialOnly}
-            aria-label={t.transfers.officialOnlyToggle}
-            style={{
-              width: '40px',
-              height: '22px',
-              borderRadius: '999px',
-              border: 'none',
-              cursor: 'pointer',
-              background: officialOnly ? theme.accent : theme.border,
-              position: 'relative',
-            }}
-          >
-            <div
-              style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: theme.surface,
-                position: 'absolute',
-                top: '3px',
-                left: officialOnly ? '21px' : '3px',
-                transition: 'left 0.15s',
-              }}
-            />
-          </button>
-        </div>
-      </div>
-
-      <LeagueCarousel
-        league={league}
-        onSwitchLeague={onSwipeLeague}
-        renderPage={(slug) => (
-          <TransfersList
-            key={slug}
+          <QuickFilters
             theme={theme}
             t={t}
-            language={language}
-            league={slug}
-            officialOnly={officialOnly}
-            activeFilter={slug === league ? activeFilter : null}
-            onOpenProfile={slug === league ? handleOpenProfile : undefined}
-            onOpenSummary={slug === league ? setSummaryTransfer : undefined}
-            pullContainerRef={slug === league ? pullContainerRef : undefined}
+            clubs={clubs}
+            favoriteClub={favoriteClub}
+            quickFilters={quickFilters}
+            activeFilterId={activeFilter?.id ?? null}
+            onSelectFilter={onSelectFilter}
+            onAddQuickFilter={onAddQuickFilter}
+            onRemoveQuickFilter={onRemoveQuickFilter}
           />
-        )}
-      />
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 2px',
+              borderTop: `1px solid ${theme.border}`,
+              borderBottom: `1px solid ${theme.border}`,
+            }}
+          >
+            <span style={{ fontSize: '13px', color: theme.textMuted }}>{t.transfers.officialOnly}</span>
+            <button
+              onClick={onToggleOfficialOnly}
+              aria-label={t.transfers.officialOnlyToggle}
+              style={{
+                width: '40px',
+                height: '22px',
+                borderRadius: '999px',
+                border: 'none',
+                cursor: 'pointer',
+                background: officialOnly ? theme.accent : theme.border,
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: theme.surface,
+                  position: 'absolute',
+                  top: '3px',
+                  left: officialOnly ? '21px' : '3px',
+                  transition: 'left 0.15s',
+                }}
+              />
+            </button>
+          </div>
+        </div>
+
+        <LeagueCarousel
+          league={league}
+          onSwitchLeague={onSwipeLeague}
+          renderPage={(slug) => (
+            <TransfersList
+              key={slug}
+              theme={theme}
+              t={t}
+              language={language}
+              league={slug}
+              officialOnly={officialOnly}
+              activeFilter={slug === league ? activeFilter : null}
+              onOpenProfile={slug === league ? handleOpenProfile : undefined}
+              onOpenSummary={slug === league ? setSummaryTransfer : undefined}
+              scrollRef={slug === league ? pullScrollRef : undefined}
+              refetchRef={slug === league ? refetchRef : undefined}
+            />
+          )}
+        />
+      </PullToRefreshIndicator>
 
       {summaryTransfer && (
         <TransferSummaryOverlay theme={theme} t={t} language={language} transfer={summaryTransfer} onClose={() => setSummaryTransfer(null)} />

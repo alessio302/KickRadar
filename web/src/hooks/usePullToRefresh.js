@@ -57,10 +57,22 @@ function dampen(rawDelta) {
 // whether a pull should be allowed to start. Falls back to `scrollRef`
 // itself when no `gestureRef` is given, so this stays backwards-compatible
 // for any future call site that only wants the old, list-scoped behaviour.
+//
+// `refreshing` (returned): per explicit feedback the pulled-down content
+// should stay pushed down, spinner spinning, for the whole time the
+// refresh is actually in flight -- like the native browser pull-to-refresh
+// on goal-api.com the request referenced, not just a brief release flash.
+// Settles to exactly PULL_THRESHOLD (not wherever between that and
+// PULL_MAX the finger happened to let go) so the "parked while loading"
+// height is always the same regardless of how far past the threshold the
+// pull went. `onRefresh` is awaited via Promise.resolve() so this works
+// whether the caller's refetch is async (the normal case) or a plain sync
+// function.
 export function usePullToRefresh(onRefresh, gestureRef) {
   const scrollRef = useRef(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [pulling, setPulling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const onRefreshRef = useRef(onRefresh);
   onRefreshRef.current = onRefresh;
 
@@ -109,11 +121,16 @@ export function usePullToRefresh(onRefresh, gestureRef) {
 
     const handleTouchEnd = () => {
       if (startY != null && vertical) {
-        setPullDistance((current) => {
-          if (current >= PULL_THRESHOLD) onRefreshRef.current();
-          return 0;
-        });
         setPulling(false);
+        setPullDistance((current) => {
+          if (current < PULL_THRESHOLD) return 0;
+          setRefreshing(true);
+          Promise.resolve(onRefreshRef.current()).finally(() => {
+            setRefreshing(false);
+            setPullDistance(0);
+          });
+          return PULL_THRESHOLD;
+        });
       }
       startX = null;
       startY = null;
@@ -132,5 +149,5 @@ export function usePullToRefresh(onRefresh, gestureRef) {
     };
   }, [gestureRef]);
 
-  return { scrollRef, pullDistance, pulling };
+  return { scrollRef, pullDistance, pulling, refreshing };
 }

@@ -61,7 +61,8 @@ function FixturesList({
   initialFixtureId,
   initialView,
   onConsumedInitialFixture,
-  pullContainerRef,
+  scrollRef,
+  refetchRef,
 }) {
   // Own clubs fetch, scoped to this page's own league -- not the
   // FixturesTab-level one below (that one only ever matches the actually
@@ -69,8 +70,12 @@ function FixturesList({
   // to resolve their own clubs' names/crests while it's mid-slide-in).
   const { clubs } = useClubs(league);
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
-  const { matchdays, loading, refreshing, refetch } = useFixtures(league);
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch, pullContainerRef);
+  const { matchdays, loading, refetch } = useFixtures(league);
+  // Plain assignment during render, same idiom as usePullToRefresh.js's own
+  // onRefreshRef -- FixturesTab's own tab-level pull-to-refresh hook reads
+  // this later, from an event handler, well after this render has
+  // committed. Only set for the active instance (see call site).
+  if (refetchRef) refetchRef.current = refetch;
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
   const matchdayFiltered = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
   // Additive to the matchday filter above, not a replacement -- the "Live"
@@ -117,7 +122,6 @@ function FixturesList({
         padding: '12px 16px 14px',
       }}
     >
-      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
       {!loading && visible.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
@@ -193,8 +197,16 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   const [selected, setSelected] = useState(null);
   const locale = DATE_LOCALES[language];
   // Whole-tab pull-to-refresh target -- see TransfersTab.jsx's own comment
-  // and usePullToRefresh.js's `gestureRef` for why.
+  // and usePullToRefresh.js's `gestureRef` for why. The hook itself lives
+  // here (not in FixturesList) so PullToRefreshIndicator can wrap -- and
+  // visually push down -- the header along with the list; refetchRef is
+  // how the active FixturesList instance's own refetch reaches back up.
   const pullContainerRef = useRef(null);
+  const refetchRef = useRef(() => {});
+  const { scrollRef: pullScrollRef, pullDistance, pulling, refreshing: pullRefreshing } = usePullToRefresh(
+    () => refetchRef.current(),
+    pullContainerRef
+  );
 
   // Confirmed live 2026-09-10 (same root cause first found in EuropaTab.jsx):
   // `selected.fixture` above is a snapshot of the row from the moment it
@@ -252,7 +264,8 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   };
 
   return (
-    <div ref={pullContainerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
         {/* League switcher stays first in every tab's header (Transfers,
             Tabelle already had this order) -- per explicit feedback, moved
@@ -346,10 +359,12 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
             initialFixtureId={slug === league ? initialFixtureId : null}
             initialView={slug === league ? initialView : null}
             onConsumedInitialFixture={slug === league ? onConsumedInitialFixture : undefined}
-            pullContainerRef={slug === league ? pullContainerRef : undefined}
+            scrollRef={slug === league ? pullScrollRef : undefined}
+            refetchRef={slug === league ? refetchRef : undefined}
           />
         )}
       />
+      </PullToRefreshIndicator>
 
       {liveSelectedFixture && (
         <FixtureDetailOverlay
