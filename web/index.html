@@ -77,18 +77,28 @@
         overscroll-behavior: none;
       }
 
-      /* Belt-and-suspenders against pinch-zoom on top of the viewport
-         meta's maximum-scale/user-scalable above -- iOS Safari (including
-         standalone PWAs) has ignored user-scalable=no for pinch gestures
-         specifically since iOS 10's accessibility change, so the meta tag
-         alone doesn't reliably block it there; touch-action does. pan-x
-         pan-y (not the bare "manipulation" keyword, which still permits
-         pinch-zoom) keeps panning/scrolling and tap responsiveness intact
-         everywhere else in the app while dropping pinch-zoom and
-         double-tap-to-zoom specifically. */
-      html, body {
-        touch-action: pan-x pan-y;
-      }
+      /* Reverted (2026-09-12): `touch-action: pan-x pan-y` on html/body,
+         added alongside the viewport meta's maximum-scale/user-scalable
+         above as a pinch-zoom belt-and-suspenders, broke pull-to-refresh
+         and (very likely) the league/competition swipe carousel on real
+         devices -- both rely on `e.preventDefault()` inside a non-passive
+         touchmove listener to substitute their own custom drag physics for
+         the browser's native behaviour, and granting `pan-x pan-y` at the
+         document root tells the browser upfront that it's free to commit
+         to native panning for a vertical or horizontal drag, which on at
+         least some engines pre-empts a later `preventDefault()` for that
+         same gesture. Confirmed live (2026-09-12): user-reported pull-to-
+         refresh "geht gar nicht mehr" right after this shipped -- a
+         synthetic-touch-event test couldn't reproduce it (dispatching
+         TouchEvents via JS bypasses the browser's own gesture arbitration
+         entirely, which is exactly the layer touch-action affects), but it
+         did confirm every other part of the gesture chain (axis-lock,
+         threshold, calling refetch) still works correctly, narrowing this
+         down to exactly this CSS. The viewport meta tag alone is the
+         standard, lower-risk way to block pinch-zoom; if it turns out not
+         to be enough on some device, touch-action would need scoping to
+         specific non-gesture regions instead of the whole document, not
+         reapplying here. */
 
       /* Nothing in the app should be selectable/copyable -- no text input
          fields exist anywhere in the UI (confirmed: no <input>/<textarea>
