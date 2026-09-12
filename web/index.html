@@ -20,7 +20,12 @@
          iOS PWA): both the status bar up top and the flush bottom nav
          render cleanly this way, user-approved -- settled state, not an
          open experiment. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- maximum-scale=1, user-scalable=no: this is an app shell with its
+         own fixed header/bottom-nav layout, not a document meant to be
+         zoomed -- pinch-zoom breaking that layout is a bug, not a missing
+         accessibility affordance (nothing here relies on native page zoom
+         to be readable; text sizing is already fixed by the design). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#0B0D10" />
     <!-- Confirmed live: without these two, iOS draws the status bar area
          as its own opaque white bar instead of letting the app's own
@@ -70,6 +75,19 @@
          actually stays put, not just the one that happened to set contain. */
       html, body {
         overscroll-behavior: none;
+      }
+
+      /* Belt-and-suspenders against pinch-zoom on top of the viewport
+         meta's maximum-scale/user-scalable above -- iOS Safari (including
+         standalone PWAs) has ignored user-scalable=no for pinch gestures
+         specifically since iOS 10's accessibility change, so the meta tag
+         alone doesn't reliably block it there; touch-action does. pan-x
+         pan-y (not the bare "manipulation" keyword, which still permits
+         pinch-zoom) keeps panning/scrolling and tap responsiveness intact
+         everywhere else in the app while dropping pinch-zoom and
+         double-tap-to-zoom specifically. */
+      html, body {
+        touch-action: pan-x pan-y;
       }
 
       /* Nothing in the app should be selectable/copyable -- no text input
