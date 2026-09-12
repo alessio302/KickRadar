@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import QuickFilters from './QuickFilters.jsx';
@@ -19,9 +19,9 @@ import { DATE_LOCALES } from '../i18n/languages.js';
 // club filter is ignored -- see LeagueCarousel.jsx's own comment for why a
 // mid-drag preview represents "what you're about to land on" rather than
 // something meant to be tapped).
-function TransfersList({ theme, t, language, league, officialOnly, activeFilter, onOpenProfile, onOpenSummary }) {
+function TransfersList({ theme, t, language, league, officialOnly, activeFilter, onOpenProfile, onOpenSummary, pullContainerRef }) {
   const { transfers, loading, refreshing, refetch } = useTransfers(league, { officialOnly });
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch, pullContainerRef);
 
   const filtered = useMemo(() => {
     if (!activeFilter) return transfers;
@@ -39,7 +39,7 @@ function TransfersList({ theme, t, language, league, officialOnly, activeFilter,
         padding: '12px 16px 14px',
       }}
     >
-      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
+      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading && (
           <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>
@@ -86,6 +86,10 @@ export default function TransfersTab({
   const [summaryTransfer, setSummaryTransfer] = useState(null);
   const [profilePlayer, setProfilePlayer] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  // Whole-tab pull-to-refresh target (header + list together) -- see
+  // usePullToRefresh.js's own `gestureRef` comment for why this needs to
+  // be the tab's own outer wrapper rather than just the scrolling list.
+  const pullContainerRef = useRef(null);
 
   // Immediate placeholder from the already-fetched, possibly-stale
   // `players` join (so the overlay isn't blank while the live call is in
@@ -100,7 +104,7 @@ export default function TransfersTab({
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div ref={pullContainerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
         <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
 
@@ -170,6 +174,7 @@ export default function TransfersTab({
             activeFilter={slug === league ? activeFilter : null}
             onOpenProfile={slug === league ? handleOpenProfile : undefined}
             onOpenSummary={slug === league ? setSummaryTransfer : undefined}
+            pullContainerRef={slug === league ? pullContainerRef : undefined}
           />
         )}
       />

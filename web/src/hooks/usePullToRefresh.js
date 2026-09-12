@@ -45,7 +45,19 @@ function dampen(rawDelta) {
 // the drag is dominantly vertical mirrors the same lock useLeagueCarousel
 // applies for "dominantly horizontal" -- a diagonal drag now commits to
 // whichever axis actually wins, never both.
-export function usePullToRefresh(onRefresh) {
+//
+// `gestureRef` (optional): per explicit feedback, pulling down only worked
+// with a finger already inside the scrolling list itself, not from
+// anywhere else in the tab (e.g. starting on the league switcher/header
+// above it). Every call site now owns a ref on its own outermost wrapper
+// (header + list together) and passes it in here -- touch listeners attach
+// to that instead of the list's own scrolling element, while `scrollRef`
+// (still returned, still attached to the actual scrolling div by the
+// caller) is used only to read `scrollTop`, which is what actually decides
+// whether a pull should be allowed to start. Falls back to `scrollRef`
+// itself when no `gestureRef` is given, so this stays backwards-compatible
+// for any future call site that only wants the old, list-scoped behaviour.
+export function usePullToRefresh(onRefresh, gestureRef) {
   const scrollRef = useRef(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [pulling, setPulling] = useState(false);
@@ -53,8 +65,9 @@ export function usePullToRefresh(onRefresh) {
   onRefreshRef.current = onRefresh;
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    const contentEl = scrollRef.current;
+    const el = gestureRef?.current ?? contentEl;
+    if (!el || !contentEl) return;
 
     let startX = null;
     let startY = null;
@@ -62,7 +75,7 @@ export function usePullToRefresh(onRefresh) {
     let vertical = null;
 
     const handleTouchStart = (e) => {
-      if (el.scrollTop <= 0) {
+      if (contentEl.scrollTop <= 0) {
         startX = e.touches[0].clientX;
         startY = e.touches[0].clientY;
         vertical = null;
@@ -83,7 +96,7 @@ export function usePullToRefresh(onRefresh) {
         if (!vertical) return;
       }
 
-      if (dy <= 0 || el.scrollTop > 0) {
+      if (dy <= 0 || contentEl.scrollTop > 0) {
         startY = null;
         setPulling(false);
         setPullDistance(0);
@@ -117,7 +130,7 @@ export function usePullToRefresh(onRefresh) {
       el.removeEventListener('touchend', handleTouchEnd);
       el.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, []);
+  }, [gestureRef]);
 
   return { scrollRef, pullDistance, pulling };
 }

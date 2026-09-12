@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useEuropaFixtures } from '../hooks/useEuropaFixtures.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import LeagueCarousel from './LeagueCarousel.jsx';
@@ -414,8 +414,8 @@ function pickActiveMatchday(fixtures) {
 // instance (see LeagueCarousel.jsx's own comment on why the preview one
 // stays non-interactive) -- EuropaFixtureRow's onClick already guards
 // against it being undefined.
-function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, refetch, refreshing, onSelectFixture }) {
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
+function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, refetch, refreshing, onSelectFixture, pullContainerRef }) {
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch, pullContainerRef);
   const activeMatchday = useMemo(() => pickActiveMatchday(fixtures), [fixtures]);
 
   const grouped = useMemo(() => {
@@ -447,7 +447,7 @@ function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchd
         padding: '0 16px 14px',
       }}
     >
-      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
+      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
 
       {loading && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
@@ -523,6 +523,13 @@ export default function EuropaTab({ theme, t, language }) {
   // via adjacentCompetition instead of LEAGUES/adjacentLeague.
   const swipeComp = (direction) => setSelectedComp(adjacentCompetition(selectedComp, direction).slug);
 
+  // Whole-tab pull-to-refresh target -- see TransfersTab.jsx's own comment
+  // and usePullToRefresh.js's `gestureRef` for why. Only meaningful for the
+  // Spiele sub-tab (EuropaFixturesList has a refetch to call); the Tabelle
+  // sub-tab is a client-side derived view with nothing of its own to
+  // re-fetch.
+  const pullContainerRef = useRef(null);
+
   return (
     // Same app-shell split as FixturesTab.jsx: a pinned, non-scrolling
     // header (selector + filters) as a flexShrink:0 sibling, then
@@ -531,7 +538,7 @@ export default function EuropaTab({ theme, t, language }) {
     // nested inside its scrolling box -- see this file's own git history
     // for why a position:fixed overlay nested inside a
     // WebkitOverflowScrolling:'touch' ancestor renders clipped on iOS.
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div ref={pullContainerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>
         <CompetitionSelector selected={selectedComp} theme={theme} onSelect={setSelectedComp} />
 
@@ -650,6 +657,7 @@ export default function EuropaTab({ theme, t, language }) {
               refetch={refetch}
               refreshing={refreshing}
               onSelectFixture={slug === selectedComp ? setSelectedFixture : undefined}
+              pullContainerRef={slug === selectedComp ? pullContainerRef : undefined}
             />
           )}
         />

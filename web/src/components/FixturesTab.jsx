@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import LiveCarousel from './LiveCarousel.jsx';
@@ -61,6 +61,7 @@ function FixturesList({
   initialFixtureId,
   initialView,
   onConsumedInitialFixture,
+  pullContainerRef,
 }) {
   // Own clubs fetch, scoped to this page's own league -- not the
   // FixturesTab-level one below (that one only ever matches the actually
@@ -69,7 +70,7 @@ function FixturesList({
   const { clubs } = useClubs(league);
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
   const { matchdays, loading, refreshing, refetch } = useFixtures(league);
-  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch);
+  const { scrollRef, pullDistance, pulling } = usePullToRefresh(refetch, pullContainerRef);
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
   const matchdayFiltered = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
   // Additive to the matchday filter above, not a replacement -- the "Live"
@@ -116,7 +117,7 @@ function FixturesList({
         padding: '12px 16px 14px',
       }}
     >
-      <PullToRefreshIndicator theme={theme} t={t} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
+      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={refreshing} />
       {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
       {!loading && visible.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
@@ -191,6 +192,9 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   // show that fixture's real league, not this tab's currently active one.
   const [selected, setSelected] = useState(null);
   const locale = DATE_LOCALES[language];
+  // Whole-tab pull-to-refresh target -- see TransfersTab.jsx's own comment
+  // and usePullToRefresh.js's `gestureRef` for why.
+  const pullContainerRef = useRef(null);
 
   // Confirmed live 2026-09-10 (same root cause first found in EuropaTab.jsx):
   // `selected.fixture` above is a snapshot of the row from the moment it
@@ -248,7 +252,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div ref={pullContainerRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
         {/* League switcher stays first in every tab's header (Transfers,
             Tabelle already had this order) -- per explicit feedback, moved
@@ -342,6 +346,7 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
             initialFixtureId={slug === league ? initialFixtureId : null}
             initialView={slug === league ? initialView : null}
             onConsumedInitialFixture={slug === league ? onConsumedInitialFixture : undefined}
+            pullContainerRef={slug === league ? pullContainerRef : undefined}
           />
         )}
       />
