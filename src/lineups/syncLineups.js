@@ -7,6 +7,7 @@ import { resolveClub } from '../news/clubMatch.js';
 import { normalize } from '../util/normalize.js';
 import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
+import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
 
 // Confirmed live (Kazakhstan Premier League, 2026-08-25, still true after
 // switching providers from Highlightly to GOAL API): a real lineup becomes
@@ -396,6 +397,25 @@ export async function syncLineups() {
           if (rows.length > 0) {
             const { error: eventsErr } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
             if (eventsErr) console.error(`Failed to store events for fixture ${f.id}:`, eventsErr.message);
+            else {
+              // Now safe to call from here (previously deliberately never
+              // was, see matchEventNotifier.js's own comment on why): that
+              // restriction only existed because a domestic fixture's live
+              // goals could still be sitting in match_events under
+              // syncLiveEvents.js's own different event_key scheme, so
+              // notifying again here with these rows' own keys would have
+              // re-notified everything a second time right as the match
+              // ended. Domestic fixtures have exactly one match_events
+              // writer now -- this one, live or finished alike -- so
+              // notified_match_events' own (fixture_id, event_key)
+              // insert-as-claim naturally covers both without ever
+              // double-notifying the same real event.
+              try {
+                await notifyFavoritedFixtureEvents(supabase, f.id, league.slug, rows);
+              } catch (err) {
+                console.error(`Failed to notify favorited-fixture events for fixture ${f.id}:`, err.message);
+              }
+            }
           }
           // events_synced_at is a permanent "this fixture is fully and
           // finally done, never fetch again" flag (see this file's own top

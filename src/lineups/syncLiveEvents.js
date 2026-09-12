@@ -1,12 +1,24 @@
 // Live in-play events (goals/cards/substitutions) via GOAL API's WebSocket
-// feed -- the primary path while a match is being played. The REST path in
-// syncLineups.js (getFixtureEvents/getFixtureCards/getFixtureSubstitutions)
-// stays as the safety net that runs once per fixture after it finishes and
-// fully replaces whatever this file wrote (see its own comment on the
-// delete-before-insert there): GOAL API's live match_update payload has no
-// stable per-event id the way its REST endpoints do, so this file can only
-// key rows by content, and that content-based key needs to be reconciled
-// away rather than trusted forever.
+// feed. Historically this connection's own match_events write for every
+// tracked fixture, domestic and European alike -- as of 2026-09-12 it's
+// down to European (UEFA_COMPETITIONS) fixtures only, still as their sole
+// source (syncEuropeanLineups.js has no REST-based events backfill of its
+// own yet, unlike its domestic counterpart -- see below). Domestic
+// fixtures' match_events now come exclusively from syncLineups.js's own
+// REST fetch (getFixtureEvents/getFixtureCards/getFixtureSubstitutions),
+// which now refreshes a still-'live' fixture on every one of that job's
+// ~15min runs, not just once after it finishes. Confirmed live the two
+// writers side by side produced real duplicates (the same goal stored
+// twice, once under each path's own incompatible event_key scheme -- this
+// file's is a synthetic content-based key, since the WS payload has no
+// stable per-event id the way the REST endpoints do) the moment the REST
+// side started covering live fixtures too, so this file backed off rather
+// than the two trying to reconcile keys that can't reliably match. This
+// also means domestic match_events staleness, however it happens (a dead
+// connection, a silently stalled one, one specific match going quiet, a
+// dropped message, or anything not yet seen), self-heals within that
+// job's own cadence instead of needing a dedicated fix here for each new
+// way this WS can misbehave.
 //
 // Deliberately never touches DOMESTIC fixtures' status/home_score/
 // away_score -- syncLiveScores.js (football-data.org) already owns that,
@@ -23,8 +35,9 @@
 // stuck on 'scheduled' for the rest of the match despite GOAL API's own
 // REST snapshot already showing the correct live score). That file is a
 // REST poll backstop for status/home_score/away_score alone -- this
-// connection stays the only writer for live_minute and match_events,
-// which have no REST equivalent to fall back to.
+// connection stays the only writer for live_minute (all leagues) and
+// match_events (European only, per above), neither of which has a REST
+// equivalent it can fall back to yet.
 //
 // One WS connection total, tracking BOTH domestic and European matches at
 // once -- GOAL API's FREE plan caps maxConnections at 1 (confirmed live,
@@ -79,17 +92,19 @@ function sleep(ms) {
 // schedule's cadence (also 15min), same reasoning as syncLiveScores.js's own
 // JOB_BUDGET_MS -- this file also holds one long-lived WS connection for the
 // whole run, which needs to close cleanly before GitHub Actions would kill
-// it. User-reported: goals/cards/subs sometimes took minutes to show up even
-// across several overlay close/reopen cycles -- confirmed the underlying
-// cause is upstream of the frontend entirely (this connection is the sole
-// writer for match_events during live play, no webhook/REST catch-up exists
-// while a match is still in progress, see this file's own top comment), and
-// part of that is structural: at the old 13min, every single 15-min cycle
-// had a guaranteed ~2min window where nothing was listening at all, whether
-// or not GOAL API's own feed was behaving. Bumped to 14 -- checkout/npm ci
-// before this script even starts already eats some of the workflow's 15min
-// hard timeout, so this still leaves comfortable headroom rather than
-// pushing right up against it, while shrinking the guaranteed gap to ~1min.
+// it. User-reported (2026-09-12, before match_events moved to
+// syncLineups.js's own REST refresh for domestic fixtures -- see this
+// file's top comment): goals/cards/subs sometimes took minutes to show up
+// even across several overlay close/reopen cycles, confirmed upstream of
+// the frontend entirely, and part of it was structural: at the old 13min,
+// every single 15-min cycle had a guaranteed ~2min window where nothing
+// was listening at all, whether or not GOAL API's own feed was behaving.
+// Bumped to 14 -- checkout/npm ci before this script even starts already
+// eats some of the workflow's 15min hard timeout, so this still leaves
+// comfortable headroom rather than pushing right up against it, while
+// shrinking the guaranteed gap to ~1min. Still relevant for live_minute
+// (every league) and match_events (European only) even now that domestic
+// match_events has its own independent backstop.
 const JOB_BUDGET_MS = 14 * 60 * 1000;
 
 // A connected socket that's gone quiet for this long, after having already
@@ -602,6 +617,34 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
           if (statusErr) console.error(`Failed to update status/score for European fixture ${info.fixtureId}:`, statusErr.message);
         }
       }
+
+      // Domestic fixtures no longer get match_events written from here at
+      // all (2026-09-12) -- confirmed live this WS payload's lack of a
+      // stable per-event id (see this file's own top comment) meant the
+      // only way to reconcile a retraction or a one-off incomplete
+      // snapshot was this increasingly elaborate two-strikes/score.changed
+      // machinery below, and it still had a gap no version of it could
+      // close: one specific subscribed match going silent while the
+      // connection and every other match on it stayed healthy (confirmed
+      // live, Real Madrid vs Rayo Vallecano) -- a failure shape this
+      // per-match logic can't detect by construction, since it only ever
+      // reacts to a match_update that arrives, never to one that doesn't.
+      // Worse, running this *alongside* syncLineups.js's own REST-based
+      // events refresh (now extended to still-'live' domestic fixtures,
+      // not just finished ones, specifically to close that gap) produced
+      // real, immediate duplicates: both paths wrote the same real goal
+      // under their own different key scheme (this file's synthetic
+      // content-based one, that file's real GOAL API id), so both stuck
+      // around side by side. Domestic fixtures now have exactly one
+      // match_events writer -- syncLineups.js's REST fetch, bounded to
+      // that job's own ~15min cadence -- with this WS connection staying
+      // domestic fixtures' fast path for live_minute alone.
+      //
+      // Still the only writer for European fixtures below, unchanged:
+      // syncEuropeanLineups.js has no equivalent REST backfill yet (a
+      // natural next step, not done here to keep this fix scoped to the
+      // domestic bug actually reported).
+      if (info.kind !== 'european') return;
 
       const count = countLiveEvents(data);
       if (lastCounts.get(goalApiId) === count) return; // no new goal/card/sub since last push

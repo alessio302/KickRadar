@@ -1,20 +1,25 @@
 // Pushes new goals/cards/subs to whichever push subscriptions favorited
-// the fixture they belong to. Called directly from syncLiveEvents.js right
-// after it upserts a batch of live event rows, so a favorited match's
-// events go out within the same WS push that wrote them -- no separate
-// polling job needed, unlike the earlier version of this feature (see git
-// history, "Revert favorite-fixtures / match-event push feature"): that
-// one had to fetch Highlightly's /events endpoint itself per favorited
-// fixture, which didn't fit alongside the existing lineups sync's share of
-// a 100 req/day budget. This version costs nothing extra -- it only
-// filters and pushes rows syncLiveEvents.js already fetched and stored for
-// every match, favorited or not.
+// the fixture they belong to. Costs nothing extra to call -- it only
+// filters and pushes rows the caller already fetched and stored for every
+// match, favorited or not (unlike the earlier version of this feature, see
+// git history "Revert favorite-fixtures / match-event push feature", which
+// fetched Highlightly's /events endpoint itself per favorited fixture).
 //
-// Deliberately never called from syncLineups.js's post-finish REST
-// reconciliation: that pass deletes and re-inserts a fixture's entire
-// event set to correct the stored data (see its own comment on why), and
-// would otherwise re-notify every event a second time right as the match
-// ends, since its event_key scheme differs from the live path's.
+// Two callers as of 2026-09-12, split by league type:
+// - syncLineups.js, right after it upserts a domestic fixture's own REST-
+//   fetched events (both for a still-'live' fixture, refreshed on every
+//   run, and once more when it finishes) -- domestic match_events has
+//   exactly one writer now, so this is the only place that needs to call
+//   it for those leagues.
+// - syncLiveEvents.js, right after it upserts a batch of live event rows
+//   for a EUROPEAN fixture -- still that WS connection's sole source (see
+//   its own top comment), so still notified from there.
+// notified_match_events' own (fixture_id, event_key) insert-as-claim is
+// what keeps either caller from double-notifying the same real event
+// across repeated calls, not any coordination between the two files --
+// each event's own event_key only ever comes from ONE of them for a given
+// fixture (whichever league it belongs to), so there's no cross-file key
+// collision to worry about either.
 import { sendPushToFixtureFavoriters } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 
