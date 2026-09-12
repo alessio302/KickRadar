@@ -107,6 +107,16 @@ export function useLeagueCarousel(activeLeague, onCommit, adjacent = adjacentLea
 
       if (horizontal == null) {
         if (Math.abs(dx) < DIRECTION_LOCK && Math.abs(dy) < DIRECTION_LOCK) return;
+        // A real swipe's very first sample past the lock distance is often
+        // slightly diagonal (a thumb drifts a few px vertically before
+        // straightening out) -- deciding off that one ambiguous sample used
+        // to permanently rule out "horizontal" for the rest of the gesture
+        // the moment dy edged past dx, even by a single pixel. Confirmed
+        // live: swiping the Tabelle tab did nothing because of exactly this.
+        // Only commit once one axis clearly dominates (some margin, not a
+        // razor's edge); otherwise keep waiting for a clearer sample instead
+        // of deciding "vertical" and locking it in for good.
+        if (Math.abs(dx) <= Math.abs(dy) * 2 && Math.abs(dy) <= Math.abs(dx) * 2) return;
         horizontal = Math.abs(dx) > Math.abs(dy);
         if (!horizontal) return;
         setDirection(dx < 0 ? 'next' : 'prev');

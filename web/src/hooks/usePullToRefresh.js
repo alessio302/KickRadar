@@ -94,6 +94,13 @@ export function usePullToRefresh(onRefresh, gestureRef) {
 
       if (vertical == null) {
         if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) return;
+        // Mirrors useLeagueCarousel.js's own fix: a horizontal swipe's first
+        // sample past the lock distance can be slightly diagonal (a couple
+        // px of vertical drift before the finger straightens out) -- only
+        // commit to "vertical" once dy clearly dominates dx, not the instant
+        // it edges ahead by a pixel, so a swipe attempt doesn't get read as
+        // a pull just because of that early ambiguity.
+        if (Math.abs(dx) <= Math.abs(dy) * 2 && Math.abs(dy) <= Math.abs(dx) * 2) return;
         vertical = Math.abs(dy) > Math.abs(dx);
         if (!vertical) return;
       }
