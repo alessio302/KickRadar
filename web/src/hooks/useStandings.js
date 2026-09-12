@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { useLeagueId } from './useLeagueId.js';
 
@@ -16,6 +16,14 @@ export function useStandings(leagueSlug) {
   const [table, setTable] = useState(() => cache.get(leagueId) ?? []);
   const [loading, setLoading] = useState(() => leagueId == null || !cache.has(leagueId));
 
+  const buildQuery = useCallback(() => {
+    return supabase
+      .from('standings')
+      .select('club_id, position, played, won, draw, lost, points, goals_for, goals_against, goal_difference')
+      .eq('league_id', leagueId)
+      .order('position', { ascending: true });
+  }, [leagueId]);
+
   useEffect(() => {
     if (leagueId == null) return;
     let cancelled = false;
@@ -26,26 +34,35 @@ export function useStandings(leagueSlug) {
     } else {
       setLoading(true);
     }
-    supabase
-      .from('standings')
-      .select('club_id, position, played, won, draw, lost, points, goals_for, goals_against, goal_difference')
-      .eq('league_id', leagueId)
-      .order('position', { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error('Failed to load standings for league', leagueSlug, error);
-          if (!cached) setTable([]);
-        } else {
-          cache.set(leagueId, data);
-          setTable(data);
-        }
-        setLoading(false);
-      });
+    buildQuery().then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to load standings for league', leagueSlug, error);
+        if (!cached) setTable([]);
+      } else {
+        cache.set(leagueId, data);
+        setTable(data);
+      }
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [leagueId, leagueSlug]);
+  }, [leagueId, leagueSlug, buildQuery]);
 
-  return { table, loading };
+  // Re-queries Supabase directly for pull-to-refresh -- same rationale as
+  // useFixtures.js's own refetch(): this never touches football-data.org,
+  // just re-reads whatever the last sync already stored.
+  const refetch = useCallback(async () => {
+    if (leagueId == null) return;
+    const { data, error } = await buildQuery();
+    if (error) {
+      console.error('Failed to refresh standings for league', leagueSlug, error);
+    } else {
+      cache.set(leagueId, data);
+      setTable(data);
+    }
+  }, [leagueId, leagueSlug, buildQuery]);
+
+  return { table, loading, refetch };
 }

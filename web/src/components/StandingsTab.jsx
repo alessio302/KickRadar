@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import ClubJersey from './ClubJersey.jsx';
 import ClubDetailOverlay from './ClubDetailOverlay.jsx';
+import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import { TopScorersTable } from './TopScorersTable.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useStandings } from '../hooks/useStandings.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { leagueBySlug, zoneForPosition } from '../lib/leagues.js';
 
 // Fixed, not theme-driven -- these identify a *competition* zone (Champions
@@ -78,14 +80,21 @@ function ZoneLegend({ theme, t, league }) {
 // is being dragged into view), each instance fetching its own data.
 // Exported so FixtureDetailOverlay.jsx's own "Tabelle" tab can reuse the
 // exact same component (per explicit request: 1:1 identical to this
-// tab), rather than a second copy of the same markup.
-export function StandingsTable({ theme, t, league, onSelectClub }) {
+// tab), rather than a second copy of the same markup. scrollRef/refetchRef
+// are optional (StandingsTab.jsx's own tab-level pull-to-refresh passes
+// them for its active instance; FixtureDetailOverlay's embedded use leaves
+// them unset, same plain display as before).
+export function StandingsTable({ theme, t, league, onSelectClub, scrollRef, refetchRef }) {
   const { clubs } = useClubs(league);
-  const { table, loading } = useStandings(league);
+  const { table, loading, refetch } = useStandings(league);
+  // Plain assignment during render, same idiom as usePullToRefresh.js's own
+  // onRefreshRef -- the tab-level hook call reads this later, from an event
+  // handler, well after this render has committed.
+  if (refetchRef) refetchRef.current = refetch;
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.id, c])), [clubs]);
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
+    <div ref={scrollRef} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
       {loading && <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>}
       {!loading && table.length === 0 && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.standings.empty}</p>
@@ -160,9 +169,23 @@ export function StandingsTable({ theme, t, league, onSelectClub }) {
 export default function StandingsTab({ theme, t, language, league, onSelectLeague, onSwipeLeague }) {
   const [selectedClub, setSelectedClub] = useState(null);
   const [subTab, setSubTab] = useState('table');
+  // Whole-tab pull-to-refresh target -- see TransfersTab.jsx's own comment
+  // and usePullToRefresh.js's `gestureRef` for why. The hook itself lives
+  // here (not in StandingsTable/TopScorersTable) so PullToRefreshIndicator
+  // can wrap -- and visually push down -- the header along with the list.
+  // refetchRef is how the active sub-tab's own refetch (table or scorers,
+  // only known inside whichever is currently rendered) reaches back up
+  // here; switching sub-tabs just points it at a different refetch.
+  const pullContainerRef = useRef(null);
+  const refetchRef = useRef(() => {});
+  const { scrollRef: pullScrollRef, pullDistance, pulling, refreshing: pullRefreshing } = usePullToRefresh(
+    () => refetchRef.current(),
+    pullContainerRef
+  );
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
         <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
       </div>
@@ -207,12 +230,29 @@ export default function StandingsTab({ theme, t, language, league, onSelectLeagu
         onSwitchLeague={onSwipeLeague}
         renderPage={(slug) =>
           subTab === 'table' ? (
-            <StandingsTable key={`${slug}-table`} theme={theme} t={t} league={slug} onSelectClub={slug === league ? setSelectedClub : undefined} />
+            <StandingsTable
+              key={`${slug}-table`}
+              theme={theme}
+              t={t}
+              league={slug}
+              onSelectClub={slug === league ? setSelectedClub : undefined}
+              scrollRef={slug === league ? pullScrollRef : undefined}
+              refetchRef={slug === league ? refetchRef : undefined}
+            />
           ) : (
-            <TopScorersTable key={`${slug}-scorers`} theme={theme} t={t} language={language} league={slug} />
+            <TopScorersTable
+              key={`${slug}-scorers`}
+              theme={theme}
+              t={t}
+              language={language}
+              league={slug}
+              scrollRef={slug === league ? pullScrollRef : undefined}
+              refetchRef={slug === league ? refetchRef : undefined}
+            />
           )
         }
       />
+      </PullToRefreshIndicator>
 
       {selectedClub && (
         <ClubDetailOverlay

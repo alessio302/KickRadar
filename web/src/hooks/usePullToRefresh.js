@@ -85,17 +85,7 @@ export function usePullToRefresh(onRefresh, gestureRef) {
     let startY = null;
     // null = undecided, false = horizontal/ignored this touch, true = vertical pull live.
     let vertical = null;
-
-    const handleTouchStart = (e) => {
-      if (contentEl.scrollTop <= 0) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        vertical = null;
-      } else {
-        startX = null;
-        startY = null;
-      }
-    };
+    let moveAttached = false;
 
     const handleTouchMove = (e) => {
       if (startY == null || vertical === false) return;
@@ -119,6 +109,39 @@ export function usePullToRefresh(onRefresh, gestureRef) {
       setPullDistance(dampen(dy));
     };
 
+    const detachMove = () => {
+      if (!moveAttached) return;
+      el.removeEventListener('touchmove', handleTouchMove);
+      moveAttached = false;
+    };
+
+    // User-reported: scrolling inside a genuinely long/scrollable list felt
+    // like it was "competing" with the pull gesture. Root cause: touchmove
+    // has to be non-passive (see this hook's own top comment for why --
+    // preventDefault() has to be available once a pull is confirmed), and a
+    // *permanently* registered non-passive listener forces the browser to
+    // synchronously ask this handler before it can commit to its own fast,
+    // compositor-thread scroll path -- true for every touchmove anywhere in
+    // the gesture area, even ones this handler immediately no-ops on
+    // (startY == null, i.e. the list wasn't at the top). That's what read as
+    // sluggish/competing scrolling deeper in a long list. Attaching
+    // touchmove only for the duration of a touch that actually STARTS at
+    // scrollTop <= 0 (a genuine pull candidate) keeps the browser's fast
+    // path fully available for every other touch, which is the vast
+    // majority of scrolling in anything long enough to need it.
+    const handleTouchStart = (e) => {
+      if (contentEl.scrollTop <= 0) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        vertical = null;
+        el.addEventListener('touchmove', handleTouchMove, { passive: false });
+        moveAttached = true;
+      } else {
+        startX = null;
+        startY = null;
+      }
+    };
+
     const handleTouchEnd = () => {
       if (startY != null && vertical) {
         setPulling(false);
@@ -135,17 +158,17 @@ export function usePullToRefresh(onRefresh, gestureRef) {
       startX = null;
       startY = null;
       vertical = null;
+      detachMove();
     };
 
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
-    el.addEventListener('touchmove', handleTouchMove, { passive: false });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
     el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
     return () => {
       el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
       el.removeEventListener('touchcancel', handleTouchEnd);
+      detachMove();
     };
   }, [gestureRef]);
 

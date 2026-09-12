@@ -30,8 +30,13 @@ function NumCell({ children, theme }) {
   );
 }
 
-export function TopScorersTable({ theme, t, language, league }) {
-  const { scorers, loading } = useTopScorers(league);
+export function TopScorersTable({ theme, t, language, league, scrollRef, refetchRef }) {
+  const { scorers, loading, refetch } = useTopScorers(league);
+  // Plain assignment during render, same idiom as usePullToRefresh.js's own
+  // onRefreshRef -- StandingsTab.jsx's own tab-level pull-to-refresh hook
+  // reads this later, from an event handler, well after this render has
+  // committed.
+  if (refetchRef) refetchRef.current = refetch;
   const locale = DATE_LOCALES[language];
 
   const [profilePlayer, setProfilePlayer] = useState(null);
@@ -55,7 +60,7 @@ export function TopScorersTable({ theme, t, language, league }) {
   };
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
+    <div ref={scrollRef} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
       {loading && (
         <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
           {t.common.loading}
