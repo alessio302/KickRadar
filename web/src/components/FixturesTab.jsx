@@ -250,9 +250,14 @@ export default function FixturesTab({ theme, t, language, league, onSelectLeague
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
-        <LiveCarousel theme={theme} t={t} onSelectFixture={openFromCarousel} />
-
+        {/* League switcher stays first in every tab's header (Transfers,
+            Tabelle already had this order) -- per explicit feedback, moved
+            above the live carousel here too so it's the first thing seen
+            and doesn't shift position depending on whether anything is
+            live right now. */}
         <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
+
+        <LiveCarousel theme={theme} t={t} onSelectFixture={openFromCarousel} />
 
         <div
           style={{

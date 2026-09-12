@@ -111,7 +111,7 @@ function EuropaStandingsPanel({ theme, t, fixtures }) {
   ];
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', padding: '8px 16px 14px' }}>
+    <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', padding: '8px 16px 14px' }}>
       {/* Column headers -- mirrors StandingsTab.jsx exactly */}
       <div style={{ display: 'flex', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid ${theme.border}` }}>
         <div style={{ width: '3px', flexShrink: 0 }} />
@@ -654,10 +654,21 @@ export default function EuropaTab({ theme, t, language }) {
           )}
         />
       ) : (
-        <EuropaStandingsPanel
-          theme={theme}
-          t={t}
-          fixtures={data[selectedComp] ?? []}
+        // Same swipe-to-switch as the Spiele sub-tab above -- per explicit
+        // feedback, the Tabelle sub-tab had no way to swipe between UCL/
+        // UEL/UECL, unlike every other competition/league page in the app.
+        <LeagueCarousel
+          league={selectedComp}
+          onSwitchLeague={swipeComp}
+          adjacent={adjacentCompetition}
+          renderPage={(slug) => (
+            <EuropaStandingsPanel
+              key={slug}
+              theme={theme}
+              t={t}
+              fixtures={data[slug] ?? []}
+            />
+          )}
         />
       )}
 
