@@ -148,9 +148,22 @@ export async function syncLineups() {
     .gte('kickoff_at', pastCutoff);
   if (frErr) throw frErr;
 
+  // Separate from nearKickoff above (which is scoped to LOOKBACK_MIN/
+  // LOOKAHEAD_MIN around kickoff_at, sized for lineup confirmation, not for
+  // covering a whole match) -- a fixture deep into a long second half, extra
+  // time, or one this job simply hasn't run for in a while could already
+  // have drifted outside that window while still genuinely 'live'. Explicit
+  // status filter instead, so eventsNeeded()'s own live-events refresh below
+  // never depends on kickoff timing at all.
+  const { data: currentlyLive, error: liveErr } = await supabase
+    .from('fixtures')
+    .select('id, league_id, home_club_id, away_club_id, kickoff_at, status, events_synced_at, goal_api_id')
+    .eq('status', 'live');
+  if (liveErr) throw liveErr;
+
   const nearKickoffIds = new Set(nearKickoff.map((f) => f.id));
   const fixturesById = new Map();
-  for (const f of [...nearKickoff, ...finishedRecent]) fixturesById.set(f.id, f);
+  for (const f of [...nearKickoff, ...finishedRecent, ...currentlyLive]) fixturesById.set(f.id, f);
   const candidates = [...fixturesById.values()];
   if (candidates.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
@@ -176,7 +189,23 @@ export async function syncLineups() {
     const minutesSinceKickoff = (now.getTime() - new Date(f.kickoff_at).getTime()) / 60000;
     return minutesSinceKickoff <= LINEUP_GIVE_UP_MIN;
   };
-  const eventsNeeded = (f) => f.status === 'finished' && !f.events_synced_at;
+  // User-reported: goals/cards/subs sometimes just never arrived during a
+  // live match, sitting missing for the rest of it -- confirmed live
+  // (2026-09-12, Real Madrid vs Rayo Vallecano) that GOAL API's own REST
+  // view already had a goal syncLiveEvents.js's WebSocket never wrote,
+  // despite that connection being otherwise healthy (a different match on
+  // the same connection kept updating fine). That WS is inherently a best-
+  // effort push with no delivery guarantee and, per this file's own
+  // buildEventRows comment, no stable per-event id to reconcile against --
+  // rather than chasing each new way it can silently drop something with
+  // another bespoke watchdog, a 'live' fixture now gets the exact same
+  // authoritative REST fetch + full-replace treatment as a freshly-finished
+  // one below, just repeated on every run instead of once. Bounds any WS
+  // gap, whatever its cause, to this job's own ~15min cadence instead of
+  // "however long until full-time" -- unconditional (no finished-count-style
+  // guard) since there's no cheap signal to know in advance whether
+  // anything changed for a match still being played.
+  const eventsNeeded = (f) => f.status === 'live' || (f.status === 'finished' && !f.events_synced_at);
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
   // checked: 0, not candidates.length -- candidates is the raw DB query
@@ -355,20 +384,37 @@ export async function syncLineups() {
           // already written rows for this fixture while it was live, keyed
           // by content (its WS payload has no stable per-event id, unlike
           // these REST endpoints) -- clearing first guarantees the row set
-          // a finished fixture ends up with is exactly GOAL API's REST
-          // data, with no leftover live-only duplicates sitting alongside it.
+          // ends up exactly matching GOAL API's own REST data, with no
+          // leftover WS-only duplicates sitting alongside it. Runs on every
+          // tick for a still-'live' fixture now (see eventsNeeded() above),
+          // not just once at full-time -- each pass is a clean, independent
+          // "replace with current REST truth", so repeating it mid-match is
+          // exactly as safe as the original once-at-finish call, just more
+          // frequent.
           const { error: deleteErr } = await supabase.from('match_events').delete().eq('fixture_id', f.id);
           if (deleteErr) console.error(`Failed to clear existing events for fixture ${f.id}:`, deleteErr.message);
           if (rows.length > 0) {
             const { error: eventsErr } = await supabase.from('match_events').upsert(rows, { onConflict: 'fixture_id,event_key' });
             if (eventsErr) console.error(`Failed to store events for fixture ${f.id}:`, eventsErr.message);
           }
-          const { error: markErr } = await supabase
-            .from('fixtures')
-            .update({ events_synced_at: new Date().toISOString() })
-            .eq('id', f.id);
-          if (markErr) console.error(`Failed to mark events_synced_at for fixture ${f.id}:`, markErr.message);
-          else eventsFetched += 1;
+          // events_synced_at is a permanent "this fixture is fully and
+          // finally done, never fetch again" flag (see this file's own top
+          // comment on LINEUP_GIVE_UP_MIN/PAST_WINDOW_DAYS) -- eventsNeeded()
+          // doesn't even consult it for a 'live' fixture, so setting it here
+          // wouldn't currently change this run's own behavior, but it would
+          // still be a lie: the fixture isn't done, it's still being played.
+          // Reserved for the one point that's actually true, same as before
+          // this change -- the moment status flips to 'finished'.
+          if (f.status === 'finished') {
+            const { error: markErr } = await supabase
+              .from('fixtures')
+              .update({ events_synced_at: new Date().toISOString() })
+              .eq('id', f.id);
+            if (markErr) console.error(`Failed to mark events_synced_at for fixture ${f.id}:`, markErr.message);
+            else eventsFetched += 1;
+          } else {
+            eventsFetched += 1;
+          }
         }
       }
     }
