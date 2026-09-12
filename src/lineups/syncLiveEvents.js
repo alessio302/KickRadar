@@ -75,11 +75,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Bounded below the workflow's own job timeout and below the outer
-// schedule's cadence, same reasoning as syncLiveScores.js's JOB_BUDGET_MS --
-// this file also holds one long-lived WS connection for the whole run,
-// which needs to close cleanly before GitHub Actions would kill it.
-const JOB_BUDGET_MS = 13 * 60 * 1000;
+// Bounded below the workflow's own job timeout (15min) and below the outer
+// schedule's cadence (also 15min), same reasoning as syncLiveScores.js's own
+// JOB_BUDGET_MS -- this file also holds one long-lived WS connection for the
+// whole run, which needs to close cleanly before GitHub Actions would kill
+// it. User-reported: goals/cards/subs sometimes took minutes to show up even
+// across several overlay close/reopen cycles -- confirmed the underlying
+// cause is upstream of the frontend entirely (this connection is the sole
+// writer for match_events during live play, no webhook/REST catch-up exists
+// while a match is still in progress, see this file's own top comment), and
+// part of that is structural: at the old 13min, every single 15-min cycle
+// had a guaranteed ~2min window where nothing was listening at all, whether
+// or not GOAL API's own feed was behaving. Bumped to 14 -- checkout/npm ci
+// before this script even starts already eats some of the workflow's 15min
+// hard timeout, so this still leaves comfortable headroom rather than
+// pushing right up against it, while shrinking the guaranteed gap to ~1min.
+const JOB_BUDGET_MS = 14 * 60 * 1000;
+
+// A connected socket that's gone quiet for this long, after having already
+// proven itself alive with at least one real match_update, is either GOAL
+// API silently stalling it (confirmed live elsewhere in this file: it can
+// also close outright within seconds of a successful subscribe with zero
+// messages ever delivered -- this is the same failure mode's other shape,
+// a connection that never closes but also never delivers again) or some
+// other break this end can't otherwise detect, since neither a 'close' nor
+// an 'error' event fires for it. Left unhandled, that silence would just
+// sit there un-reconnected for the rest of the run's own JOB_BUDGET_MS
+// deadline -- exactly the "minutes of no updates" symptom this is meant to
+// close off. 90s is well past the normal live-minute tick cadence a genuine
+// in-play match keeps producing match_update for (GOAL API pushes one on
+// essentially every elapsed-minute change, not just on a goal/card/sub), so
+// this shouldn't false-positive on a normal quiet stretch of play.
+const STALE_CONNECTION_MS = 90 * 1000;
+const STALE_CHECK_INTERVAL_MS = 15 * 1000;
 
 // How often to re-scan our own fixtures table for matches that have gone
 // live (or are about to) since the run started, and subscribe to them over
@@ -425,12 +453,21 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
     let settled = false;
     let rescanTimer = null;
     let deadlineTimer = null;
+    let staleCheckTimer = null;
+    // Set on every match_update this connection actually receives (whether
+    // or not it's for a match we're tracking -- this is a socket-health
+    // signal, not a per-match one). Stays null until the first one arrives,
+    // so the watchdog never fires before this connection has proven it's
+    // receiving anything at all (e.g. a run whose only candidates haven't
+    // kicked off yet, still waiting on their first tick).
+    let lastMatchUpdateAt = null;
 
     const finish = (reachedDeadline) => {
       if (settled) return;
       settled = true;
       clearInterval(rescanTimer);
       clearTimeout(deadlineTimer);
+      clearInterval(staleCheckTimer);
       try {
         ws.close();
       } catch {
@@ -440,6 +477,13 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
     };
 
     deadlineTimer = setTimeout(() => finish(true), Math.max(deadline - Date.now(), 0));
+
+    staleCheckTimer = setInterval(() => {
+      if (lastMatchUpdateAt == null) return;
+      if (Date.now() - lastMatchUpdateAt <= STALE_CONNECTION_MS) return;
+      console.error(`Live events: no match_update in ${STALE_CONNECTION_MS / 1000}s, reconnecting.`);
+      finish(false);
+    }, STALE_CHECK_INTERVAL_MS);
 
     const subscribeTo = (goalApiId) => {
       ws.send(JSON.stringify({ type: 'subscribe', resource: 'match', matchId: goalApiId }));
@@ -517,6 +561,7 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
       }
 
       if (msg.type !== 'match_update') return;
+      lastMatchUpdateAt = Date.now();
       counts.updatesHandled += 1;
 
       const data = msg.data;
