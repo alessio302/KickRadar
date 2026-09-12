@@ -9,6 +9,7 @@
 // Bosch tagged "Midfielder" in the lineup vs "Defender" on his profile)
 // would otherwise never self-heal. One-off script, removed once run.
 import { getSupabaseClient } from '../db/supabaseClient.js';
+import { fetchAllRows } from '../db/fetchAllRows.js';
 import { normalize } from '../util/normalize.js';
 
 function correctedPosition(entry, positionByGoalApiId, positionByNormalizedName) {
@@ -33,19 +34,31 @@ function fixPlayers(players, positionByGoalApiId, positionByNormalizedName) {
 export async function backfillLineupPositions() {
   const supabase = getSupabaseClient();
 
-  const { data: allPlayers, error: playersErr } = await supabase.from('players').select('goal_api_id, normalized_name, position');
-  if (playersErr) throw playersErr;
+  // fetchAllRows(), not a plain .select() -- confirmed live this run
+  // (2026-09-12, same class of bug as syncPlayerProfiles.js's own fix on
+  // 2026-09-06): players has grown well past PostgREST's default 1000-row
+  // response cap, so an unpaginated select here silently missed most of
+  // the table. First attempt at this backfill reported updated: 90 but
+  // missed the exact two players (Zeno Van Den Bosch, Robert Skov) the
+  // user actually reported, since neither happened to be in whatever
+  // arbitrary first page came back.
+  const allPlayers = await fetchAllRows(supabase, 'players', 'goal_api_id, normalized_name, position');
   const positionByGoalApiId = new Map(allPlayers.filter((p) => p.goal_api_id).map((p) => [p.goal_api_id, p.position]));
   const positionByNormalizedName = new Map(allPlayers.filter((p) => p.position).map((p) => [p.normalized_name, p.position]));
 
-  const { data: lineups, error: lineupsErr } = await supabase.from('lineups').select('fixture_id, club_id, players');
-  if (lineupsErr) throw lineupsErr;
+  const lineups = await fetchAllRows(supabase, 'lineups', 'fixture_id, club_id, players');
 
   let checked = 0;
   let updated = 0;
   let failed = 0;
   for (const row of lineups) {
     checked += 1;
+    // European lineups (syncEuropeanLineups.js) store a non-numeric
+    // club_id placeholder -- confirmed live (this run) that filtering an
+    // update on it throws "invalid input syntax for type integer", a
+    // separate pre-existing issue unrelated to this backfill. Nothing to
+    // key an update on for those rows, so skip rather than fail on them.
+    if (!Number.isFinite(row.club_id)) continue;
     const { changed, players } = fixPlayers(row.players ?? {}, positionByGoalApiId, positionByNormalizedName);
     if (!changed) continue;
     const { error } = await supabase.from('lineups').update({ players }).eq('fixture_id', row.fixture_id).eq('club_id', row.club_id);
