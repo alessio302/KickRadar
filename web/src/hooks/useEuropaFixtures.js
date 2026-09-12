@@ -143,5 +143,18 @@ export function useEuropaFixtures() {
     };
   }, [refetch]);
 
+  // Same additional fix as useFixtures.js (domestic) for the same
+  // recurring "frozen" report -- see its own comment for the full
+  // reasoning: visibilitychange/focus only fires on an actual background/
+  // foreground transition, not when the Realtime socket dies silently
+  // while the tab stays in the foreground the whole time. A plain poll
+  // while visible closes that gap regardless of cause.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') refetch();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+
   return { data, loading, refreshing, refetch };
 }

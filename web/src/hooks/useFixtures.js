@@ -186,5 +186,22 @@ export function useFixtures(leagueSlug) {
     };
   }, [refetch]);
 
+  // User-reported (2026-09-12): frozen again despite the visibilitychange/
+  // focus fix above -- backend confirmed healthy the whole time
+  // (fixtures.updated_at seconds old). That fix only fires on an actual
+  // background/foreground transition; it does nothing if the tab stays in
+  // the foreground the entire time and the Realtime socket dies silently
+  // underneath it (a network handoff, a dropped connection the client
+  // hasn't noticed yet) -- there's no event to catch that case at all. A
+  // plain poll while the page is visible closes that gap independently of
+  // whether anything actually fired: worst case it's a redundant read next
+  // to a Realtime update that already arrived.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') refetch();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+
   return { matchdays, loading, refreshing, refetch };
 }

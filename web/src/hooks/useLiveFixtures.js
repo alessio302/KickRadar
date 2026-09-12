@@ -92,11 +92,24 @@ export function useLiveFixtures() {
     document.addEventListener('visibilitychange', handleWake);
     window.addEventListener('focus', handleWake);
 
+    // User-reported (2026-09-12): frozen again despite the fix above --
+    // backend confirmed healthy the whole time (fixtures.updated_at
+    // seconds old). visibilitychange/focus only fires on an actual
+    // background/foreground transition; it does nothing if the tab stays
+    // in the foreground the entire time and the Realtime socket dies
+    // silently underneath it. A plain poll while visible closes that gap
+    // regardless of cause -- worst case it's a redundant reload next to a
+    // Realtime update that already landed.
+    const interval = setInterval(() => {
+      if (!cancelled && document.visibilityState === 'visible') load();
+    }, 20000);
+
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
       document.removeEventListener('visibilitychange', handleWake);
       window.removeEventListener('focus', handleWake);
+      clearInterval(interval);
     };
   }, []);
 
