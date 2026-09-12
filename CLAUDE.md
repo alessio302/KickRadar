@@ -71,6 +71,30 @@ recommendation, but then hand the actual deletion to the user —
 https://github.com/alessio302/KickRadar/branches, trash icon per branch,
 seconds per branch. Don't promise to delete them yourself.
 
+## Testing/diagnosing the backend — use a workflow_dispatch Action, not local network calls
+
+This sandbox's outbound network to Supabase/football-data.org/GOAL API is
+unreliable (seen repeatedly: `curl`/Playwright hitting Supabase from here
+gets `ERR_TUNNEL_CONNECTION_FAILED` or a bare connection failure, seemingly
+at random, sometimes recovering a few minutes later with no code change).
+Don't burn time treating that as a bug to fix or working around it with
+retries — it's this environment's own network, not the app's.
+
+The repo already has an established pattern for exactly this: a one-off
+`src/**/diagnoseX.js` script paired with a `workflow_dispatch`-only
+GitHub Actions workflow (no `schedule:` trigger) that runs it in CI with
+the real secrets, e.g. `.github/workflows/diagnose-wide-range-status.yml`
+→ `src/football-api/diagnoseWideRangeStatus.js` (also
+`diagnose-squad-gaps.yml`, `diagnose-european-leagues.yml`). When you need
+to inspect live backend/DB state, or exercise sync-job logic against the
+real Supabase/GOAL API/football-data.org endpoints, write a script in this
+same shape, commit + push it, then trigger it — either
+`mcp__github__actions_run_trigger` (or the equivalent GitHub MCP tool) or
+ask the user to run it from the Actions tab — and read the run's logs
+instead of trying to reach those services directly from this sandbox.
+Clean the throwaway script back out (or leave it if it's genuinely reusable
+diagnostic tooling, matching the existing `diagnose-*` files) once done.
+
 ## Vercel project reference
 
 - Project: `kick-radar`, id `prj_XWFSU0ox6z2d6eydFCa2XAWYeHg2`
