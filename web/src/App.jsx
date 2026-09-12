@@ -8,6 +8,7 @@ import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
+import { useHasLive } from './hooks/useHasLive.js';
 import { adjacentLeague } from './lib/leagues.js';
 
 function useDarkMode(mode) {
@@ -144,6 +145,7 @@ export default function App() {
   const [darkModeSetting, setDarkModeSetting] = usePersistedState('kickradar.theme', 'system');
   const [accentColor, setAccentColor] = usePersistedState('kickradar.accentColor', 'terracotta');
   const { language, setLanguage, t } = useLanguage();
+  const { hasDomestic: hasLiveSpiele, hasEuropa: hasLiveEuropa } = useHasLive();
 
   const isDark = useDarkMode(darkModeSetting);
 
@@ -386,7 +388,7 @@ export default function App() {
 
       <div style={{ flexShrink: 0, position: 'relative' }}>
         <Toast theme={theme} message={toast} onDismiss={() => setToast(null)} />
-        <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} />
+        <BottomNav tab={tab} onSelectTab={setTab} theme={theme} t={t} hasLiveSpiele={hasLiveSpiele} hasLiveEuropa={hasLiveEuropa} />
       </div>
     </div>
   );
