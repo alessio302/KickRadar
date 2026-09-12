@@ -54,6 +54,23 @@ a push. Before saying it's ready to test:
    Vercel SSO protection and the user can't open them without a Vercel
    login).
 
+## Branch cleanup — can't delete branches with available tools
+
+Confirmed live 2026-09-12: neither `git push origin --delete <branch>`
+(HTTP 403 from the git remote — the provisioned push credential has no
+delete-ref permission) nor the GitHub MCP server (no delete-branch/
+delete-ref tool exposed at all) can delete a branch. Don't spend time
+retrying either approach.
+
+If asked to clean up stale branches: do the analysis (compare each branch
+against `claude/backend-code-project-fmcfrm` with `git rev-list
+--left-right --count`, check `git merge-base --is-ancestor` for "already
+fully merged", read the unique commits to judge whether anything is
+actually unmerged/valuable), present the findings and a delete
+recommendation, but then hand the actual deletion to the user —
+https://github.com/alessio302/KickRadar/branches, trash icon per branch,
+seconds per branch. Don't promise to delete them yourself.
+
 ## Vercel project reference
 
 - Project: `kick-radar`, id `prj_XWFSU0ox6z2d6eydFCa2XAWYeHg2`
