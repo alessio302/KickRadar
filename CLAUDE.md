@@ -105,6 +105,19 @@ instead of trying to reach those services directly from this sandbox.
 Clean the throwaway script back out (or leave it if it's genuinely reusable
 diagnostic tooling, matching the existing `diagnose-*` files) once done.
 
+**Also applies to sanity-checking frontend (`web/src`) Supabase queries,
+not just backend sync jobs.** Confirmed live 2026-09-13: to verify
+`web/src/hooks/useAllLiveFixtures.js`/`useLiveFixtures.js`'s own queries
+and `LigenTab.jsx`'s `pickCurrentMatchday` logic against real data, a
+diagnose script re-implementing those same queries with
+`SUPABASE_SERVICE_ROLE_KEY` (not the frontend's anon key — this still
+runs as a plain Node script via the backend's own `getSupabaseClient()`)
+worked exactly the same way and got a clean, conclusive answer in one
+Action run. Reach for this same pattern for a frontend hook/component
+question too, not just backend script debugging — the diagnose script
+doesn't need to run any frontend code, just reproduce the same Postgrest
+query shape.
+
 ## Vercel project reference
 
 - Project: `kick-radar`, id `prj_XWFSU0ox6z2d6eydFCa2XAWYeHg2`

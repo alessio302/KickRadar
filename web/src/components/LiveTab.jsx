@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { Radio } from 'lucide-react';
 import FixtureRow from './FixtureRow.jsx';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
@@ -78,6 +79,51 @@ function EuropaLiveRow({ theme, fixture, onSelectFixture }) {
   );
 }
 
+// Shown instead of the list when nothing is live anywhere -- per explicit
+// feedback, a lone sentence floating at the top of an otherwise-empty
+// screen read as accidental/unfinished rather than a deliberate "nothing
+// to see right now" state. Centered in the available height (not pinned
+// to the top) with an icon + a hint pointing at where the schedule
+// actually lives, same reasoning FixturesList/EuropaFixturesList's own
+// (much plainer) t.fixtures.empty already covers for one league at a
+// time -- this one's the cross-league equivalent, so it earns a bit more
+// than a single muted line.
+function LiveEmptyState({ theme, t }) {
+  return (
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '14px',
+        padding: '24px',
+        textAlign: 'center',
+      }}
+    >
+      <span
+        style={{
+          width: '52px',
+          height: '52px',
+          borderRadius: '999px',
+          background: theme.surfaceRaised,
+          border: `1px solid ${theme.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Radio size={24} color={theme.textMuted} />
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <span style={{ fontSize: '15px', fontWeight: 700, color: theme.text }}>{t.live.empty}</span>
+        <span style={{ fontSize: '13px', color: theme.textMuted, maxWidth: '240px', lineHeight: 1.5 }}>{t.live.emptyHint}</span>
+      </div>
+    </div>
+  );
+}
+
 function LeagueGroupHeader({ theme, meta }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 8px' }}>
@@ -148,52 +194,44 @@ export default function LiveTab({ theme, t, language, onFavoriteToast }) {
       <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
         <div
           ref={pullScrollRef}
-          style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', padding: '14px 16px' }}
+          style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            {total > 0 && <span aria-hidden="true" className="kr-live-dot" style={{ background: theme.danger }} />}
-            <span style={{ fontSize: '15px', fontWeight: 700, color: theme.text }}>
-              {loading && total === 0 ? t.common.loading : total > 0 ? t.live.summary(total) : t.live.empty}
-            </span>
-          </div>
-          <style>{`
-            .kr-live-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; animation: kr-live-pulse 1.8s infinite; }
-            @keyframes kr-live-pulse {
-              0% { box-shadow: 0 0 0 0 rgba(239,68,68,.5); }
-              70% { box-shadow: 0 0 0 7px rgba(239,68,68,0); }
-              100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-            }
-            @media (prefers-reduced-motion: reduce) { .kr-live-dot { animation: none; } }
-          `}</style>
-
-          {groups.map((group) => {
-            const isDomestic = group.fixtures[0]?.homeClub !== undefined;
-            return (
-              <div key={group.slug} style={{ marginBottom: '18px' }}>
-                <LeagueGroupHeader theme={theme} meta={group.meta} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {group.fixtures.map((f) =>
-                    isDomestic ? (
-                      <FixtureRow
-                        key={f.id}
-                        theme={theme}
-                        t={t}
-                        locale={undefined}
-                        formatTime={() => ''}
-                        clubsById={new Map([[f.home_club_id, f.homeClub], [f.away_club_id, f.awayClub]])}
-                        fixture={f}
-                        isFavorite={favoriteIds?.has(f.id) ?? false}
-                        onSelectFixture={setSelectedDomestic}
-                        onToggleFavorite={handleToggleFavorite}
-                      />
-                    ) : (
-                      <EuropaLiveRow key={f.id} theme={theme} fixture={f} onSelectFixture={setSelectedEuropa} />
-                    )
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {loading && total === 0 ? (
+            <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>{t.common.loading}</p>
+          ) : total === 0 ? (
+            <LiveEmptyState theme={theme} t={t} />
+          ) : (
+            <div style={{ padding: '14px 16px' }}>
+              {groups.map((group) => {
+                const isDomestic = group.fixtures[0]?.homeClub !== undefined;
+                return (
+                  <div key={group.slug} style={{ marginBottom: '18px' }}>
+                    <LeagueGroupHeader theme={theme} meta={group.meta} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {group.fixtures.map((f) =>
+                        isDomestic ? (
+                          <FixtureRow
+                            key={f.id}
+                            theme={theme}
+                            t={t}
+                            locale={undefined}
+                            formatTime={() => ''}
+                            clubsById={new Map([[f.home_club_id, f.homeClub], [f.away_club_id, f.awayClub]])}
+                            fixture={f}
+                            isFavorite={favoriteIds?.has(f.id) ?? false}
+                            onSelectFixture={setSelectedDomestic}
+                            onToggleFavorite={handleToggleFavorite}
+                          />
+                        ) : (
+                          <EuropaLiveRow key={f.id} theme={theme} fixture={f} onSelectFixture={setSelectedEuropa} />
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </PullToRefreshIndicator>
 
