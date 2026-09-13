@@ -97,7 +97,7 @@ jobs:
             gap_min=$(( (now_epoch - last_epoch) / 60 ))
             echo "$workflow: last successful run $last_run ($gap_min min ago, threshold ${threshold_min}m)"
 
-            if [ "$gap_min" -gt "$threshold_min" ]; then
+            if [ "$gap_min" -ge "$threshold_min" ]; then
               echo "$workflow: gap exceeds threshold -- dispatching manually."
               gh workflow run "$workflow" --repo "$REPO" --ref "$REF"
             else
@@ -119,10 +119,34 @@ jobs:
           # costs nothing on quiet days -- live-scores.yml exits in ~1-2s
           # when nothing is live -- so there's no reason not to check it
           # aggressively.
+          #
+          # live-scores/live-events/live-scores-european thresholds are set
+          # equal to (not "just over") each job's own JOB_BUDGET_MS, not
+          # threshold_min+1. Confirmed live 2026-09-13: with threshold=14 for
+          # live-scores (13-min self-loop) and this watchdog itself only
+          # getting checked every ~15 min (external cron, since GitHub's own
+          # schedule trigger for live-scores.yml/live-events.yml wasn't
+          # firing that day either -- same root issue this whole file
+          # exists for), a run that started at :01 and finished at :14 left
+          # gap_min truncating to exactly 14 at the :15 check -- one minute
+          # short of the OLD "$gap_min -gt 14" condition, so that check did
+          # nothing and the next chance wasn't until :30, a genuine ~16-min
+          # freeze live scores/events users could see stall mid-match. Two
+          # independent fixes for the same root cause: the comparison below
+          # is now "-ge", not "-gt" (a gap exactly equal to the threshold
+          # now counts as stale), and every live-* threshold here dropped by
+          # 1 to equal the job's own JOB_BUDGET_MS exactly -- together they
+          # guarantee the very first watchdog tick after a run genuinely
+          # finishes always re-triggers it, instead of needing a lucky
+          # truncation or a whole extra ~15-min cycle. Still safe against a
+          # false trigger while a run is legitimately still live: gap can't
+          # reach JOB_BUDGET_MS while the job itself is still inside that
+          # same budget, and even if it did, live-scores.yml/live-events.yml
+          # both already guard against overlap with concurrency groups.
           check_and_trigger news-scraper.yml 50     # cadence 30 min
           check_and_trigger lineups-sync.yml 25     # cadence 15 min
-          check_and_trigger live-events.yml 15      # self-loops ~14 min while live -- see this file's own top comment
-          check_and_trigger live-scores.yml 14      # self-loops ~13 min while live; see comment above
-          check_and_trigger live-scores-european.yml 14  # same self-loop shape as live-scores.yml
+          check_and_trigger live-events.yml 14      # self-loops ~14 min while live -- see this file's own top comment
+          check_and_trigger live-scores.yml 13      # self-loops ~13 min while live; see comment above
+          check_and_trigger live-scores-european.yml 13  # same self-loop shape as live-scores.yml
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
           check_and_trigger highlights-sync.yml 50  # cadence 30 min
