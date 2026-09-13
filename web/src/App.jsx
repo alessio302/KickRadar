@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import TransfersTab from './components/TransfersTab.jsx';
-import FixturesTab from './components/FixturesTab.jsx';
-import StandingsTab from './components/StandingsTab.jsx';
+import LigenTab from './components/LigenTab.jsx';
+import LiveTab from './components/LiveTab.jsx';
 import EuropaTab from './components/EuropaTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
@@ -110,7 +110,8 @@ export default function App() {
   //
   // A lineup-confirmed push additionally carries a `fixture` id (see
   // syncLineups.js) -- that one should land straight on the fixture's own
-  // detail overlay in the Spiele tab, not just the league's transfer list.
+  // detail overlay in the Ligen tab's Spiele sub-tab, not just the league's
+  // transfer list.
   // Confirmed live: tapping that notification only switched leagues, the
   // user still had to find and open the actual fixture by hand.
   //
@@ -129,7 +130,7 @@ export default function App() {
       if (Number.isInteger(fixtureId)) {
         setInitialFixtureId(fixtureId);
         setInitialView(requestedView || null);
-        setTab('spiele');
+        setTab('ligen');
       } else {
         setTab('transfers');
       }
@@ -345,8 +346,8 @@ export default function App() {
             onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
           />
         )}
-        {tab === 'spiele' && (
-          <FixturesTab
+        {tab === 'ligen' && (
+          <LigenTab
             theme={theme}
             t={t}
             language={language}
@@ -362,8 +363,8 @@ export default function App() {
             onFavoriteToast={setToast}
           />
         )}
-        {tab === 'tabelle' && (
-          <StandingsTab theme={theme} t={t} language={language} league={league} onSelectLeague={selectLeague} onSwipeLeague={swipeLeague} />
+        {tab === 'live' && (
+          <LiveTab theme={theme} t={t} language={language} onFavoriteToast={setToast} />
         )}
         {tab === 'europa' && (
           <EuropaTab theme={theme} t={t} language={language} />

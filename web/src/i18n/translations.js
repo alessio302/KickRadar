@@ -30,7 +30,7 @@ function ordinalEn(n) {
 }
 
 const de = {
-  nav: { transfers: 'Transfers', fixtures: 'Spiele', standings: 'Tabelle', europa: 'Europa', settings: 'Einstellungen' },
+  nav: { transfers: 'Transfers', ligen: 'Ligen', live: 'Live', europa: 'Europa', settings: 'Einstellungen', fixtures: 'Spiele', standings: 'Tabelle' },
   common: {
     loading: 'Lädt…',
     chooseClub: 'Verein wählen…',
@@ -134,6 +134,11 @@ const de = {
     zoneEliminated: 'Ausgeschieden',
     standingsEmpty: 'Tabelle noch nicht verfügbar.',
   },
+  live: {
+    title: 'Live',
+    summary: (n) => (n === 1 ? '1 Spiel läuft gerade' : `${n} Spiele laufen gerade`),
+    empty: 'Gerade läuft kein Spiel.',
+  },
   topscorers: {
     title: 'Torschützen',
     empty: 'Torschützen-Ranking noch nicht verfügbar.',
@@ -197,7 +202,7 @@ const de = {
 };
 
 const en = {
-  nav: { transfers: 'Transfers', fixtures: 'Fixtures', standings: 'Table', europa: 'Europe', settings: 'Settings' },
+  nav: { transfers: 'Transfers', ligen: 'Leagues', live: 'Live', europa: 'Europe', settings: 'Settings', fixtures: 'Fixtures', standings: 'Table' },
   common: {
     loading: 'Loading…',
     chooseClub: 'Choose club…',
@@ -299,6 +304,11 @@ const en = {
     zoneEliminated: 'Eliminated',
     standingsEmpty: 'Standings not yet available.',
   },
+  live: {
+    title: 'Live',
+    summary: (n) => (n === 1 ? '1 match in progress' : `${n} matches in progress`),
+    empty: 'Nothing live right now.',
+  },
   topscorers: {
     title: 'Top Scorers',
     empty: 'Top scorers ranking not yet available.',
@@ -362,7 +372,7 @@ const en = {
 };
 
 const it = {
-  nav: { transfers: 'Trasferimenti', fixtures: 'Partite', standings: 'Classifica', europa: 'Europa', settings: 'Impostazioni' },
+  nav: { transfers: 'Trasferimenti', ligen: 'Campionati', live: 'Live', europa: 'Europa', settings: 'Impostazioni', fixtures: 'Partite', standings: 'Classifica' },
   common: {
     loading: 'Caricamento…',
     chooseClub: 'Scegli squadra…',
@@ -464,6 +474,11 @@ const it = {
     zoneEliminated: 'Eliminato',
     standingsEmpty: 'Classifica non ancora disponibile.',
   },
+  live: {
+    title: 'Live',
+    summary: (n) => (n === 1 ? '1 partita in corso' : `${n} partite in corso`),
+    empty: 'Nessuna partita in corso al momento.',
+  },
   topscorers: {
     title: 'Capocannonieri',
     empty: 'Classifica capocannonieri non ancora disponibile.',
@@ -527,7 +542,7 @@ const it = {
 };
 
 const fr = {
-  nav: { transfers: 'Transferts', fixtures: 'Matchs', standings: 'Classement', europa: 'Europe', settings: 'Réglages' },
+  nav: { transfers: 'Transferts', ligen: 'Championnats', live: 'Live', europa: 'Europe', settings: 'Réglages', fixtures: 'Matchs', standings: 'Classement' },
   common: {
     loading: 'Chargement…',
     chooseClub: 'Choisir un club…',
@@ -629,6 +644,11 @@ const fr = {
     zoneEliminated: 'Éliminé',
     standingsEmpty: 'Classement pas encore disponible.',
   },
+  live: {
+    title: 'Live',
+    summary: (n) => (n === 1 ? '1 match en direct' : `${n} matchs en direct`),
+    empty: 'Aucun match en direct pour le moment.',
+  },
   topscorers: {
     title: 'Meilleurs buteurs',
     empty: 'Classement des meilleurs buteurs pas encore disponible.',
@@ -692,7 +712,7 @@ const fr = {
 };
 
 const es = {
-  nav: { transfers: 'Traspasos', fixtures: 'Partidos', standings: 'Clasificación', europa: 'Europa', settings: 'Ajustes' },
+  nav: { transfers: 'Traspasos', ligen: 'Ligas', live: 'En vivo', europa: 'Europa', settings: 'Ajustes', fixtures: 'Partidos', standings: 'Clasificación' },
   common: {
     loading: 'Cargando…',
     chooseClub: 'Elegir club…',
@@ -793,6 +813,11 @@ const es = {
     zonePlayoff: 'Ronda de playoffs',
     zoneEliminated: 'Eliminado',
     standingsEmpty: 'Clasificación no disponible todavía.',
+  },
+  live: {
+    title: 'En vivo',
+    summary: (n) => (n === 1 ? '1 partido en vivo' : `${n} partidos en vivo`),
+    empty: 'Ahora mismo no hay ningún partido en vivo.',
   },
   topscorers: {
     title: 'Máximos goleadores',
