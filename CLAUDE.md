@@ -9,6 +9,16 @@
 - Feature work happens on `claude/*` branches and gets merged into
   `claude/backend-code-project-fmcfrm` via PR.
 
+## Always PR + merge to prod — user wants to live-test every change
+
+**User instruction (2026-09-13): after finishing a fix/feature, always
+open a PR and merge it into `claude/backend-code-project-fmcfrm` right
+away, without waiting to be asked — the user wants to live-test each
+change on production as soon as it's done.** Don't just push a branch and
+stop. Finish the loop every time: push branch -> open PR -> merge (squash,
+per the section below) -> verify the Vercel deploy actually landed (see
+"After merging" below) -> tell the user it's live and where to test it.
+
 ## Merging a PR into the production branch — squash only
 
 **Always merge PRs into `claude/backend-code-project-fmcfrm` with
