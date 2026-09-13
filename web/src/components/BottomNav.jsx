@@ -80,12 +80,11 @@ export default function BottomNav({ tab, onSelectTab, theme, t, hasLiveSpiele, h
       }}
     >
       {TABS.map(([id, getLabel, Icon]) => {
-        // Ligen no longer carries its own dot (2026-09-13, per explicit
-        // feedback) -- Live is now the one place a "something's on" signal
-        // belongs, since it already surfaces every league/competition's
-        // live matches in one list. Europa keeps its own for now (only
-        // asked about Ligen's).
-        const showDot = (id === 'europa' && hasLiveEuropa) || (id === 'live' && (hasLiveSpiele || hasLiveEuropa));
+        // Neither Ligen nor Europa carries its own dot anymore (2026-09-13,
+        // per explicit feedback) -- Live is now the single place a
+        // "something's on" signal belongs, since it already surfaces every
+        // league's AND every UEFA competition's live matches in one list.
+        const showDot = id === 'live' && (hasLiveSpiele || hasLiveEuropa);
         return (
           <button
             key={id}
