@@ -27,19 +27,42 @@ function formatTime(iso, locale) {
 // with their result). Falls back to the most recent round if every synced
 // fixture is already in the past (e.g. right after a round finished and
 // the next one hasn't synced in yet).
+//
+// Live takes priority over the `matchdays` array's own sort order, checked
+// in its own pass first -- confirmed live (La Liga, 2026-09-13): a single
+// matchday-6 fixture rescheduled to Sept 3 (earlier than matchday 5's
+// entire Sept 11-14 round) gave matchday 6's group the earliest games[0]
+// of the two, so it sorted -- and was reached by the old single for-loop
+// below -- *before* matchday 5, and matchday 6 also has real future games
+// of its own, so the loop matched and returned it first. That hid the
+// actual live match (Levante vs Barcelona, matchday 5) behind a "current"
+// round that had nothing live at all, and the "Live" filter -- additive to
+// this pick -- then showed nothing, even with a real live game elsewhere
+// in the data. A live fixture anywhere in `matchdays` is unambiguously the
+// current round regardless of how one other round's own outlier fixture
+// happens to sort; only once nothing is live does the soonest individual
+// upcoming fixture (not a group's own possibly-skewed games[0]) decide it.
+// Same two-priority order EuropaTab.jsx's own pickActiveMatchday already
+// uses for the same reason.
 function pickCurrentMatchday(matchdays) {
   if (matchdays.length === 0) return null;
+
+  const liveGroup = matchdays.find((group) => group.games.some((g) => g.status === 'live'));
+  if (liveGroup) return liveGroup;
+
   const now = Date.now();
+  let soonestGroup = null;
+  let soonestKickoff = Infinity;
   for (const group of matchdays) {
-    // A game already live counts as "current" even though its own
-    // kickoff_at is now in the past -- otherwise a round where every game
-    // has kicked off, but the last one is still being played, would get
-    // skipped in favor of a future round while a match is visibly live.
-    if (group.games.some((g) => g.status === 'live' || new Date(g.kickoff_at).getTime() >= now)) {
-      return group;
+    for (const g of group.games) {
+      const kickoff = new Date(g.kickoff_at).getTime();
+      if (kickoff >= now && kickoff < soonestKickoff) {
+        soonestKickoff = kickoff;
+        soonestGroup = group;
+      }
     }
   }
-  return matchdays[matchdays.length - 1];
+  return soonestGroup ?? matchdays[matchdays.length - 1];
 }
 
 // The fixture list for one league -- rendered twice by LeagueCarousel
