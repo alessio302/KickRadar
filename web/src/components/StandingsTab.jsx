@@ -1,14 +1,17 @@
-import { useMemo, useRef, useState } from 'react';
-import LeagueSwitcher from './LeagueSwitcher.jsx';
-import LeagueCarousel from './LeagueCarousel.jsx';
+import { useMemo } from 'react';
 import ClubJersey from './ClubJersey.jsx';
-import ClubDetailOverlay from './ClubDetailOverlay.jsx';
-import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
-import { TopScorersTable } from './TopScorersTable.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useStandings } from '../hooks/useStandings.js';
-import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { leagueBySlug, zoneForPosition } from '../lib/leagues.js';
+
+// The standalone "Tabelle" nav tab this file used to also export
+// (StandingsTab, default export) was retired in favor of LigenTab.jsx,
+// which merges it with the former "Spiele" tab into one "Ligen" nav item
+// with two internal sub-tabs -- the same pattern EuropaTab.jsx already
+// established for the 3 UEFA competitions. StandingsTable (below) is the
+// only thing this file still needs to export: LigenTab.jsx's own Tabelle
+// sub-tab and FixtureDetailOverlay.jsx's own embedded Tabelle tab both
+// render it directly.
 
 // Fixed, not theme-driven -- these identify a *competition* zone (Champions
 // League/Europa league/relegation), the same way FixtureRow.jsx's favorite
@@ -181,104 +184,3 @@ export function StandingsTable({ theme, t, league, onSelectClub, scrollRef, refe
   );
 }
 
-export default function StandingsTab({ theme, t, language, league, onSelectLeague, onSwipeLeague }) {
-  const [selectedClub, setSelectedClub] = useState(null);
-  const [subTab, setSubTab] = useState('table');
-  // Whole-tab pull-to-refresh target -- see TransfersTab.jsx's own comment
-  // and usePullToRefresh.js's `gestureRef` for why. The hook itself lives
-  // here (not in StandingsTable/TopScorersTable) so PullToRefreshIndicator
-  // can wrap -- and visually push down -- the header along with the list.
-  // refetchRef is how the active sub-tab's own refetch (table or scorers,
-  // only known inside whichever is currently rendered) reaches back up
-  // here; switching sub-tabs just points it at a different refetch.
-  const pullContainerRef = useRef(null);
-  const refetchRef = useRef(() => {});
-  const { scrollRef: pullScrollRef, pullDistance, pulling, refreshing: pullRefreshing } = usePullToRefresh(
-    () => refetchRef.current(),
-    pullContainerRef
-  );
-
-  return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
-      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
-        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
-      </div>
-
-      <div style={{ flexShrink: 0, display: 'flex', gap: '12px', padding: '12px 16px', borderBottom: `1px solid ${theme.border}` }}>
-        <button
-          onClick={() => setSubTab('table')}
-          style={{
-            padding: '6px 12px',
-            border: 'none',
-            borderRadius: '6px',
-            background: subTab === 'table' ? theme.accent : theme.surfaceRaised,
-            color: subTab === 'table' ? theme.surface : theme.text,
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 200ms',
-          }}
-        >
-          {t.standings?.title ?? 'Tabelle'}
-        </button>
-        <button
-          onClick={() => setSubTab('scorers')}
-          style={{
-            padding: '6px 12px',
-            border: 'none',
-            borderRadius: '6px',
-            background: subTab === 'scorers' ? theme.accent : theme.surfaceRaised,
-            color: subTab === 'scorers' ? theme.surface : theme.text,
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 200ms',
-          }}
-        >
-          {t.topscorers?.title ?? 'Torschützen'}
-        </button>
-      </div>
-
-      <LeagueCarousel
-        league={league}
-        onSwitchLeague={onSwipeLeague}
-        renderPage={(slug) =>
-          subTab === 'table' ? (
-            <StandingsTable
-              key={`${slug}-table`}
-              theme={theme}
-              t={t}
-              league={slug}
-              onSelectClub={slug === league ? setSelectedClub : undefined}
-              scrollRef={slug === league ? pullScrollRef : undefined}
-              refetchRef={slug === league ? refetchRef : undefined}
-            />
-          ) : (
-            <TopScorersTable
-              key={`${slug}-scorers`}
-              theme={theme}
-              t={t}
-              language={language}
-              league={slug}
-              scrollRef={slug === league ? pullScrollRef : undefined}
-              refetchRef={slug === league ? refetchRef : undefined}
-            />
-          )
-        }
-      />
-      </PullToRefreshIndicator>
-
-      {selectedClub && (
-        <ClubDetailOverlay
-          theme={theme}
-          t={t}
-          language={language}
-          league={league}
-          club={selectedClub}
-          onClose={() => setSelectedClub(null)}
-        />
-      )}
-    </div>
-  );
-}

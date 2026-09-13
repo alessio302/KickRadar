@@ -1,14 +1,20 @@
-import { ArrowLeftRight, Calendar, Globe, ListOrdered, Settings } from 'lucide-react';
+import { ArrowLeftRight, Trophy, Radio, Globe, Settings } from 'lucide-react';
 
 // No separate "Aufstellungen" tab -- lineups live in a per-fixture overlay
-// opened from the Spiele tab instead (tap a match card), see
+// opened from the Ligen tab instead (tap a match card), see
 // FixtureDetailOverlay.jsx. Tab ids stay the fixed internal keys they
 // always were (App.jsx branches on them, notifications deep-link via
 // them) -- only the displayed label is translated.
+//
+// The former standalone 'spiele'/'tabelle' tabs merged into one 'ligen' tab
+// (LigenTab.jsx, same two-sub-tab shape EuropaTab.jsx already had) -- the
+// nav slot that freed up now holds 'live' (LiveTab.jsx), replacing
+// LiveCarousel.jsx as the app's primary cross-league/cross-competition
+// "what's live right now" surface.
 const TABS = [
   ['transfers', (t) => t.nav.transfers, ArrowLeftRight],
-  ['spiele', (t) => t.nav.fixtures, Calendar],
-  ['tabelle', (t) => t.nav.standings, ListOrdered],
+  ['ligen', (t) => t.nav.ligen, Trophy],
+  ['live', (t) => t.nav.live, Radio],
   ['europa', (t) => t.nav.europa, Globe],
   ['einstellungen', (t) => t.nav.settings, Settings],
 ];
@@ -74,7 +80,10 @@ export default function BottomNav({ tab, onSelectTab, theme, t, hasLiveSpiele, h
       }}
     >
       {TABS.map(([id, getLabel, Icon]) => {
-        const showDot = (id === 'spiele' && hasLiveSpiele) || (id === 'europa' && hasLiveEuropa);
+        const showDot =
+          (id === 'ligen' && hasLiveSpiele) ||
+          (id === 'europa' && hasLiveEuropa) ||
+          (id === 'live' && (hasLiveSpiele || hasLiveEuropa));
         return (
           <button
             key={id}
