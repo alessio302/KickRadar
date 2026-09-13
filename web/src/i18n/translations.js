@@ -136,8 +136,8 @@ const de = {
   },
   live: {
     title: 'Live',
-    summary: (n) => (n === 1 ? '1 Spiel läuft gerade' : `${n} Spiele laufen gerade`),
-    empty: 'Gerade läuft kein Spiel.',
+    empty: 'Gerade läuft kein Spiel',
+    emptyHint: 'Schau später wieder vorbei, oder wirf einen Blick auf den Spielplan unter Ligen oder Europa.',
   },
   topscorers: {
     title: 'Torschützen',
@@ -306,8 +306,8 @@ const en = {
   },
   live: {
     title: 'Live',
-    summary: (n) => (n === 1 ? '1 match in progress' : `${n} matches in progress`),
-    empty: 'Nothing live right now.',
+    empty: 'Nothing live right now',
+    emptyHint: 'Check back later, or take a look at the schedule under Leagues or Europe.',
   },
   topscorers: {
     title: 'Top Scorers',
@@ -476,8 +476,8 @@ const it = {
   },
   live: {
     title: 'Live',
-    summary: (n) => (n === 1 ? '1 partita in corso' : `${n} partite in corso`),
-    empty: 'Nessuna partita in corso al momento.',
+    empty: 'Nessuna partita in corso al momento',
+    emptyHint: 'Torna più tardi, oppure guarda il calendario in Campionati o Europa.',
   },
   topscorers: {
     title: 'Capocannonieri',
@@ -646,8 +646,8 @@ const fr = {
   },
   live: {
     title: 'Live',
-    summary: (n) => (n === 1 ? '1 match en direct' : `${n} matchs en direct`),
-    empty: 'Aucun match en direct pour le moment.',
+    empty: 'Aucun match en direct pour le moment',
+    emptyHint: 'Reviens plus tard, ou consulte le calendrier dans Championnats ou Europe.',
   },
   topscorers: {
     title: 'Meilleurs buteurs',
@@ -816,8 +816,8 @@ const es = {
   },
   live: {
     title: 'En vivo',
-    summary: (n) => (n === 1 ? '1 partido en vivo' : `${n} partidos en vivo`),
-    empty: 'Ahora mismo no hay ningún partido en vivo.',
+    empty: 'Ahora mismo no hay ningún partido en vivo',
+    emptyHint: 'Vuelve más tarde, o consulta el calendario en Ligas o Europa.',
   },
   topscorers: {
     title: 'Máximos goleadores',
