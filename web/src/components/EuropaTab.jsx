@@ -297,11 +297,11 @@ function TeamBadge({ url, name, size = 20, theme }) {
 function TeamRow({ badgeUrl, name, theme, score, isLive }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-        <TeamBadge url={badgeUrl} name={name} theme={theme} size={22} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+        <TeamBadge url={badgeUrl} name={name} theme={theme} size={18} />
         <span
           style={{
-            fontSize: '14px',
+            fontSize: '12.5px',
             fontWeight: 700,
             color: theme.text,
             overflow: 'hidden',
@@ -316,7 +316,7 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
         // fontVariantNumeric: 'tabular-nums' -- same fix FixtureRow.jsx
         // (domestic)'s own TeamRow needed for the same user-reported
         // issue; see its own comment for why.
-        <span style={{ fontSize: '14px', fontWeight: 700, color: isLive ? theme.danger : theme.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+        <span style={{ fontSize: '12.5px', fontWeight: 700, color: isLive ? theme.danger : theme.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
           {score}
         </span>
       )}
@@ -330,6 +330,15 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
 // "home vs away" row, no "LIVE" text label (the live minute plus its red
 // color, or just the left accent bar absent a minute, are the indicator
 // already).
+//
+// Card padding/radius/gaps/font sizes/badge size and the status column's
+// width all match FixtureRow.jsx (domestic, now the Ligen tab) exactly, not
+// just its layout shape -- user-reported (2026-09-14) the two tabs' cards
+// were still visibly different sizes despite sharing this same design.
+// No favorite star here though (unlike FixtureRow.jsx): European fixtures
+// aren't favoritable anywhere else in the app either (LiveTab.jsx's own
+// EuropaLiveRow has none), so there's no same-width spacer needed in its
+// place -- the row just ends after the team-row block.
 function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
   const isLive = fixture.status === 'live';
   const isFinished = fixture.status === 'finished';
@@ -360,21 +369,21 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
       style={{
         background: theme.surfaceRaised,
         border: `1px solid ${theme.border}`,
-        borderRadius: '12px',
+        borderRadius: '10px',
         display: 'flex',
         alignItems: 'stretch',
-        gap: '10px',
-        padding: '12px 14px',
+        gap: '8px',
+        padding: '8px 12px',
         cursor: 'pointer',
       }}
     >
       <span aria-hidden="true" style={{ width: '3px', borderRadius: '2px', background: isLive ? theme.danger : 'transparent', flexShrink: 0 }} />
-      <div style={{ width: '66px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: '13px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
+      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         <TeamRow
           badgeUrl={fixture.home_team_badge}
           name={fixture.home_team_short_name || fixture.home_team_name}
@@ -478,7 +487,7 @@ function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchd
             >
               {date}
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {dayFixtures.map((f) => (
                 <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={onSelectFixture} />
               ))}
