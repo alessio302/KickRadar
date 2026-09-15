@@ -81,7 +81,16 @@ export default function BottomNav({ tab, onSelectTab, theme, t, hasLiveSpiele, h
         background: hexToRgba(theme.bg, 0.92),
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        borderTop: `1px solid ${theme.border}`,
+        // No top border -- user-reported: now that the bar's own fill is
+        // theme.bg (see above), theme.border read as a thin accent-tinted
+        // line along the top edge. It's not literally theme.accent, but
+        // every non-mono palette's border token is itself a very dark,
+        // low-saturation version of the accent hue (see App.jsx's
+        // ACCENT_PALETTES) -- invisible against the old theme.surface fill
+        // (a similarly-toned neighbour), but a visible coloured hairline
+        // now that it sits directly on pure black. The bar's own blur+92%-
+        // opacity fill against scrolling content already reads as a
+        // distinct layer without needing a border to mark the seam.
       }}
     >
       {TABS.map(([id, getLabel, Icon]) => {
