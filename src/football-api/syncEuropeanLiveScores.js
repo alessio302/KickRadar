@@ -43,12 +43,25 @@ function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
-// Only decides whether this run's own internal loop keeps sleeping and
-// re-polling, or exits early -- NOT which fixtures pollOnce() writes (see
-// this file's own top comment). Scoped to the 3 UEFA competitions' own
-// league rows so this doesn't keep a run alive over a domestic kickoff
-// syncLiveScores.js already has covered.
-async function hasFixtureStartingSoon(supabase, uefaLeagueIds) {
+// Decides both whether this run should poll AT ALL (called once up front,
+// before pollOnce() ever spends any GOAL API budget) and whether its own
+// internal loop keeps sleeping and re-polling once it's started -- NOT
+// which fixtures pollOnce() writes (see this file's own top comment).
+// Scoped to the 3 UEFA competitions' own league rows so this doesn't keep
+// a run alive (or start one) over a domestic kickoff syncLiveScores.js
+// already has covered.
+//
+// Checks status='live' too, not just near-kickoff 'scheduled' -- confirmed
+// live (2026-09-14, a day with zero UEFA fixtures at all): this file had
+// no gate before its own first pollOnce() call, so it burned 3 real GOAL
+// API requests (one per competition) on every single run regardless,
+// roughly 96 times/day via the schedule watchdog's own re-triggering --
+// about 288 wasted requests/day against the shared 1000/day budget for
+// literally nothing to show for it. A fixture already sitting at 'live'
+// (this run's own earlier poll, or a previous run) needs to keep being
+// gated in too, not just one about to kick off -- the original name/scope
+// (hasFixtureStartingSoon) undersold what this now checks.
+async function hasFixtureNeedingAttention(supabase, uefaLeagueIds) {
   const now = new Date();
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
@@ -56,9 +69,7 @@ async function hasFixtureStartingSoon(supabase, uefaLeagueIds) {
     .from('fixtures')
     .select('id', { count: 'exact', head: true })
     .in('league_id', uefaLeagueIds)
-    .eq('status', 'scheduled')
-    .gte('kickoff_at', recently)
-    .lte('kickoff_at', soon);
+    .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return (count ?? 0) > 0;
 }
@@ -125,6 +136,12 @@ export async function syncEuropeanLiveScores() {
   const uefaLeagueIds = dbLeagues.map((l) => l.id);
   if (uefaLeagueIds.length === 0) return { polls: 0, totalUpdated: 0 };
 
+  // Gate before the very first poll, not just between polls -- see
+  // hasFixtureNeedingAttention()'s own comment for why this was missing.
+  if (!(await hasFixtureNeedingAttention(supabase, uefaLeagueIds))) {
+    return { polls: 0, totalUpdated: 0 };
+  }
+
   const deadline = Date.now() + JOB_BUDGET_MS;
   let polls = 0;
   let totalUpdated = 0;
@@ -134,7 +151,7 @@ export async function syncEuropeanLiveScores() {
     polls += 1;
     totalUpdated += updated;
 
-    const keepGoing = stillLive || (await hasFixtureStartingSoon(supabase, uefaLeagueIds));
+    const keepGoing = stillLive || (await hasFixtureNeedingAttention(supabase, uefaLeagueIds));
     if (!keepGoing) break;
 
     await sleep(POLL_INTERVAL_MS);
