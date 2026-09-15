@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { UEFA_COMPETITIONS, LEAGUES } from '../config/leagues.js';
 
 // Follow-up to the earlier diagnoseHeadToHeadCoverage.js (since removed),
