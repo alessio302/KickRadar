@@ -1,4 +1,4 @@
-name: Diagnose H2H team name matching
+name: Diagnose H2H team list pagination
 
 on:
   workflow_dispatch: {}
@@ -14,8 +14,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/football-api/diagnoseHeadToHeadTeamMatch.js
+      - run: node src/football-api/diagnoseHeadToHeadPagination.js
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
