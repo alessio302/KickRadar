@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { RotateCcwClock, Video } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
@@ -172,28 +173,36 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               </p>
             </div>
 
-            {/* Same tab-switcher styling as FixtureDetailOverlay.jsx's own
-                (identical padding/border/color values). Spielinfo shows
-                once there's something to time-line (live or finished, same
-                gate MatchInfoTimeline itself applies) -- syncLiveEvents.js's
-                WebSocket already writes match_events for a live European
-                fixture the same way it does for the 5 domestic leagues, so
-                this isn't only fed by the one-off finished-match backfill.
-                Highlights stays finished-only: an upcoming or live European
-                fixture can never have a highlight clip yet. */}
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
+            {/* Same tab-switcher styling as FixtureDetailOverlay.jsx's own,
+                including icons-only-with-aria-label -- see that file's own
+                comment on why (labels overflowed the sheet's 420px width
+                for the domestic overlay's 5-tab case; this one only ever
+                shows up to 3, but matching keeps both overlays visually
+                consistent rather than one being text and the other icons).
+                Spielinfo shows once there's something to time-line (live or
+                finished, same gate MatchInfoTimeline itself applies) --
+                syncLiveEvents.js's WebSocket already writes match_events
+                for a live European fixture the same way it does for the 5
+                domestic leagues, so this isn't only fed by the one-off
+                finished-match backfill. Highlights stays finished-only: an
+                upcoming or live European fixture can never have a
+                highlight clip yet. */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
               {[
-                ['lineups', t.matchInfo.tabLineups],
-                ...(fixture.status === 'finished' || fixture.status === 'live' ? [['info', t.matchInfo.tabInfo]] : []),
-                ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights]] : []),
-              ].map(([key, label]) => (
+                ['lineups', t.matchInfo.tabLineups, <PitchIcon key="icon" />],
+                ...(fixture.status === 'finished' || fixture.status === 'live' ? [['info', t.matchInfo.tabInfo, <RotateCcwClock key="icon" size={18} />]] : []),
+                ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights, <Video key="icon" size={18} />]] : []),
+              ].map(([key, label, icon]) => (
                 <button
                   key={key}
                   onClick={() => setView(key)}
+                  aria-label={label}
+                  title={label}
                   style={{
+                    flex: 1,
+                    display: 'flex',
+                    justifyContent: 'center',
                     padding: '6px 2px 10px',
-                    fontSize: '13px',
-                    fontWeight: view === key ? 700 : 600,
                     border: 'none',
                     borderBottom: view === key ? `2px solid ${theme.accent}` : '2px solid transparent',
                     background: 'transparent',
@@ -201,7 +210,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
                     cursor: 'pointer',
                   }}
                 >
-                  {label}
+                  {icon}
                 </button>
               ))}
             </div>
