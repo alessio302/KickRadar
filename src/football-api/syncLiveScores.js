@@ -76,21 +76,27 @@ function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
-// Live and about-to-start are two different signals: whether to keep
-// polling *today's whole match list* (cheap: still just one request) is
-// its own question from whether to keep the *loop* alive waiting for the
-// next kickoff. A scheduled fixture within the window means "worth
-// waiting", independent of whether anything is live played right now.
-async function hasFixtureStartingSoon(supabase) {
+// Decides both whether this run should poll AT ALL (called once up front,
+// before pollOnce() ever spends any football-data.org budget) and whether
+// its own internal loop keeps sleeping and re-polling once it's started.
+// Checks status='live' too, not just near-kickoff 'scheduled' -- same fix
+// as syncEuropeanLiveScores.js's own hasFixtureNeedingAttention()
+// (2026-09-15): this file had no gate before its own first pollOnce()
+// call either, so every run burned 5 real football-data.org requests (one
+// per league) regardless of whether anything was actually live or about
+// to kick off. Lower-severity here than the European job was (a per-
+// minute rate cap, not a shared daily one currently over budget), but the
+// same "don't spend a real request to learn nothing's happening" principle
+// applies -- a scheduled fixture within the window means "worth waiting"
+// independent of whether anything is live right now, same as before.
+async function hasFixtureNeedingAttention(supabase) {
   const now = new Date();
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
   const { count, error } = await supabase
     .from('fixtures')
     .select('id', { count: 'exact', head: true })
-    .eq('status', 'scheduled')
-    .gte('kickoff_at', recently)
-    .lte('kickoff_at', soon);
+    .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return (count ?? 0) > 0;
 }
@@ -314,6 +320,14 @@ async function refreshStandingsFor(supabase, leagueSlugs) {
 export async function syncLiveScores() {
   const supabase = getSupabaseClient();
 
+  // Gate before the very first poll, not just between polls -- see
+  // hasFixtureNeedingAttention()'s own comment for why this was missing.
+  // Checked before the clubs query below too, so a run with nothing to do
+  // costs exactly one cheap count query, not a club table scan as well.
+  if (!(await hasFixtureNeedingAttention(supabase))) {
+    return { polls: 0, totalUpdated: 0 };
+  }
+
   // Loaded once per invocation, not per poll tick -- club identity/crest
   // don't change mid-run, and this loop can tick dozens of times across a
   // long live window.
@@ -332,7 +346,7 @@ export async function syncLiveScores() {
 
     if (finishedLeagueSlugs.size > 0) await refreshStandingsFor(supabase, finishedLeagueSlugs);
 
-    const keepGoing = stillLive || (await hasFixtureStartingSoon(supabase));
+    const keepGoing = stillLive || (await hasFixtureNeedingAttention(supabase));
     if (!keepGoing) break;
 
     await sleep(POLL_INTERVAL_MS);
