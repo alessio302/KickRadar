@@ -94,7 +94,9 @@ async function call(path, params = {}) {
     const isRetryable = res.status === 429 || res.status === 502;
     const isLastAttempt = attempt === RETRY_BACKOFFS_MS.length;
     if (!isRetryable || isLastAttempt) {
-      throw new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
+      const err = new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
+      err.status = res.status; // lets callers distinguish a real "not found" from a genuine failure
+      throw err;
     }
 
     const wait = retryDelayMs(res, attempt);
@@ -120,9 +122,32 @@ export async function getLeagueFixtures(leagueId, date) {
 // venue detail -- one call resolves every club's GOAL API id at once,
 // rather than needing to sample fixture dates across a season to
 // eventually see each club as home or away.
+//
+// Paginated (confirmed live, diagnoseHeadToHeadPagination.js, since
+// removed): the endpoint silently caps an unpaginated call at exactly 50
+// results, and for a UEFA competition (81 teams tracked -- every
+// qualifying-round entrant, not just the current league-phase 36) that cut
+// off mid-alphabet-ish ordering, dropping current league-phase giants like
+// Real Madrid/Bayern/PSG entirely while keeping every eliminated qualifier.
+// Domestic leagues (well under 50) never actually needed this, but paging
+// unconditionally means this function always returns the true complete
+// set rather than silently depending on staying under an undocumented
+// cap. limit=100 is the endpoint's own documented max (confirmed live: 200
+// -> 400 "Limit must be between 1 and 100"). Capped at 5 pages (500 teams)
+// as a runaway guard, well beyond any real competition's roster.
+const MAX_TEAM_PAGES = 5;
+
 export async function getLeagueTeams(leagueId) {
-  const data = await call(`/leagues/${leagueId}/teams`);
-  return data.data ?? [];
+  const teams = [];
+  let offset = 0;
+  for (let page = 0; page < MAX_TEAM_PAGES; page++) {
+    const data = await call(`/leagues/${leagueId}/teams`, { limit: 100, offset });
+    const pageTeams = data.data ?? [];
+    teams.push(...pageTeams);
+    if (!data.pagination?.hasMore || pageTeams.length === 0) break;
+    offset += pageTeams.length;
+  }
+  return teams;
 }
 
 // Full current squad for one team -- id, name, image, number, position
@@ -225,9 +250,21 @@ export async function getPlayer(goalApiId) {
 //   scores as strings), team_home_badge, team_away_badge, ... }. Order is
 // not guaranteed most-recent-first by the API itself (unconfirmed) --
 // callers sort by match_date before trusting the order.
+//
+// A 404 here (confirmed live, syncEuropeanHeadToHead.js's first real run)
+// is a legitimate "these two teams have never met" answer, not a failure
+// -- two teams drawn together for the first time in a UEFA competition's
+// group/league phase is the normal case, not the exception. Caught here
+// and turned into an empty result so one never-met pairing doesn't abort
+// an entire sync run's remaining candidates.
 export async function getHeadToHeadDirect(team1Id, team2Id) {
-  const data = await call(`/h2h/${team1Id}/${team2Id}/direct`);
-  return data.matches ?? [];
+  try {
+    const data = await call(`/h2h/${team1Id}/${team2Id}/direct`);
+    return data.matches ?? [];
+  } catch (err) {
+    if (err.status === 404) return [];
+    throw err;
+  }
 }
 
 // Exchanges the API key for a short-lived (60s), single-use WebSocket
