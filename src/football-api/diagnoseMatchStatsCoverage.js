@@ -189,9 +189,12 @@ async function main() {
   console.log('Goal: find out what real data exists for a "Statistiken" tab on UEFA fixtures.');
 
   await checkFootballDataUcl();
-  for (const comp of UEFA_GOAL_API_LEAGUES) {
-    await checkGoalApiCompetition(comp);
-  }
+  // GOAL API side already confirmed in a prior run (statistics/lineups/
+  // events/cards/substitutions all 200 for all 3 UEFA comps) -- skipped
+  // here to keep this run small; re-enable if GOAL API needs re-checking.
+  // for (const comp of UEFA_GOAL_API_LEAGUES) {
+  //   await checkGoalApiCompetition(comp);
+  // }
 
   section('Summary');
   console.log('Look for a statistics/possession/shots-shaped field in any of the dumps above.');
