@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Users, CalendarClock, ArrowUpCircle, ArrowDownCircle, RotateCcwClock, BarChart2, ListOrdered, Video } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
@@ -874,27 +874,39 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
               which side's lineup is shown within the Aufstellungen tab are
               two independent choices, so this is a second, outer toggle
               row rather than folding "Spielinfo" in as a third side
-              option. */}
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
+              option.
+
+              Icons, not text labels -- confirmed live: with all 5 possible
+              tabs' labels (worst case "Aufstellungen"/"Highlights"), this
+              row overflowed the sheet's 420px width with no scroll or wrap,
+              clipping the last tab off screen entirely. Icons keep every
+              tab's width fixed and small regardless of language, so all of
+              them always fit; each still carries its real label via
+              aria-label/title for screen readers and hover, it just isn't
+              painted. */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', borderBottom: `1px solid ${theme.border}` }}>
             {[
-              ['lineups', t.matchInfo.tabLineups],
-              ['info', t.matchInfo.tabInfo],
-              ['stats', t.matchInfo.tabStats],
-              ['table', t.matchInfo.tabTable],
+              ['lineups', t.matchInfo.tabLineups, <PitchIcon key="icon" />],
+              ['info', t.matchInfo.tabInfo, <RotateCcwClock key="icon" size={18} />],
+              ['stats', t.matchInfo.tabStats, <BarChart2 key="icon" size={18} />],
+              ['table', t.matchInfo.tabTable, <ListOrdered key="icon" size={18} />],
               // Only offered once the match is actually over -- an upcoming
               // or live fixture can never have a highlight clip yet, same
               // reasoning FixtureRow.jsx already applies to the favorite
               // star for the opposite case (a finished match can't go live
               // again).
-              ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights]] : []),
-            ].map(([key, label]) => (
+              ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights, <Video key="icon" size={18} />]] : []),
+            ].map(([key, label, icon]) => (
               <button
                 key={key}
                 onClick={() => setView(key)}
+                aria-label={label}
+                title={label}
                 style={{
+                  flex: 1,
+                  display: 'flex',
+                  justifyContent: 'center',
                   padding: '6px 2px 10px',
-                  fontSize: '13px',
-                  fontWeight: view === key ? 700 : 600,
                   border: 'none',
                   borderBottom: view === key ? `2px solid ${theme.accent}` : '2px solid transparent',
                   background: 'transparent',
@@ -902,7 +914,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
                   cursor: 'pointer',
                 }}
               >
-                {label}
+                {icon}
               </button>
             ))}
           </div>
