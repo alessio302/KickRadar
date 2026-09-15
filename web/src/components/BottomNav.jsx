@@ -19,8 +19,8 @@ const TABS = [
   ['einstellungen', (t) => t.nav.settings, Settings],
 ];
 
-// theme.surface is a plain hex string -- needed as rgba() for the bar's
-// own translucency below, not just a flat opaque fill.
+// theme.bg is a plain hex string -- needed as rgba() for the bar's own
+// translucency below, not just a flat opaque fill.
 function hexToRgba(hex, alpha) {
   const n = parseInt(hex.replace('#', ''), 16);
   const r = (n >> 16) & 255;
@@ -73,7 +73,12 @@ export default function BottomNav({ tab, onSelectTab, theme, t, hasLiveSpiele, h
         // live this fixed it -- user-approved, see this file's own closing
         // comment below.
         padding: '16px 4px 20px',
-        background: hexToRgba(theme.surface, 0.92),
+        // theme.bg, not theme.surface -- confirmed live: with surface
+        // (a lighter "raised" step above bg, see App.jsx's ACCENT_PALETTES)
+        // dark mode's now-pure-black page background sat behind a visibly
+        // lighter grey bar instead of reading as truly black. Using bg here
+        // instead makes the bar match the page it's sitting on exactly.
+        background: hexToRgba(theme.bg, 0.92),
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         borderTop: `1px solid ${theme.border}`,
@@ -113,7 +118,7 @@ export default function BottomNav({ tab, onSelectTab, theme, t, hasLiveSpiele, h
                     height: '6px',
                     borderRadius: '50%',
                     background: theme.danger,
-                    border: `1.5px solid ${hexToRgba(theme.surface, 0.92)}`,
+                    border: `1.5px solid ${hexToRgba(theme.bg, 0.92)}`,
                   }}
                 />
               )}
