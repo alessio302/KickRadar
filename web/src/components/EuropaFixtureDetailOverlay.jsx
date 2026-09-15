@@ -3,8 +3,20 @@ import { RotateCcwClock, Video, BarChart2 } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
-import { LineupList, Whistle, PitchIcon, HighlightsTab, MatchInfoTimeline } from './FixtureDetailOverlay.jsx';
+import {
+  LineupList,
+  Whistle,
+  PitchIcon,
+  HighlightsTab,
+  MatchInfoTimeline,
+  SECTION_LABEL_STYLE,
+  HINT_STYLE,
+  FormRow,
+  StandingRow,
+} from './FixtureDetailOverlay.jsx';
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
+import { useEuropaTeamForm } from '../hooks/useEuropaTeamForm.js';
+import { useEuropaLeagueStandings } from '../hooks/useEuropaLeagueStandings.js';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { fetchFixtureStatistics } from '../lib/fixtureStatistics.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -75,7 +87,63 @@ function StatRow({ theme, label, home, away }) {
 // response also carries a `players` breakdown (per-player shot/pass
 // counts) and firstHalf/secondHalf splits, both left unused here until
 // there's a reason to add them; fullTime is what's fetched and shown.
-function MatchStatisticsTab({ theme, t, fixture }) {
+// Key computeStandings() itself groups teams by (home/away_team_short_name
+// || ...team_name) -- matching that same fallback here is what makes a
+// fixture's own home/away identity resolve to the right row in the table
+// computeStandings returned, rather than two silently-different keys for
+// the same team.
+function standingsKey(shortName, name) {
+  return shortName || name;
+}
+
+function EuropaFormSection({ t, theme, homeClub, awayClub }) {
+  const { form: homeForm, loading: homeLoading } = useEuropaTeamForm(homeClub?.name);
+  const { form: awayForm, loading: awayLoading } = useEuropaTeamForm(awayClub?.name);
+  const loading = homeLoading || awayLoading;
+  const noForm = !loading && homeForm.length === 0 && awayForm.length === 0;
+
+  return (
+    <>
+      <p style={SECTION_LABEL_STYLE(theme)}>{t.stats.form}</p>
+      {loading ? (
+        <p style={HINT_STYLE(theme)}>{t.common.loading}</p>
+      ) : noForm ? (
+        <p style={HINT_STYLE(theme)}>{t.stats.noForm}</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
+          <FormRow theme={theme} club={homeClub} form={homeForm} />
+          <FormRow theme={theme} club={awayClub} form={awayForm} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function EuropaStandingSection({ t, theme, fixture, homeClub, awayClub }) {
+  const { rows, loading } = useEuropaLeagueStandings(fixture.league_id);
+  const homeKey = standingsKey(fixture.home_team_short_name, fixture.home_team_name);
+  const awayKey = standingsKey(fixture.away_team_short_name, fixture.away_team_name);
+  const homeRank = rows.findIndex((r) => r.name === homeKey) + 1;
+  const awayRank = rows.findIndex((r) => r.name === awayKey) + 1;
+
+  return (
+    <>
+      <p style={SECTION_LABEL_STYLE(theme)}>{t.stats.standing}</p>
+      {loading ? (
+        <p style={HINT_STYLE(theme)}>{t.common.loading}</p>
+      ) : rows.length === 0 ? (
+        <p style={HINT_STYLE(theme)}>{t.standings.empty}</p>
+      ) : (
+        <div>
+          <StandingRow theme={theme} t={t} club={homeClub} entry={homeRank > 0 ? { position: homeRank } : null} />
+          <StandingRow theme={theme} t={t} club={awayClub} entry={awayRank > 0 ? { position: awayRank } : null} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function MatchStatisticsTab({ theme, t, fixture, homeClub, awayClub }) {
   const [stats, setStats] = useState(null); // undefined-until-loaded via null, then { available, fullTime } | { available: false }
   const [loading, setLoading] = useState(true);
 
@@ -92,31 +160,44 @@ function MatchStatisticsTab({ theme, t, fixture }) {
     };
   }, [fixture.goal_api_id]);
 
-  if (loading) {
-    return <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '32px 16px' }}>{t.common.loading}</p>;
-  }
-  if (!stats?.available) {
-    return <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '32px 16px' }}>{t.stats.noStatistics}</p>;
-  }
-
   // Deduped by type, first occurrence wins -- GOAL API's own list repeats
   // a handful of types (confirmed live: "Corners" and "Ball Possession"
   // both appear twice, the second "Ball Possession" pair even disagreeing
   // with the first).
   const byType = new Map();
-  for (const row of stats.fullTime) {
-    if (!byType.has(row.type)) byType.set(row.type, row);
+  if (stats?.available) {
+    for (const row of stats.fullTime) {
+      if (!byType.has(row.type)) byType.set(row.type, row);
+    }
   }
 
+  // Form/Tabellenplatz per explicit direction, to harmonize with Ligen's
+  // own Statistiken tab (MatchStatsTab in FixtureDetailOverlay.jsx) --
+  // Direkter Vergleich (head-to-head) deliberately left out: confirmed live
+  // GOAL API has no head-to-head endpoint on its FREE tier (see
+  // diagnoseHeadToHeadCoverage.js, since removed), so there's no reliable
+  // source for it here the way football-data.org's /head2head serves the
+  // domestic leagues.
   return (
-    <div style={{ padding: '16px' }}>
-      {STAT_ROWS.map(([apiType, labelKey]) => {
-        const row = byType.get(apiType);
-        if (!row) return null;
-        return (
-          <StatRow key={apiType} theme={theme} label={t.stats[labelKey]} home={parseStatValue(row.home)} away={parseStatValue(row.away)} />
-        );
-      })}
+    <div style={{ padding: '4px 16px 20px' }}>
+      {loading ? (
+        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '32px 16px' }}>{t.common.loading}</p>
+      ) : !stats?.available ? (
+        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '16px' }}>{t.stats.noStatistics}</p>
+      ) : (
+        <div style={{ marginBottom: '22px' }}>
+          {STAT_ROWS.map(([apiType, labelKey]) => {
+            const row = byType.get(apiType);
+            if (!row) return null;
+            return (
+              <StatRow key={apiType} theme={theme} label={t.stats[labelKey]} home={parseStatValue(row.home)} away={parseStatValue(row.away)} />
+            );
+          })}
+        </div>
+      )}
+
+      <EuropaFormSection t={t} theme={theme} homeClub={homeClub} awayClub={awayClub} />
+      <EuropaStandingSection t={t} theme={theme} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
     </div>
   );
 }
@@ -198,8 +279,14 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
   // ClubJersey only ever reads club.crest_url/club.name -- wrapping the
   // fixture's own team_name/team_badge fields in that shape reuses it
   // as-is instead of a parallel badge component.
-  const homeClub = useMemo(() => ({ name: fixture.home_team_name, crest_url: fixture.home_team_badge }), [fixture]);
-  const awayClub = useMemo(() => ({ name: fixture.away_team_name, crest_url: fixture.away_team_badge }), [fixture]);
+  const homeClub = useMemo(
+    () => ({ name: fixture.home_team_name, short_name: fixture.home_team_short_name, crest_url: fixture.home_team_badge }),
+    [fixture]
+  );
+  const awayClub = useMemo(
+    () => ({ name: fixture.away_team_name, short_name: fixture.away_team_short_name, crest_url: fixture.away_team_badge }),
+    [fixture]
+  );
 
   // Same profile-overlay wiring as FixtureDetailOverlay.jsx's own
   // handleSelectPlayer -- fetchPlayerProfile(p.id) falls through to the
@@ -377,7 +464,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               </>
             )}
             {view === 'info' && <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
-            {view === 'stats' && <MatchStatisticsTab theme={theme} t={t} fixture={fixture} />}
+            {view === 'stats' && <MatchStatisticsTab theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
             {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
           </div>
         </div>
