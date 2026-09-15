@@ -558,7 +558,11 @@ export function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
   );
 }
 
-const SECTION_LABEL_STYLE = (theme) => ({
+// Exported -- EuropaFixtureDetailOverlay.jsx's own MatchStatisticsTab reuses
+// these plus FormRow/StandingRow below so its Form/Tabellenplatz sections
+// look identical to this file's own MatchStatsTab, per explicit direction
+// to harmonize the two overlays' UI.
+export const SECTION_LABEL_STYLE = (theme) => ({
   fontSize: '11px',
   fontWeight: 700,
   color: theme.textMuted,
@@ -566,7 +570,7 @@ const SECTION_LABEL_STYLE = (theme) => ({
   letterSpacing: '0.04em',
   margin: '0 0 10px',
 });
-const HINT_STYLE = (theme) => ({ fontSize: '13px', color: theme.textMuted, margin: '0 0 4px', padding: '4px 0' });
+export const HINT_STYLE = (theme) => ({ fontSize: '13px', color: theme.textMuted, margin: '0 0 4px', padding: '4px 0' });
 
 // W green / L red / D grey, exactly the FlashScore-style convention this
 // was modeled on -- letters stay the fixed English W/D/L abbreviations
@@ -595,7 +599,7 @@ function FormCircle({ result }) {
 
 // Oldest-to-newest left-to-right (useTeamForm.js already returns them in
 // that order) -- the most recent result reads as the rightmost circle.
-function FormRow({ theme, club, form }) {
+export function FormRow({ theme, club, form }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
       <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
@@ -655,7 +659,7 @@ function HeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
   );
 }
 
-function StandingRow({ theme, t, club, entry }) {
+export function StandingRow({ theme, t, club, entry }) {
   if (!entry) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '5px 0' }}>
