@@ -1,12 +1,125 @@
-import { useMemo, useRef, useState } from 'react';
-import { RotateCcwClock, Video } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { RotateCcwClock, Video, BarChart2 } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
 import MatchScore from './MatchScore.jsx';
 import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
 import { LineupList, Whistle, PitchIcon, HighlightsTab, MatchInfoTimeline } from './FixtureDetailOverlay.jsx';
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
+import { fetchFixtureStatistics } from '../lib/fixtureStatistics.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
+
+// Which of GOAL API's own `type` strings (see get-fixture-statistics) this
+// tab shows, in display order, and which t.stats.* key/theme colour each
+// maps to. GOAL API's raw list carries more than this (Throw In, Free
+// Kick, Goal Kick, Penalty, Substitution counts, Attacks, Dangerous
+// Attacks) plus a second, differently-valued "On Target"/"Off Target" pair
+// alongside "Shots On Goal"/"Shots Off Goal" -- confirmed live the two
+// pairs don't even agree with each other (13/2 vs 11/2 for the same
+// match), evidently two merged upstream feeds. Standardized on the
+// On Goal/Off Goal/Blocked triplet here since it's the only internally
+// consistent three-way shot breakdown GOAL API returns; the rest are
+// either not meaningful to a casual reader (throw-ins, goal kicks) or
+// redundant with what's already shown elsewhere (Substitution count vs.
+// the actual sub events in the Spielinfo tab).
+const STAT_ROWS = [
+  ['Ball Possession', 'possession', true],
+  ['Shots On Goal', 'shotsOnGoal', false],
+  ['Shots Off Goal', 'shotsOffGoal', false],
+  ['Shots Blocked', 'shotsBlocked', false],
+  ['Corners', 'corners', false],
+  ['Offsides', 'offsides', false],
+  ['Fouls', 'fouls', false],
+  ['Yellow Cards', 'yellowCards', false],
+  ['Red Cards', 'redCards', false],
+];
+
+// "%" -> 62, "" -> null (no data for this row, e.g. "Shots Total"/"Shots
+// Inside Box" in GOAL API's own response), "9" -> 9.
+function parseStatValue(raw) {
+  if (raw == null || raw === '') return null;
+  const n = Number.parseInt(String(raw).replace('%', ''), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+// One bar per stat: the side with the bigger raw number is highlighted in
+// the user's chosen accent colour (per explicit direction -- always the
+// larger count, not "better for that stat", so e.g. more fouls is still
+// the highlighted side), the other in a neutral tone. A tie highlights
+// neither, since there's no leader to point at.
+function StatRow({ theme, label, home, away }) {
+  if (home == null && away == null) return null;
+  const h = home ?? 0;
+  const a = away ?? 0;
+  const total = h + a;
+  const homeShare = total > 0 ? h / total : 0.5;
+  const homeLeads = h > a;
+  const awayLeads = a > h;
+
+  return (
+    <div style={{ marginBottom: '18px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px', fontSize: '13px' }}>
+        <span style={{ fontWeight: 700, color: homeLeads ? theme.accent : theme.text, minWidth: '32px' }}>{home ?? '–'}</span>
+        <span style={{ color: theme.textMuted, textAlign: 'center', flex: 1 }}>{label}</span>
+        <span style={{ fontWeight: 700, color: awayLeads ? theme.accent : theme.text, minWidth: '32px', textAlign: 'right' }}>{away ?? '–'}</span>
+      </div>
+      <div style={{ display: 'flex', height: '6px', borderRadius: '999px', overflow: 'hidden', background: theme.border }}>
+        <div style={{ width: `${homeShare * 100}%`, background: homeLeads ? theme.accent : theme.border }} />
+        <div style={{ flex: 1, background: awayLeads ? theme.accent : theme.border }} />
+      </div>
+    </div>
+  );
+}
+
+// Team stats only for now (per explicit direction) -- GOAL API's own
+// response also carries a `players` breakdown (per-player shot/pass
+// counts) and firstHalf/secondHalf splits, both left unused here until
+// there's a reason to add them; fullTime is what's fetched and shown.
+function MatchStatisticsTab({ theme, t, fixture }) {
+  const [stats, setStats] = useState(null); // undefined-until-loaded via null, then { available, fullTime } | { available: false }
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchFixtureStatistics(fixture.goal_api_id).then((result) => {
+      if (cancelled) return;
+      setStats(result);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fixture.goal_api_id]);
+
+  if (loading) {
+    return <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '32px 16px' }}>{t.common.loading}</p>;
+  }
+  if (!stats?.available) {
+    return <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '32px 16px' }}>{t.stats.noStatistics}</p>;
+  }
+
+  // Deduped by type, first occurrence wins -- GOAL API's own list repeats
+  // a handful of types (confirmed live: "Corners" and "Ball Possession"
+  // both appear twice, the second "Ball Possession" pair even disagreeing
+  // with the first).
+  const byType = new Map();
+  for (const row of stats.fullTime) {
+    if (!byType.has(row.type)) byType.set(row.type, row);
+  }
+
+  return (
+    <div style={{ padding: '16px' }}>
+      {STAT_ROWS.map(([apiType, labelKey]) => {
+        const row = byType.get(apiType);
+        if (!row) return null;
+        return (
+          <StatRow key={apiType} theme={theme} label={t.stats[labelKey]} home={parseStatValue(row.home)} away={parseStatValue(row.away)} />
+        );
+      })}
+    </div>
+  );
+}
 
 const DISMISS_THRESHOLD_PX = 100;
 
@@ -47,10 +160,16 @@ function MatchInfoFooter({ theme, fixture }) {
 }
 
 // Slim counterpart to FixtureDetailOverlay.jsx for UCL/UEL/UECL fixtures --
-// Aufstellungen + Spielinfo + Highlights, but no Statistik/Tabelle: those
-// key off a clubs table row or one of our 5 tracked domestic league
-// standings, neither of which exists for European fixtures (see
-// src/lineups/syncEuropeanLineups.js's own top comment). Reuses
+// Aufstellungen + Spielinfo + Statistiken + Highlights, but no Tabelle:
+// that keys off one of our 5 tracked domestic league standings, which
+// doesn't exist for European fixtures (see
+// src/lineups/syncEuropeanLineups.js's own top comment). Domestic's own
+// "Statistiken" tab (form/head-to-head/table position, all clubs.id-keyed)
+// can't run here either for the same reason -- this tab is a different
+// thing entirely: real live match statistics (shots/possession/corners/
+// fouls/cards) from GOAL API's own /fixtures/{id}/statistics, which
+// football-data.org (UCL's other data source) doesn't have at all
+// (confirmed live, see get-fixture-statistics's own top comment). Reuses
 // FixtureDetailOverlay's LineupList, MatchInfoTimeline and HighlightsTab
 // as-is -- LineupList only needs a `row` shaped { confirmed, formation,
 // players }, MatchInfoTimeline's own side-detection already falls back to
@@ -66,9 +185,9 @@ function MatchInfoFooter({ theme, fixture }) {
 // syncHighlights.js (see that file's own top comment for the YouTube
 // source and matching rationale).
 export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture, onClose }) {
-  // 'lineups' | 'info' | 'highlights' -- mirrors FixtureDetailOverlay.jsx's
-  // own `view` state, just without the 'stats'/'table' tabs this slim
-  // overlay has no data source for (see the top comment).
+  // 'lineups' | 'info' | 'stats' | 'highlights' -- mirrors
+  // FixtureDetailOverlay.jsx's own `view` state, just without the 'table'
+  // tab this slim overlay has no data source for (see the top comment).
   const [view, setView] = useState('lineups');
   const [side, setSide] = useState('home');
   const { byTeamName } = useEuropaLineups(fixture.id);
@@ -191,6 +310,9 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               {[
                 ['lineups', t.matchInfo.tabLineups, <PitchIcon key="icon" />],
                 ...(fixture.status === 'finished' || fixture.status === 'live' ? [['info', t.matchInfo.tabInfo, <RotateCcwClock key="icon" size={18} />]] : []),
+                // Same gate as Spielinfo -- GOAL API has nothing to show
+                // for a fixture that hasn't kicked off yet either.
+                ...(fixture.status === 'finished' || fixture.status === 'live' ? [['stats', t.matchInfo.tabStats, <BarChart2 key="icon" size={18} />]] : []),
                 ...(fixture.status === 'finished' ? [['highlights', t.matchInfo.tabHighlights, <Video key="icon" size={18} />]] : []),
               ].map(([key, label, icon]) => (
                 <button
@@ -255,6 +377,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               </>
             )}
             {view === 'info' && <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
+            {view === 'stats' && <MatchStatisticsTab theme={theme} t={t} fixture={fixture} />}
             {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
           </div>
         </div>

@@ -4,8 +4,11 @@ import { supabase } from '../lib/supabaseClient.js';
 const SLUGS = ['champions-league', 'europa-league', 'conference-league'];
 const PAST_WINDOW_DAYS = 7;
 
+// goal_api_id added for MatchStatisticsTab (EuropaFixtureDetailOverlay.jsx)
+// -- the get-fixture-statistics Edge Function calls GOAL API by this id,
+// not our own numeric fixture id.
 const FIXTURE_COLUMNS =
-  'id, league_id, matchday, home_team_name, away_team_name, home_team_short_name, away_team_short_name, home_team_badge, away_team_badge, kickoff_at, kickoff_confirmed, status, home_score, away_score, live_minute, referee, venue, highlight_video_url';
+  'id, league_id, matchday, home_team_name, away_team_name, home_team_short_name, away_team_short_name, home_team_badge, away_team_badge, kickoff_at, kickoff_confirmed, status, home_score, away_score, live_minute, referee, venue, highlight_video_url, goal_api_id';
 
 async function fetchUefaLeagues() {
   const { data: leagues, error } = await supabase.from('leagues').select('id, slug').in('slug', SLUGS);
