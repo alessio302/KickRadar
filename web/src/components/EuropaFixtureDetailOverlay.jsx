@@ -17,6 +17,7 @@ import {
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
 import { useEuropaTeamForm } from '../hooks/useEuropaTeamForm.js';
 import { useEuropaLeagueStandings } from '../hooks/useEuropaLeagueStandings.js';
+import { useEuropaHeadToHead } from '../hooks/useEuropaHeadToHead.js';
 import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { fetchFixtureStatistics } from '../lib/fixtureStatistics.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
@@ -119,6 +120,55 @@ function EuropaFormSection({ t, theme, homeClub, awayClub }) {
   );
 }
 
+// Name-keyed counterpart to FixtureDetailOverlay.jsx's own (unexported,
+// club_id-keyed) HeadToHeadRow -- same visual shape, just resolving
+// host/guest by team name instead of club_id since Europa meetings carry
+// no club_id at all.
+function EuropaHeadToHeadRow({ theme, meeting, homeClub, awayClub, locale }) {
+  const meetingIsHomeClubHost = meeting.home_team_name === homeClub?.name;
+  const hostClub = meetingIsHomeClubHost ? homeClub : awayClub;
+  const guestClub = meetingIsHomeClubHost ? awayClub : homeClub;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12.5px', padding: '6px 0' }}>
+      <span style={{ color: theme.textMuted, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+        {new Date(meeting.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ width: '96px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {hostClub?.short_name || hostClub?.name}
+        </span>
+        <span style={{ width: '40px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>
+          {meeting.home_score} : {meeting.away_score}
+        </span>
+        <span style={{ width: '96px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {guestClub?.short_name || guestClub?.name}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EuropaHeadToHeadSection({ t, theme, locale, homeClub, awayClub }) {
+  const { meetings, loading } = useEuropaHeadToHead(homeClub?.name, awayClub?.name);
+
+  return (
+    <>
+      <p style={SECTION_LABEL_STYLE(theme)}>{t.stats.headToHead}</p>
+      {loading ? (
+        <p style={HINT_STYLE(theme)}>{t.common.loading}</p>
+      ) : meetings.length === 0 ? (
+        <p style={HINT_STYLE(theme)}>{t.stats.noHeadToHead}</p>
+      ) : (
+        <div style={{ marginBottom: '22px' }}>
+          {meetings.map((m) => (
+            <EuropaHeadToHeadRow key={m.id} theme={theme} meeting={m} homeClub={homeClub} awayClub={awayClub} locale={locale} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function EuropaStandingSection({ t, theme, fixture, homeClub, awayClub }) {
   const { rows, loading } = useEuropaLeagueStandings(fixture.league_id);
   const homeKey = standingsKey(fixture.home_team_short_name, fixture.home_team_name);
@@ -143,7 +193,7 @@ function EuropaStandingSection({ t, theme, fixture, homeClub, awayClub }) {
   );
 }
 
-function MatchStatisticsTab({ theme, t, fixture, homeClub, awayClub }) {
+function MatchStatisticsTab({ theme, t, locale, fixture, homeClub, awayClub }) {
   const [stats, setStats] = useState(null); // undefined-until-loaded via null, then { available, fullTime } | { available: false }
   const [loading, setLoading] = useState(true);
 
@@ -171,13 +221,12 @@ function MatchStatisticsTab({ theme, t, fixture, homeClub, awayClub }) {
     }
   }
 
-  // Form/Tabellenplatz per explicit direction, to harmonize with Ligen's
-  // own Statistiken tab (MatchStatsTab in FixtureDetailOverlay.jsx) --
-  // Direkter Vergleich (head-to-head) deliberately left out: confirmed live
-  // GOAL API has no head-to-head endpoint on its FREE tier (see
-  // diagnoseHeadToHeadCoverage.js, since removed), so there's no reliable
-  // source for it here the way football-data.org's /head2head serves the
-  // domestic leagues.
+  // Form/Direkter Vergleich/Tabellenplatz, harmonized with Ligen's own
+  // Statistiken tab (MatchStatsTab in FixtureDetailOverlay.jsx). An earlier
+  // diagnostic wrongly concluded GOAL API had no head-to-head endpoint on
+  // its FREE tier; a follow-up diagnostic (since removed) found the actual
+  // documented shape (/h2h/:team1Id/:team2Id/direct) works fine -- see
+  // syncEuropeanHeadToHead.js.
   return (
     <div style={{ padding: '4px 16px 20px' }}>
       {loading ? (
@@ -197,6 +246,7 @@ function MatchStatisticsTab({ theme, t, fixture, homeClub, awayClub }) {
       )}
 
       <EuropaFormSection t={t} theme={theme} homeClub={homeClub} awayClub={awayClub} />
+      <EuropaHeadToHeadSection t={t} theme={theme} locale={locale} homeClub={homeClub} awayClub={awayClub} />
       <EuropaStandingSection t={t} theme={theme} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
     </div>
   );
@@ -464,7 +514,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               </>
             )}
             {view === 'info' && <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
-            {view === 'stats' && <MatchStatisticsTab theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
+            {view === 'stats' && <MatchStatisticsTab theme={theme} t={t} locale={locale} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
             {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
           </div>
         </div>

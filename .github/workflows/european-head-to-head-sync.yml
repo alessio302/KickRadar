@@ -1,0 +1,27 @@
+name: European head-to-head sync
+
+on:
+  schedule:
+    # Same low-frequency, rarely-changing-data cadence as head-to-head-sync.yml
+    # (4x/day), offset to :45 so it doesn't share a literal cron pattern with
+    # any other workflow in this repo (see highlights-sync-european.yml's own
+    # comment for the full list of minutes already in use).
+    - cron: '45 5,11,17,23 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncEuropeanHeadToHead.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
