@@ -198,6 +198,8 @@ const de = {
   },
   errors: {
     notificationsDenied: 'Benachrichtigungen wurden nicht erlaubt.',
+    tabCrashed: 'Etwas ist schiefgelaufen.',
+    retry: 'Erneut versuchen',
   },
 };
 
@@ -368,6 +370,8 @@ const en = {
   },
   errors: {
     notificationsDenied: 'Notifications were not allowed.',
+    tabCrashed: 'Something went wrong.',
+    retry: 'Try again',
   },
 };
 
@@ -538,6 +542,8 @@ const it = {
   },
   errors: {
     notificationsDenied: 'Le notifiche non sono state autorizzate.',
+    tabCrashed: 'Qualcosa è andato storto.',
+    retry: 'Riprova',
   },
 };
 
@@ -708,6 +714,8 @@ const fr = {
   },
   errors: {
     notificationsDenied: "Les notifications n'ont pas été autorisées.",
+    tabCrashed: 'Une erreur est survenue.',
+    retry: 'Réessayer',
   },
 };
 
@@ -878,6 +886,8 @@ const es = {
   },
   errors: {
     notificationsDenied: 'No se permitieron las notificaciones.',
+    tabCrashed: 'Algo salió mal.',
+    retry: 'Reintentar',
   },
 };
 

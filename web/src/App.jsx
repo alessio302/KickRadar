@@ -6,10 +6,25 @@ import EuropaTab from './components/EuropaTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Toast from './components/Toast.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { usePersistedState } from './hooks/usePersistedState.js';
 import { useLanguage } from './hooks/useLanguage.js';
 import { useHasLive } from './hooks/useHasLive.js';
 import { adjacentLeague } from './lib/leagues.js';
+
+// Tried route-based code-splitting (React.lazy per tab) here first, but
+// measured (npm run build, before/after) that it made things *worse*, not
+// better: Rollup hoists any module shared by 2+ tabs into this always-
+// loaded entry chunk rather than creating a lazy-only shared chunk (since
+// the entry is guaranteed to load first, that's a valid place to put it),
+// which grew the initial bundle from 65.46 KB to 77.91 KB gzip. On top of
+// that, sw.js's own precacheAndRoute(self.__WB_MANIFEST) (see that file)
+// already fetches and caches every chunk on install regardless of which
+// tab is open, so a returning/installed PWA user gets zero benefit from
+// deferred loading either way -- the split only added a real regression
+// to the one case (first, uncached load) it could have helped. Plain
+// eager imports measured smaller and simpler; not worth revisiting unless
+// the service worker's caching strategy changes first.
 
 function useDarkMode(mode) {
   const [systemDark, setSystemDark] = useState(
@@ -328,63 +343,65 @@ export default function App() {
           is required here for that nested flex:1 scroll area to size
           correctly instead of overflowing its flex parent. */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        {tab === 'transfers' && (
-          <TransfersTab
-            theme={theme}
-            t={t}
-            language={language}
-            league={league}
-            onSelectLeague={selectLeague}
-            onSwipeLeague={swipeLeague}
-            favoriteClub={favoriteClub}
-            quickFilters={quickFilters}
-            activeFilter={activeFilter}
-            onSelectFilter={selectFilter}
-            onAddQuickFilter={addQuickFilter}
-            onRemoveQuickFilter={removeQuickFilter}
-            officialOnly={officialOnly}
-            onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
-          />
-        )}
-        {tab === 'ligen' && (
-          <LigenTab
-            theme={theme}
-            t={t}
-            language={language}
-            league={league}
-            onSelectLeague={selectLeague}
-            onSwipeLeague={swipeLeague}
-            initialFixtureId={initialFixtureId}
-            initialView={initialView}
-            onConsumedInitialFixture={() => {
-              setInitialFixtureId(null);
-              setInitialView(null);
-            }}
-            onFavoriteToast={setToast}
-          />
-        )}
-        {tab === 'live' && (
-          <LiveTab theme={theme} t={t} language={language} onFavoriteToast={setToast} />
-        )}
-        {tab === 'europa' && (
-          <EuropaTab theme={theme} t={t} language={language} />
-        )}
-        {tab === 'einstellungen' && (
-          <SettingsTab
-            theme={theme}
-            t={t}
-            language={language}
-            onSetLanguage={setLanguage}
-            darkModeSetting={darkModeSetting}
-            onSetDarkModeSetting={setDarkModeSetting}
-            accentColor={accentColor}
-            onSetAccentColor={setAccentColor}
-            favoriteClub={favoriteClub}
-            onSetFavoriteClub={setFavoriteClub}
-            quickFilters={quickFilters}
-            onRemoveQuickFilter={removeQuickFilter}
-          />
-        )}
+        <ErrorBoundary theme={theme} t={t}>
+          {tab === 'transfers' && (
+            <TransfersTab
+              theme={theme}
+              t={t}
+              language={language}
+              league={league}
+              onSelectLeague={selectLeague}
+              onSwipeLeague={swipeLeague}
+              favoriteClub={favoriteClub}
+              quickFilters={quickFilters}
+              activeFilter={activeFilter}
+              onSelectFilter={selectFilter}
+              onAddQuickFilter={addQuickFilter}
+              onRemoveQuickFilter={removeQuickFilter}
+              officialOnly={officialOnly}
+              onToggleOfficialOnly={() => setOfficialOnly((v) => !v)}
+            />
+          )}
+          {tab === 'ligen' && (
+            <LigenTab
+              theme={theme}
+              t={t}
+              language={language}
+              league={league}
+              onSelectLeague={selectLeague}
+              onSwipeLeague={swipeLeague}
+              initialFixtureId={initialFixtureId}
+              initialView={initialView}
+              onConsumedInitialFixture={() => {
+                setInitialFixtureId(null);
+                setInitialView(null);
+              }}
+              onFavoriteToast={setToast}
+            />
+          )}
+          {tab === 'live' && (
+            <LiveTab theme={theme} t={t} language={language} onFavoriteToast={setToast} />
+          )}
+          {tab === 'europa' && (
+            <EuropaTab theme={theme} t={t} language={language} />
+          )}
+          {tab === 'einstellungen' && (
+            <SettingsTab
+              theme={theme}
+              t={t}
+              language={language}
+              onSetLanguage={setLanguage}
+              darkModeSetting={darkModeSetting}
+              onSetDarkModeSetting={setDarkModeSetting}
+              accentColor={accentColor}
+              onSetAccentColor={setAccentColor}
+              favoriteClub={favoriteClub}
+              onSetFavoriteClub={setFavoriteClub}
+              quickFilters={quickFilters}
+              onRemoveQuickFilter={removeQuickFilter}
+            />
+          )}
+        </ErrorBoundary>
       </div>
 
       <div style={{ flexShrink: 0, position: 'relative' }}>
