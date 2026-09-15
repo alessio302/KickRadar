@@ -60,7 +60,7 @@ const HOME_TEAM_ID = 'cmri0gk70br4ulb07mfk2k6wl'; // Ferencvaros
 const AWAY_TEAM_ID = 'cmri0ey33b6jrlb07mo6ei5jt'; // Trabzonspor
 const SAMPLE_FIXTURE_ID = 'cmsvp3y1199o5pg075c82ynas';
 
-async function probe(label, path, params) {
+async function probe(label, path, params, trim) {
   await sleep(1000);
   const res = await goalCall(path, params);
   if (!res.ok) {
@@ -68,7 +68,15 @@ async function probe(label, path, params) {
     return;
   }
   ok(`${label} (${path}) → 200`);
-  dump(label, res.body);
+  // Some responses (the per-team fixtures list in particular) dump
+  // hundreds of entries -- trimmed to a sample so the job log's own tail
+  // cap doesn't push the more important h2h section out of what's
+  // actually retrievable afterwards.
+  let body = res.body;
+  if (trim && Array.isArray(body?.data)) {
+    body = { ...body, data: body.data.slice(0, 3), _trimmedFrom: body.data.length };
+  }
+  dump(label, body);
 }
 
 async function main() {
@@ -82,7 +90,7 @@ async function main() {
   await probe('h2h via fixture id (head2head)', `/fixtures/${SAMPLE_FIXTURE_ID}/head2head`);
 
   section('Per-team recent-results candidates (would also cover "Form" for European fixtures)');
-  await probe('team matches/fixtures history', `/teams/${HOME_TEAM_ID}/fixtures`);
+  await probe('team matches/fixtures history', `/teams/${HOME_TEAM_ID}/fixtures`, undefined, true);
   await probe('team matches (alt path)', `/teams/${HOME_TEAM_ID}/matches`);
   await probe('team profile (may embed recent form)', `/teams/${HOME_TEAM_ID}`);
 
