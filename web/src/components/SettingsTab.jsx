@@ -11,6 +11,7 @@ const ACCENT_OPTIONS = [
   ['terracotta', (t) => t.settings.accentTerracotta],
   ['violet', (t) => t.settings.accentViolet],
   ['green', (t) => t.settings.accentGreen],
+  ['mono', (t) => t.settings.accentMono],
 ];
 
 export default function SettingsTab({

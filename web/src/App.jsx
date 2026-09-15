@@ -42,24 +42,33 @@ function useDarkMode(mode) {
 
 const LEAGUE_SLUGS = ['serie-a', 'bundesliga', 'premier-league', 'ligue-1', 'la-liga'];
 
-// User-selectable accent colour (Einstellungen > Akzentfarbe) -- terracotta
-// is the original brand colour and stays the default for existing users;
-// violet/green are opt-in. Per explicit feedback, the accent now tints the
-// *whole* surface stack (page background, cards, borders), not just the
-// header and small highlights -- bg/surface/surfaceRaised/border are all
-// part of the palette below, each a muted, low-saturation version of the
-// accent hue (dark and desaturated in dark mode, pale in light mode) so
-// text stays readable without needing its own per-accent colour. danger
-// stays fixed too: it's semantic (errors/relegation), not a brand colour.
+// User-selectable accent colour (Einstellungen > Akzentfarbe) -- mono is the
+// default now (see usePersistedState below); terracotta/violet/green are
+// opt-in, mono being the plainest, most broadly-liked option in review. Per
+// explicit feedback, the accent tints the *whole* surface stack (page
+// background, cards, borders), not just the header and small highlights --
+// bg/surface/surfaceRaised/border are all part of the palette below. danger
+// stays fixed across every palette: it's semantic (errors/relegation), not a
+// brand colour.
+//
+// Dark-mode bg is pure black (#000000) for all four palettes, not a
+// low-saturation tint of the accent hue the way it used to be -- confirmed
+// live (screenshot comparison) this reads with noticeably better contrast
+// between the background and card surfaces than the original tinted-black
+// version. surface/surfaceRaised/border are each the old tinted value minus
+// the old bg value (i.e. shifted down by exactly the amount bg itself moved
+// to reach #000000), so every palette keeps the same *relative* contrast
+// step from one surface level to the next, just against a neutral black
+// floor instead of a coloured one.
 const ACCENT_PALETTES = {
   terracotta: {
     dark: {
       accent: '#E2896B',
       accentText: '#3A140A',
-      bg: '#150F0C',
-      surface: '#1F1613',
-      surfaceRaised: '#2A1D18',
-      border: '#3D2A22',
+      bg: '#000000',
+      surface: '#0A0707',
+      surfaceRaised: '#150E0C',
+      border: '#281B16',
     },
     light: {
       accent: '#954730',
@@ -74,10 +83,10 @@ const ACCENT_PALETTES = {
     dark: {
       accent: '#8D7BF9',
       accentText: '#1B1330',
-      bg: '#100C1F',
-      surface: '#1A1430',
-      surfaceRaised: '#241C40',
-      border: '#362A57',
+      bg: '#000000',
+      surface: '#0A0811',
+      surfaceRaised: '#141021',
+      border: '#261E38',
     },
     light: {
       accent: '#6A52E0',
@@ -92,10 +101,10 @@ const ACCENT_PALETTES = {
     dark: {
       accent: '#4CC38A',
       accentText: '#0B2A1C',
-      bg: '#0A140F',
-      surface: '#12241A',
-      surfaceRaised: '#1A3226',
-      border: '#254738',
+      bg: '#000000',
+      surface: '#08100B',
+      surfaceRaised: '#101E17',
+      border: '#1B3329',
     },
     light: {
       accent: '#1E8E5A',
@@ -104,6 +113,29 @@ const ACCENT_PALETTES = {
       surface: '#DFF3E6',
       surfaceRaised: '#D2EDDC',
       border: '#BFE3CE',
+    },
+  },
+  // No accent hue at all -- accent itself becomes white (dark mode)/black
+  // (light mode), so every pill/tab/nav highlight reads as pure monochrome.
+  // Hierarchy comes only from lightness steps (bg/surface/surfaceRaised/
+  // border), never saturation. danger is still the one fixed exception, same
+  // as every other palette above.
+  mono: {
+    dark: {
+      accent: '#FFFFFF',
+      accentText: '#000000',
+      bg: '#000000',
+      surface: '#121212',
+      surfaceRaised: '#1E1E1E',
+      border: '#303030',
+    },
+    light: {
+      accent: '#000000',
+      accentText: '#FFFFFF',
+      bg: '#FFFFFF',
+      surface: '#F2F2F2',
+      surfaceRaised: '#E5E5E5',
+      border: '#D4D4D4',
     },
   },
 };
@@ -159,7 +191,7 @@ export default function App() {
   const [favoriteClub, setFavoriteClub] = usePersistedState('kickradar.favoriteClub', null);
   const [quickFilters, setQuickFilters] = usePersistedState('kickradar.quickFilters', []);
   const [darkModeSetting, setDarkModeSetting] = usePersistedState('kickradar.theme', 'system');
-  const [accentColor, setAccentColor] = usePersistedState('kickradar.accentColor', 'terracotta');
+  const [accentColor, setAccentColor] = usePersistedState('kickradar.accentColor', 'mono');
   const { language, setLanguage, t } = useLanguage();
   const { hasDomestic: hasLiveSpiele, hasEuropa: hasLiveEuropa } = useHasLive();
 
@@ -220,7 +252,7 @@ export default function App() {
   // element by mistake (and would have next to terracotta's own accent too,
   // just less obviously). A red with no orange in it stays visually
   // distinct from all three accents at once.
-  const accentPalette = (ACCENT_PALETTES[accentColor] ?? ACCENT_PALETTES.terracotta)[isDark ? 'dark' : 'light'];
+  const accentPalette = (ACCENT_PALETTES[accentColor] ?? ACCENT_PALETTES.mono)[isDark ? 'dark' : 'light'];
   const theme = isDark
     ? {
         isDark: true,
