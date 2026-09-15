@@ -219,7 +219,7 @@ async function pollOnce(supabase, clubById) {
 
     const { data: current, error: currentErr } = await supabase
       .from('fixtures')
-      .select('status')
+      .select('status, home_score, away_score')
       .eq('external_fixture_id', m.id)
       .maybeSingle();
     if (currentErr) {
@@ -228,12 +228,32 @@ async function pollOnce(supabase, clubById) {
       continue; // already further along by a faster source (the webhook) -- never walk it backwards
     }
 
+    // Same "never walk it backwards" guard as status above, applied to the
+    // score itself -- confirmed live (Inter-Udinese, 2026-09-15): the
+    // goal-api-webhook writes a goal's score the moment GOAL API pushes it,
+    // but football-data.org's own feed lags that by up to a couple of
+    // minutes. Without this guard, the next poll tick (still ~120s away)
+    // read football-data.org's still-stale score and overwrote the correct,
+    // just-written one straight back down -- visible in the app as a score
+    // that updates on the goal and then reverts a moment later, until a
+    // later tick (once football-data.org itself has caught up) corrects it
+    // again. A score can only legitimately go down via a VAR-disallowed
+    // goal, which the webhook already handles itself through score.changed/
+    // score_correction_pending -- this REST backstop is never the right
+    // source for that, so dropping any decrease here is always safe.
+    const scoreRegressed =
+      current &&
+      current.home_score != null &&
+      current.away_score != null &&
+      homeScore != null &&
+      awayScore != null &&
+      (homeScore < current.home_score || awayScore < current.away_score);
+
     const { data: updatedRows, error } = await supabase
       .from('fixtures')
       .update({
         status: newStatus,
-        home_score: homeScore,
-        away_score: awayScore,
+        ...(scoreRegressed ? null : { home_score: homeScore, away_score: awayScore }),
         updated_at: new Date().toISOString(),
       })
       .eq('external_fixture_id', m.id)
@@ -247,7 +267,13 @@ async function pollOnce(supabase, clubById) {
 
     const fixtureRow = updatedRows?.[0];
     if (fixtureRow) {
-      await notifyFixtureStatusChange(supabase, clubById, fixtureRow, m._leagueSlug, newStatus, homeScore, awayScore);
+      // Whatever actually ended up in the row -- current.home_score/away_score
+      // when the write above skipped the (regressed) poll value, otherwise
+      // the poll's own value -- so a kickoff/full-time push never reports a
+      // score this same tick just decided not to write.
+      const notifiedHomeScore = scoreRegressed ? current.home_score : homeScore;
+      const notifiedAwayScore = scoreRegressed ? current.away_score : awayScore;
+      await notifyFixtureStatusChange(supabase, clubById, fixtureRow, m._leagueSlug, newStatus, notifiedHomeScore, notifiedAwayScore);
     }
 
     // Not cleared here on newStatus === 'finished' -- confirmed live this
