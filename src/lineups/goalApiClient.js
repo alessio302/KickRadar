@@ -212,6 +212,24 @@ export async function getPlayer(goalApiId) {
   return data.data ?? null;
 }
 
+// Up to the last several seasons' meetings between two teams -- confirmed
+// live (diagnoseHeadToHeadEndpoints.js/diagnoseHeadToHeadShape.js, both
+// since removed) this is a real, working GOAL API endpoint despite an
+// earlier diagnostic guessing 4 wrong REST shapes and concluding it didn't
+// exist. team1Id/team2Id are GOAL API's own team ids (the same cuid
+// getLeagueTeams() returns), not our DB's club_id or any external
+// football-data.org id. Each match entry's shape (confirmed live):
+// { match_id, match_date ("YYYY-MM-DD"), match_time, match_status,
+//   match_hometeam_id, match_awayteam_id, match_hometeam_name,
+//   match_awayteam_name, match_hometeam_score, match_awayteam_score (all
+//   scores as strings), team_home_badge, team_away_badge, ... }. Order is
+// not guaranteed most-recent-first by the API itself (unconfirmed) --
+// callers sort by match_date before trusting the order.
+export async function getHeadToHeadDirect(team1Id, team2Id) {
+  const data = await call(`/h2h/${team1Id}/${team2Id}/direct`);
+  return data.matches ?? [];
+}
+
 // Exchanges the API key for a short-lived (60s), single-use WebSocket
 // connection token -- required for browser-style clients per GOAL API's
 // own docs; a server-side Node client could send the API key directly on
