@@ -2,11 +2,17 @@ name: European head-to-head sync
 
 on:
   schedule:
-    # Same low-frequency, rarely-changing-data cadence as head-to-head-sync.yml
-    # (4x/day), offset to :45 so it doesn't share a literal cron pattern with
-    # any other workflow in this repo (see highlights-sync-european.yml's own
+    # Down from 4x/day (2026-09-15): unlike its domestic counterpart
+    # (head-to-head-sync.yml, football-data.org -- a separate, not
+    # currently strained budget), this job spends GOAL API requests, the
+    # same shared 1000/day pool that's already been measured going over
+    # cap on real match days. H2H data isn't remotely time-critical --
+    # nobody is waiting in real time for "last 5 meetings" to update the
+    # moment a match ends -- so once a day is exactly as useful to a user
+    # as 4x/day was, at a quarter of the cost. Offset to :45, distinct
+    # from every other cron here (see highlights-sync-european.yml's own
     # comment for the full list of minutes already in use).
-    - cron: '45 5,11,17,23 * * *'
+    - cron: '45 5 * * *'
   workflow_dispatch: {}
 
 jobs:
