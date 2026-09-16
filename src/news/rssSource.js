@@ -20,6 +20,28 @@ const parser = new Parser({
   },
 });
 
+// rss-parser leaves any element it doesn't recognize as a first-class field
+// (media:content, media:thumbnail) as a raw xml2js node under its
+// namespaced tag name -- {$: {url: ...}} for a single element, an array of
+// those for several. Tried in the order a real-world feed is most likely to
+// carry image info: a plain <enclosure>, then MRSS media:content/thumbnail,
+// then finally an <img> sniffed out of any inline HTML content. Only
+// consumed by the News pipeline today (runGeneralNewsScraper.js -- card
+// thumbnails), but computed here for every source so a transfers source
+// gets it too for free if a future card design wants one.
+function extractImage(item) {
+  if (item.enclosure?.url) return item.enclosure.url;
+  for (const key of ['media:content', 'media:thumbnail']) {
+    const node = item[key];
+    if (!node) continue;
+    const first = Array.isArray(node) ? node[0] : node;
+    const url = first?.$?.url || first?.url;
+    if (url) return url;
+  }
+  const match = /<img[^>]+src=["']([^"']+)["']/i.exec(item['content:encoded'] || item.content || '');
+  return match?.[1] ?? null;
+}
+
 // Shared factory for the RSS-based sources (tuttomercatoweb, kicker). Feed
 // URL is env-overridable per source since the exact feed path/section can
 // only be confirmed with real internet access to the site (unavailable in
@@ -45,6 +67,7 @@ export function createRssSource({ sourceKey, feedUrlEnvVar, defaultFeedUrl }) {
           guid: item.guid || item.link,
           publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
           summary,
+          image: extractImage(item),
         };
       });
     },
