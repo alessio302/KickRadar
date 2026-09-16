@@ -42,6 +42,23 @@ function extractImage(item) {
   return match?.[1] ?? null;
 }
 
+// Confirmed live (gazzetta.js, diagnoseGeneralNewsFeeds.js's real-world run):
+// a <guid isPermaLink="false">text</guid> element -- valid, common RSS --
+// comes back from rss-parser as an object ({_: 'text', $: {isPermaLink:
+// 'false'}}), not a plain string, whenever it carries an attribute. Every
+// other source's plain <guid>text</guid> (no attributes) already comes back
+// as a string, so this went unnoticed until a source that actually uses the
+// attribute form hit it. runGeneralNewsScraper.js's externalIdFor() then
+// crashed the whole source's scrape (createHash().update() requires a
+// string/Buffer) since `item.guid || item.link` is truthy for an object and
+// never falls through to the link. Coerce defensively here, once, for every
+// caller instead of trusting the shape.
+function guidToString(guid) {
+  if (typeof guid === 'string') return guid;
+  if (guid && typeof guid === 'object') return guid._ ?? guid['#text'] ?? null;
+  return null;
+}
+
 // Shared factory for the RSS-based sources (tuttomercatoweb, kicker). Feed
 // URL is env-overridable per source since the exact feed path/section can
 // only be confirmed with real internet access to the site (unavailable in
@@ -64,7 +81,7 @@ export function createRssSource({ sourceKey, feedUrlEnvVar, defaultFeedUrl }) {
         return {
           title: item.title?.trim() || '',
           link: item.link,
-          guid: item.guid || item.link,
+          guid: guidToString(item.guid) || item.link,
           publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
           summary,
           image: extractImage(item),
