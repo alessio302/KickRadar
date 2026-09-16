@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import TransfersTab from './components/TransfersTab.jsx';
+import NewsSectionTab from './components/NewsSectionTab.jsx';
 import LigenTab from './components/LigenTab.jsx';
 import LiveTab from './components/LiveTab.jsx';
 import EuropaTab from './components/EuropaTab.jsx';
@@ -377,7 +377,7 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <ErrorBoundary theme={theme} t={t}>
           {tab === 'transfers' && (
-            <TransfersTab
+            <NewsSectionTab
               theme={theme}
               t={t}
               language={language}

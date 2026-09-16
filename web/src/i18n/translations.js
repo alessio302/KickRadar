@@ -30,7 +30,7 @@ function ordinalEn(n) {
 }
 
 const de = {
-  nav: { transfers: 'Transfers', ligen: 'Ligen', live: 'Live', europa: 'Europa', settings: 'Einstellungen', fixtures: 'Spiele', standings: 'Tabelle' },
+  nav: { news: 'News', ligen: 'Ligen', live: 'Live', europa: 'Europa', settings: 'Einstellungen', fixtures: 'Spiele', standings: 'Tabelle' },
   common: {
     loading: 'Lädt…',
     chooseClub: 'Verein wählen…',
@@ -60,6 +60,7 @@ const de = {
     hoursAgo: (n) => `vor ${n} Std`,
     daysAgo: (n) => `vor ${n} Tag${n === 1 ? '' : 'en'}`,
   },
+  newsSection: { tabNews: 'News', tabTransfers: 'Transfers' },
   fixtures: {
     currentMatchdayOnly: 'Nur aktueller Spieltag',
     currentMatchdayOnlyToggle: 'Nur aktuellen Spieltag anzeigen umschalten',
@@ -215,7 +216,7 @@ const de = {
 };
 
 const en = {
-  nav: { transfers: 'Transfers', ligen: 'Leagues', live: 'Live', europa: 'Europe', settings: 'Settings', fixtures: 'Fixtures', standings: 'Table' },
+  nav: { news: 'News', ligen: 'Leagues', live: 'Live', europa: 'Europe', settings: 'Settings', fixtures: 'Fixtures', standings: 'Table' },
   common: {
     loading: 'Loading…',
     chooseClub: 'Choose club…',
@@ -243,6 +244,7 @@ const en = {
     hoursAgo: (n) => `${n} hr ago`,
     daysAgo: (n) => `${n} day${n === 1 ? '' : 's'} ago`,
   },
+  newsSection: { tabNews: 'News', tabTransfers: 'Transfers' },
   fixtures: {
     currentMatchdayOnly: 'Current matchday only',
     currentMatchdayOnlyToggle: 'Toggle showing only the current matchday',
@@ -398,7 +400,7 @@ const en = {
 };
 
 const it = {
-  nav: { transfers: 'Trasferimenti', ligen: 'Campionati', live: 'Live', europa: 'Europa', settings: 'Impostazioni', fixtures: 'Partite', standings: 'Classifica' },
+  nav: { news: 'News', ligen: 'Campionati', live: 'Live', europa: 'Europa', settings: 'Impostazioni', fixtures: 'Partite', standings: 'Classifica' },
   common: {
     loading: 'Caricamento…',
     chooseClub: 'Scegli squadra…',
@@ -426,6 +428,7 @@ const it = {
     hoursAgo: (n) => `${n} ${n === 1 ? 'ora' : 'ore'} fa`,
     daysAgo: (n) => `${n} ${n === 1 ? 'giorno' : 'giorni'} fa`,
   },
+  newsSection: { tabNews: 'News', tabTransfers: 'Trasferimenti' },
   fixtures: {
     currentMatchdayOnly: 'Solo giornata attuale',
     currentMatchdayOnlyToggle: 'Attiva/disattiva solo giornata attuale',
@@ -581,7 +584,7 @@ const it = {
 };
 
 const fr = {
-  nav: { transfers: 'Transferts', ligen: 'Championnats', live: 'Live', europa: 'Europe', settings: 'Réglages', fixtures: 'Matchs', standings: 'Classement' },
+  nav: { news: 'Actualités', ligen: 'Championnats', live: 'Live', europa: 'Europe', settings: 'Réglages', fixtures: 'Matchs', standings: 'Classement' },
   common: {
     loading: 'Chargement…',
     chooseClub: 'Choisir un club…',
@@ -609,6 +612,7 @@ const fr = {
     hoursAgo: (n) => `il y a ${n} h`,
     daysAgo: (n) => `il y a ${n} jour${n === 1 ? '' : 's'}`,
   },
+  newsSection: { tabNews: 'News', tabTransfers: 'Transferts' },
   fixtures: {
     currentMatchdayOnly: 'Seulement la journée en cours',
     currentMatchdayOnlyToggle: 'Activer/désactiver journée en cours uniquement',
@@ -764,7 +768,7 @@ const fr = {
 };
 
 const es = {
-  nav: { transfers: 'Traspasos', ligen: 'Ligas', live: 'En vivo', europa: 'Europa', settings: 'Ajustes', fixtures: 'Partidos', standings: 'Clasificación' },
+  nav: { news: 'Noticias', ligen: 'Ligas', live: 'En vivo', europa: 'Europa', settings: 'Ajustes', fixtures: 'Partidos', standings: 'Clasificación' },
   common: {
     loading: 'Cargando…',
     chooseClub: 'Elegir club…',
@@ -792,6 +796,7 @@ const es = {
     hoursAgo: (n) => `hace ${n} h`,
     daysAgo: (n) => `hace ${n} día${n === 1 ? '' : 's'}`,
   },
+  newsSection: { tabNews: 'News', tabTransfers: 'Traspasos' },
   fixtures: {
     currentMatchdayOnly: 'Solo jornada actual',
     currentMatchdayOnlyToggle: 'Alternar solo jornada actual',

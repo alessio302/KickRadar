@@ -95,3 +95,43 @@ export function resolveClub(candidateName, clubs) {
   }
   return bestMatch;
 }
+
+// Scans free text (a general-news headline/teaser, not a pre-extracted
+// candidate string) for every club it mentions -- used by
+// runGeneralNewsScraper.js to decide which league(s) an article belongs to,
+// since most of its sources (BBC, Guardian, Marca, RMC Sport, ...) cover
+// far more than one league and have no per-source league binding the way
+// runNewsScraper.js's transfer sources do. Word-boundary matching against
+// name/short_name/aliases, same conservative "no fuzzy matching" policy as
+// resolveClub() above -- a false positive here would silently misfile a
+// completely unrelated story into a league it has nothing to do with.
+//
+// Deliberately NOT reusing resolveClub(): that function matches ONE
+// candidate string against the clubs table (substring in either
+// direction), which is the wrong shape for scanning a whole sentence for
+// zero or more mentions -- a short alias like "OM" or "Inter" as a
+// substring-of/contains check against arbitrary prose would match constantly
+// (e.g. "OM" inside "Rome", "Inter" inside "international"). Word-boundary
+// regex matching against the normalized text avoids that.
+export function findMentionedClubs(text, clubs) {
+  const normText = normalize(text || '');
+  if (!normText) return [];
+  const matched = [];
+  const seenIds = new Set();
+  for (const club of clubs) {
+    const names = [club.name, club.short_name, ...(club.aliases || [])].filter(Boolean);
+    for (const name of names) {
+      const normName = normalize(name);
+      if (normName.length < 3 || GENERIC_CLUB_WORDS.has(normName)) continue;
+      const pattern = new RegExp(`\\b${normName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      if (pattern.test(normText)) {
+        if (!seenIds.has(club.id)) {
+          seenIds.add(club.id);
+          matched.push(club);
+        }
+        break;
+      }
+    }
+  }
+  return matched;
+}

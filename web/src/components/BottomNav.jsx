@@ -12,7 +12,7 @@ import { ArrowLeftRight, Trophy, Radio, Globe, Settings } from 'lucide-react';
 // LiveCarousel.jsx as the app's primary cross-league/cross-competition
 // "what's live right now" surface.
 const TABS = [
-  ['transfers', (t) => t.nav.transfers, ArrowLeftRight],
+  ['transfers', (t) => t.nav.news, ArrowLeftRight],
   ['ligen', (t) => t.nav.ligen, Trophy],
   ['live', (t) => t.nav.live, Radio],
   ['europa', (t) => t.nav.europa, Globe],
