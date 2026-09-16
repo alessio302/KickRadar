@@ -2,7 +2,29 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
 import { normalize } from '../util/normalize.js';
 import { searchPlayers } from '../lineups/goalApiClient.js';
-import { pickBestMatch } from './playerProfileResolver.js';
+
+// A DELIBERATELY stricter subset of playerProfileResolver.js's own
+// pickBestMatch(): that function's third fallback (a single result whose
+// club matches one of the candidate clubs) is right for its own use case
+// (the caller already knows the searched name is correct and just needs
+// disambiguation), but wrong for THIS one, where the question is "is this
+// literally the same name" -- confirmed live (second run of this script):
+// the club fallback alone still wrongly matched "Ibrahim Sulemana" to
+// Sassuolo's "Kamal Deen Sulemana" a SECOND time even after switching to
+// pickBestMatch(), because among ~50 loose "Sulemana"-ish global results,
+// only one happened to carry team=Sassuolo -- trivially true for the
+// genuinely different real teammate too, not evidence the search actually
+// found "Ibrahim Sulemana" specifically. Same false positive hit
+// "Francesco Esposito" -> "Pio Esposito" (Inter's real academy famously
+// has multiple actually-different Esposito brothers). Only the first two
+// (stricter) paths are trusted here: a single global result, or an exact
+// full-name string match among several.
+function strictNameMatch(results, searchedName) {
+  if (results.length === 1) return results[0];
+  const target = normalize(searchedName);
+  const exact = results.filter((r) => normalize(r.name || '') === target);
+  return exact.length === 1 ? exact[0] : null;
+}
 
 // Follow-up to the surname-collision fix (PR #116): that fix resolves TWO
 // genuinely different real players sharing a surname (Inter's Lautaro
@@ -82,19 +104,7 @@ async function main() {
         unconfirmed.push({ club, missing, reason: 'search-error' });
         continue;
       }
-      // Confirmed live (first run of this script, 2026-09-16): checking
-      // whether a sibling's goal_api_id merely APPEARS somewhere in the
-      // raw up-to-50 search results was far too loose -- GOAL API's search
-      // for a surname-only or partial name returns every loosely-similar
-      // player it tracks, not just the one being searched for. Confirmed
-      // false positive: "Ibrahim Sulemana" got matched to "Kamal Deen
-      // Sulemana" (Sassuolo) -- two genuinely different real Ghanaian
-      // footballers who just share a surname, not a name-variant of the
-      // same person. Reusing pickBestMatch() (the same conservative
-      // exact-name/single-result/club-corroborated logic
-      // playerProfileResolver.js's own resolution already trusts) instead
-      // of raw substring presence in the result set.
-      const match = pickBestMatch(results, [club], missing.name);
+      const match = strictNameMatch(results, missing.name);
       const matchingSibling = match && withId.find((p) => String(p.goal_api_id) === String(match.id));
       if (matchingSibling) {
         console.log(
