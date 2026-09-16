@@ -23,10 +23,18 @@ const GOAL_EVENT_TYPES = ['Goal', 'Penalty'];
 // exactly, confirmed live for every club currently tracked), it looks for
 // a SINGLE player whose own last name-token matches the event name's last
 // token after diacritics/case normalization ("K. Mbappe" -> "mbappe"
-// matches "Kylian Mbappé" -> normalized last token "mbappe"). Ambiguous
-// (0 or 2+ matches) is left unresolved on purpose: the row's player_id/
-// photo_url/goal_api_id stay null, and the frontend simply doesn't make
-// that row tappable rather than guessing wrong.
+// matches "Kylian Mbappé" -> normalized last token "mbappe"). A last-token
+// collision (two same-surname players on one squad -- confirmed live,
+// Inter Milan currently has both a Lautaro Martinez and a Josep Martinez)
+// falls back to matching the leading initial too ("L. Martinez" -> "l",
+// matching Lautaro's own "l" but not Josep's "j") before giving up --
+// same disambiguation syncPlayerSeasonStats.js's own resolvePlayer() uses,
+// since a same-surname squad-mate is common enough (not just this one
+// case) to be worth resolving rather than leaving both permanently
+// unlinked. Still-ambiguous (0 matches, or 2+ even after the initial
+// check) is left unresolved on purpose: the row's player_id/photo_url/
+// goal_api_id stay null, and the frontend simply doesn't make that row
+// tappable rather than guessing wrong.
 async function resolvePlayerLinks(supabase, rows) {
   const clubNames = [...new Set(rows.map((r) => r.club_name).filter(Boolean))];
   if (clubNames.length === 0) return;
@@ -47,11 +55,20 @@ async function resolvePlayerLinks(supabase, rows) {
     const parts = normalize(name).trim().split(/\s+/);
     return parts[parts.length - 1];
   };
+  const firstInitial = (name) => {
+    const token = normalize(name).trim().split(/\s+/)[0] ?? '';
+    return token.replace(/\./g, '').charAt(0) || null;
+  };
 
   for (const row of rows) {
     const pool = candidatesByClub.get(row.club_name) ?? [];
     const target = lastToken(row.player_name);
-    const matches = pool.filter((p) => lastToken(p.name) === target);
+    let matches = pool.filter((p) => lastToken(p.name) === target);
+    if (matches.length > 1) {
+      const initial = firstInitial(row.player_name);
+      const narrowed = initial ? matches.filter((p) => firstInitial(p.name) === initial) : [];
+      if (narrowed.length === 1) matches = narrowed;
+    }
     if (matches.length === 1) {
       row.player_id = matches[0].id;
       row.photo_url = matches[0].photo_url ?? null;
