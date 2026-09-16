@@ -11,7 +11,18 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Bumped from 10 (2026-09-16): confirmed live this now needs just over
+    # 10 minutes end to end (~2-2.5 min/league x 5 leagues, purely
+    # sequential one-row-at-a-time player updates, no batching) -- two
+    # consecutive real runs got cancelled by the old timeout mid-way
+    # through the 5th league, each time after making genuine progress
+    # (confirmed via season_stats_updated_at timestamps advancing steadily
+    # through leagues 1-4 right up to the cutoff), not stuck/hung. 20
+    # leaves real headroom the same way syncPlayerProfiles.js's own much
+    # heavier workflow already does, rather than tuning right up against
+    # today's exact runtime and risking the same cutoff again the moment
+    # the player/event count grows a little further over the season.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
