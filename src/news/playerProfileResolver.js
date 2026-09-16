@@ -320,6 +320,35 @@ export async function resolvePlayerProfile(supabase, playerName, candidateClubNa
 
   const goalApiProfile = await resolveGoalApiProfile(playerName, candidateClubNames);
 
+  // The real player might already have a row under a DIFFERENT name
+  // spelling -- normalized_name matched nothing above, but goal_api_id is
+  // stable across spellings and GOAL API's own search just resolved one.
+  // Confirmed live: Napoli's André-Frank Zambo Anguissa ended up with two
+  // permanently separate rows this way ("Frank Anguissa" from the squad
+  // sync, "André Zambo Anguissa" from a later transfer story), each
+  // silently accumulating its own stats instead of one real profile.
+  // Checked before the exact-name `existing` row is trusted as the final
+  // answer, same priority order syncPlayerProfiles.js's own dedup already
+  // uses (goal_api_id beats normalized_name).
+  if (goalApiProfile?.goal_api_id) {
+    const { data: byGoalApiId, error: byGoalApiIdErr } = await supabase
+      .from('players')
+      .select('id, transfermarkt_url, goal_api_id, photo_url')
+      .eq('goal_api_id', goalApiProfile.goal_api_id)
+      .maybeSingle();
+    if (byGoalApiIdErr) throw byGoalApiIdErr;
+    if (byGoalApiId && byGoalApiId.id !== existing?.id) {
+      const { data: updated, error: updateErr } = await supabase
+        .from('players')
+        .update(goalApiProfile)
+        .eq('id', byGoalApiId.id)
+        .select('id, transfermarkt_url, goal_api_id, photo_url')
+        .single();
+      if (updateErr) throw updateErr;
+      return updated;
+    }
+  }
+
   if (existing) {
     if (!goalApiProfile) return existing;
     const { data: updated, error: updateErr } = await supabase
