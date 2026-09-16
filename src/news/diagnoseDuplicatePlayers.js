@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
 import { normalize } from '../util/normalize.js';
 import { searchPlayers } from '../lineups/goalApiClient.js';
+import { pickBestMatch } from './playerProfileResolver.js';
 
 // Follow-up to the surname-collision fix (PR #116): that fix resolves TWO
 // genuinely different real players sharing a surname (Inter's Lautaro
@@ -81,8 +82,20 @@ async function main() {
         unconfirmed.push({ club, missing, reason: 'search-error' });
         continue;
       }
-      const resultIds = new Set(results.map((r) => String(r.id)));
-      const matchingSibling = withId.find((p) => resultIds.has(String(p.goal_api_id)));
+      // Confirmed live (first run of this script, 2026-09-16): checking
+      // whether a sibling's goal_api_id merely APPEARS somewhere in the
+      // raw up-to-50 search results was far too loose -- GOAL API's search
+      // for a surname-only or partial name returns every loosely-similar
+      // player it tracks, not just the one being searched for. Confirmed
+      // false positive: "Ibrahim Sulemana" got matched to "Kamal Deen
+      // Sulemana" (Sassuolo) -- two genuinely different real Ghanaian
+      // footballers who just share a surname, not a name-variant of the
+      // same person. Reusing pickBestMatch() (the same conservative
+      // exact-name/single-result/club-corroborated logic
+      // playerProfileResolver.js's own resolution already trusts) instead
+      // of raw substring presence in the result set.
+      const match = pickBestMatch(results, [club], missing.name);
+      const matchingSibling = match && withId.find((p) => String(p.goal_api_id) === String(match.id));
       if (matchingSibling) {
         console.log(
           `  [MERGE] "${missing.name}" (id ${missing.id}, ${club}) -> same GOAL API id as "${matchingSibling.name}" (id ${matchingSibling.id}, goal_api_id ${matchingSibling.goal_api_id})`
