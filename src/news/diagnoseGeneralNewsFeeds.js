@@ -169,7 +169,70 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Diagnose run failed:', err);
-  process.exitCode = 1;
-});
+// robots.txt + ToS check for NewsNow specifically -- user asked whether we
+// need to keep NewsNow's own per-article source attribution (yes, see
+// probeHtml's findings), which raised the follow-up question of whether
+// NewsNow's own terms even allow reading their aggregator pages
+// programmatically at all (distinct from the underlying publishers' own
+// terms, which is a separate question per source). Logs raw text so a
+// human/LLM reading the Action output can judge it -- no automated
+// pass/fail here, ToS language doesn't reduce to a regex.
+const NEWSNOW_TOS_CANDIDATES = [
+  'https://www.newsnow.co.uk/robots.txt',
+  'https://www.newsnow.co.uk/about/terms-and-conditions/',
+  'https://www.newsnow.co.uk/about/terms/',
+  'https://www.newsnow.co.uk/h/about/terms',
+  'https://www.newsnow.co.uk/about/',
+];
+
+function stripTags(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function checkNewsNowTos() {
+  console.log('\n\n=== NewsNow robots.txt / ToS check ===');
+  for (const url of NEWSNOW_TOS_CANDIDATES) {
+    console.log(`\nFetching ${url}`);
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        },
+      });
+      const text = await res.text();
+      console.log(`  ${res.status}  ${text.length} bytes`);
+      if (res.ok) {
+        const isPlainText = url.endsWith('robots.txt');
+        const content = isPlainText ? text : stripTags(text);
+        // Print in full for robots.txt (short), truncated for HTML ToS
+        // pages (long, mostly boilerplate) -- enough to read the actual
+        // scraping/crawling/automated-access clauses if present.
+        console.log(isPlainText ? content : content.slice(0, 6000));
+      }
+    } catch (err) {
+      console.log(`  FAIL  ${err.message}`);
+    }
+  }
+}
+
+main()
+  .then(() => checkNewsNowTos())
+  .catch((err) => {
+    console.error('Diagnose run failed:', err);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    // The script hung for ~10min past its actual completion on the previous
+    // run (cancelled by the workflow's timeout-minutes) -- something (an
+    // open keep-alive socket from fetch/rss-parser, most likely) was
+    // keeping the event loop alive after every console.log already ran.
+    // Forcing exit here is simpler than chasing which handle it is.
+    process.exit(process.exitCode ?? 0);
+  });
