@@ -19,26 +19,49 @@ function lastToken(name) {
   return parts[parts.length - 1];
 }
 
-// Same same-club surname-collision handling as syncPlayerProfiles.js's
-// goalByLastToken (e.g. two Martinez on one real squad): match_events'
-// player names are abbreviated ("L. Martinez"), so a collision can't be
-// told apart from the full-name side either -- both colliding players are
-// dropped from the map entirely rather than crediting either with the
-// other's events.
-function buildLastTokenMap(players) {
+// match_events' player names are abbreviated ("L. Martinez"), but the
+// leading initial survives abbreviation either way -- a full name's own
+// first token starts with the same letter. Strips a trailing period so
+// "L." and "Lautaro" both yield "l".
+function firstInitial(name) {
+  const token = normalize(name).trim().split(/\s+/)[0] ?? '';
+  return token.replace(/\./g, '').charAt(0) || null;
+}
+
+// Groups candidates by last-name token -- NOT collapsed to one entry per
+// token, unlike an earlier version of this file. Confirmed live
+// (2026-09-16, Inter Milan's real squad: Lautaro Martinez the striker AND
+// Josep Martinez the goalkeeper both currently on it): dropping both
+// colliding players outright, rather than trying to tell them apart,
+// meant NEITHER ever got a season_goals/assists row again -- permanently
+// stuck at null from the very first run this collision existed, since
+// there's no self-healing path back to a value once dropped. resolvePlayer()
+// below now tries first-initial disambiguation before giving up, which
+// correctly separates "L. Martinez" (Lautaro) from a hypothetical
+// "J. Martinez" (Josep) event using exactly the information match_events
+// already provides -- only a same-last-name-AND-same-first-initial
+// collision (rare) still falls back to leaving the event uncredited.
+function buildLastTokenIndex(players) {
   const map = new Map();
-  const collided = new Set();
   for (const p of players) {
     const key = lastToken(p.name);
-    if (collided.has(key)) continue;
-    if (map.has(key)) {
-      map.delete(key);
-      collided.add(key);
-      continue;
-    }
-    map.set(key, p);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(p);
   }
   return map;
+}
+
+// Returns the single player this match_events name resolves to, or null
+// if it's genuinely ambiguous (no candidate, or more than one candidate
+// even after first-initial narrowing).
+function resolvePlayer(lastTokenIndex, eventName) {
+  const candidates = lastTokenIndex.get(lastToken(eventName));
+  if (!candidates || candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  const initial = firstInitial(eventName);
+  if (!initial) return null;
+  const narrowed = candidates.filter((p) => firstInitial(p.name) === initial);
+  return narrowed.length === 1 ? narrowed[0] : null;
 }
 
 export async function syncPlayerSeasonStatsForLeague(supabase, league) {
@@ -89,19 +112,18 @@ export async function syncPlayerSeasonStatsForLeague(supabase, league) {
     const candidates = playersByClubName.get(club.name) ?? [];
     if (candidates.length === 0) continue;
 
-    const map = buildLastTokenMap(candidates);
-    // Every non-collided current squad member starts at an explicit 0, not
-    // null -- a player with genuinely no goals/assists/cards this season
-    // needs to read as "0", the same verified fact as any other count, not
-    // as "no data" (which stays reserved for a collided/unresolvable name).
+    const lastTokenIndex = buildLastTokenIndex(candidates);
+    // Every current squad member starts at an explicit 0, not null -- a
+    // player with genuinely no goals/assists/cards this season needs to
+    // read as "0", the same verified fact as any other count, not as "no
+    // data" (which stays reserved for an event resolvePlayer() itself
+    // can't attribute to anyone).
     const counts = new Map();
-    for (const p of candidates) {
-      if (map.get(lastToken(p.name)) === p) counts.set(p.id, { goals: 0, assists: 0, yellowCards: 0, redCards: 0 });
-    }
+    for (const p of candidates) counts.set(p.id, { goals: 0, assists: 0, yellowCards: 0, redCards: 0 });
 
     for (const e of eventsByClub.get(club.id) ?? []) {
       if (e.player) {
-        const target = map.get(lastToken(e.player));
+        const target = resolvePlayer(lastTokenIndex, e.player);
         const c = target && counts.get(target.id);
         if (c) {
           if (GOAL_EVENT_TYPES.includes(e.type)) c.goals += 1;
@@ -110,7 +132,7 @@ export async function syncPlayerSeasonStatsForLeague(supabase, league) {
         }
       }
       if (e.type === 'Goal' && e.assist) {
-        const target = map.get(lastToken(e.assist));
+        const target = resolvePlayer(lastTokenIndex, e.assist);
         const c = target && counts.get(target.id);
         if (c) c.assists += 1;
       }
