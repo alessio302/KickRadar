@@ -41,10 +41,63 @@ const CANDIDATES = [
   { league: 'Ligue 1', name: "L'Équipe (Football)", url: 'https://www.lequipe.fr/rss/actu_rss_Football.xml' },
   { league: 'Ligue 1', name: 'Foot Mercato general news (footmercato.js only scrapes the Ligue 1 transfers sub-page today)', url: 'https://www.footmercato.net/rss' },
   { league: 'Ligue 1', name: 'RMC Sport football', url: 'https://rmcsport.bfmtv.com/rss/football/' },
+  { league: 'Ligue 1', name: 'RMC Sport Ligue 1 (league-scoped RSS guess)', url: 'https://rmcsport.bfmtv.com/rss/football/ligue-1/' },
   { league: 'Ligue 1', name: 'Eurosport France football', url: 'https://www.eurosport.fr/rss.xml' },
   { league: 'Cross-league', name: 'Transfermarkt.com news', url: 'https://www.transfermarkt.com/rss/news' },
   { league: 'Cross-league', name: 'Transfermarkt.de Neuigkeiten', url: 'https://www.transfermarkt.de/rss/news' },
 ];
+
+// Not RSS -- these are HTML pages user-suggested as league-scoped candidates
+// (RMC Sport's own Ligue 1 section page, NewsNow's aggregator pages for
+// Premier League/La Liga). Probed separately: fetch raw HTML, look for an
+// <link rel="alternate" type="application/rss+xml"> auto-discovery tag
+// (would let us reuse rss-parser instead of writing an HTML scraper), and
+// report page size/status so we know whether HTML-scraping (createHtmlSource,
+// same approach as marca.js/footmercato.js) is even viable.
+const HTML_PROBES = [
+  { league: 'Ligue 1', name: 'RMC Sport — Ligue 1 section page', url: 'https://rmcsport.bfmtv.com/football/ligue-1/' },
+  { league: 'Premier League', name: 'NewsNow — Premier League aggregator', url: 'https://www.newsnow.co.uk/h/Sport/Football/Premier+League' },
+  { league: 'La Liga', name: 'NewsNow — La Liga aggregator', url: 'https://www.newsnow.co.uk/h/Sport/Football/La+Liga' },
+];
+
+async function probeHtml(candidate) {
+  const start = Date.now();
+  try {
+    const res = await fetch(candidate.url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8,es;q=0.7',
+      },
+    });
+    const ms = Date.now() - start;
+    const html = await res.text();
+    const rssLinkMatch = html.match(/<link[^>]+type=["']application\/rss\+xml["'][^>]*>/i);
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    // Crude source-attribution sniff: NewsNow-style pages typically render
+    // each headline's publisher as its own short text node near the link
+    // (e.g. "Sky Sports", "BBC Sport") -- not a reliable extraction, just a
+    // signal for whether that data even appears in the raw HTML we can see
+    // (vs. injected client-side by JS after load, which a plain fetch never
+    // executes and would mean HTML-scraping this page won't work at all).
+    const looksClientRendered = /<div id="root">\s*<\/div>|<div id="__next">\s*<\/div>/i.test(html);
+    return {
+      ...candidate,
+      ok: res.ok,
+      status: res.status,
+      ms,
+      bytes: html.length,
+      hasRssAutodiscovery: Boolean(rssLinkMatch),
+      rssLinkTag: rssLinkMatch?.[0] ?? null,
+      pageTitle: titleMatch?.[1]?.trim() ?? null,
+      looksClientRendered,
+    };
+  } catch (err) {
+    const ms = Date.now() - start;
+    return { ...candidate, ok: false, ms, error: err.message };
+  }
+}
 
 async function checkFeed(candidate) {
   const start = Date.now();
@@ -100,6 +153,19 @@ async function main() {
   const failed = results.filter((r) => !r.ok);
   if (failed.length > 0) {
     console.log(`\n${failed.length}/${results.length} candidate feeds failed from this runner.`);
+  }
+
+  console.log('\n\n=== HTML probes (user-suggested candidates, not RSS) ===');
+  for (const candidate of HTML_PROBES) {
+    console.log(`\nProbing [${candidate.league}] ${candidate.name}\n  ${candidate.url}`);
+    const result = await probeHtml(candidate);
+    if (result.ok) {
+      console.log(`  ${result.status}  ${result.ms}ms  ${result.bytes} bytes  title="${result.pageTitle}"`);
+      console.log(`  RSS autodiscovery: ${result.hasRssAutodiscovery ? result.rssLinkTag : 'none found'}`);
+      console.log(`  Looks client-rendered (empty root div): ${result.looksClientRendered}`);
+    } else {
+      console.log(`  FAIL  status=${result.status ?? '-'}  ${result.ms}ms  ${result.error ?? ''}`);
+    }
   }
 }
 
