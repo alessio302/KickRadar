@@ -460,7 +460,15 @@ function MatchEventContent({ theme, t, event, align }) {
   const labelKey = EVENT_LABEL_KEY[event.type];
   // Only used as a fallback when an event has no player name (rare) --
   // the icon itself (⚽/card/🔄) already says what happened, so it's no
-  // longer also spelled out as a second line under the name.
+  // longer also spelled out as a second line under the name for most
+  // types. Penalty is the one exception: user-reported the icon alone
+  // (the same ⚽ as a plain Goal -- Own Goal already reads distinctly
+  // from WHICH side it lands on, but a penalty by a player's own team
+  // looks pixel-identical to a normal goal by that same player) never
+  // actually showed a penalty conversion as anything different, even
+  // once the backend started tagging it correctly. A small label under
+  // the name, same visual slot the assist line already uses, calls it
+  // out without touching the "no 2nd line for most events" decision above.
   const label = labelKey ? t.matchInfo[labelKey] : event.type;
   const cardColor = CARD_COLOR[event.type];
   const iconEl = cardColor ? <CardIcon color={cardColor} /> : <span style={{ fontSize: '12px', lineHeight: 1 }}>{EVENT_ICON[event.type] || '•'}</span>;
@@ -472,6 +480,7 @@ function MatchEventContent({ theme, t, event, align }) {
         <span>{event.player || label}</span>
         {align === 'right' && iconEl}
       </p>
+      {event.type === 'Penalty' && <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{t.matchInfo.penalty}</p>}
       {event.assist && <p style={{ margin: '2px 0 0', fontSize: '11px', color: theme.textMuted }}>{t.matchInfo.assistLabel(event.assist)}</p>}
     </div>
   );
