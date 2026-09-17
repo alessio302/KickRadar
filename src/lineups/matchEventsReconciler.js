@@ -18,14 +18,51 @@
 // shape regardless of their own key, so two rows describing the same real
 // event are recognized as the same thing without either needing to know
 // the other's key scheme at all.
-function contentKey(row) {
-  return `${row.type}|${row.minute}|${row.player}|${row.substituted ?? ''}`;
+//
+// Minute is matched with a small tolerance, not exact equality -- user-
+// reported (2026-09-17, Juventus vs NEC): GOAL API's own WS pushed the
+// exact same Woltemade goal twice, identical scorer and identical
+// resulting score, but minute 34 on the first push and minute 35 on a
+// later one (the provider's own clock/stoppage-time estimate updating
+// between pushes for the SAME real event, not a second goal). An
+// exact-minute contentKey treated the 2nd push as brand-new and
+// duplicated it in the timeline -- a fuzzy match absorbs that kind of
+// provider-side correction. Two GENUINELY different goals/cards/subs by
+// the same player in one real match are, in practice, always several
+// minutes apart, never a single minute apart the way a same-event
+// correction typically is, so this tolerance doesn't risk merging two
+// real events into one.
+const MINUTE_TOLERANCE = 1;
+
+function parseMinuteValue(minute) {
+  if (minute === null || minute === undefined || minute === '') return null;
+  const [base, extra] = String(minute).split('+').map(Number);
+  if (Number.isNaN(base)) return null;
+  return base + (Number.isNaN(extra) ? 0 : extra);
+}
+
+function isSameEvent(a, b) {
+  if (a.type !== b.type) return false;
+  if (a.player !== b.player) return false;
+  if ((a.substituted ?? '') !== (b.substituted ?? '')) return false;
+  const minuteA = parseMinuteValue(a.minute);
+  const minuteB = parseMinuteValue(b.minute);
+  if (minuteA === null || minuteB === null) return minuteA === minuteB;
+  return Math.abs(minuteA - minuteB) <= MINUTE_TOLERANCE;
 }
 
 import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
 
-async function insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existingContentKeys) {
-  const toInsert = freshRows.filter((r) => !existingContentKeys.has(contentKey(r)));
+function dedupeWithinBatch(rows) {
+  const deduped = [];
+  for (const row of rows) {
+    if (!deduped.some((r) => isSameEvent(r, row))) deduped.push(row);
+  }
+  return deduped;
+}
+
+async function insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existingRows) {
+  const toInsert = dedupeWithinBatch(freshRows).filter((r) => !existingRows.some((e) => isSameEvent(e, r)));
   if (toInsert.length === 0) return 0;
 
   const { error } = await supabase.from('match_events').upsert(toInsert, { onConflict: 'fixture_id,event_key' });
@@ -59,8 +96,7 @@ export async function insertNewMatchEvents(supabase, fixtureId, leagueSlug, fres
     console.error(`Failed to read existing match_events for fixture ${fixtureId}:`, error.message);
     return { inserted: 0 };
   }
-  const existingKeys = new Set(existing.map(contentKey));
-  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existingKeys);
+  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existing);
   return { inserted };
 }
 
@@ -82,9 +118,7 @@ export async function reconcileMatchEvents(supabase, fixtureId, leagueSlug, fres
     return { inserted: 0, deleted: 0 };
   }
 
-  const existingKeys = new Set(existing.map(contentKey));
-  const freshKeys = new Set(freshRows.map(contentKey));
-  const toDelete = existing.filter((r) => !freshKeys.has(contentKey(r)));
+  const toDelete = existing.filter((r) => !freshRows.some((f) => isSameEvent(f, r)));
 
   if (toDelete.length > 0) {
     const { error: deleteErr } = await supabase
@@ -94,6 +128,6 @@ export async function reconcileMatchEvents(supabase, fixtureId, leagueSlug, fres
     if (deleteErr) console.error(`Failed to delete retracted events for fixture ${fixtureId}:`, deleteErr.message);
   }
 
-  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existingKeys);
+  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existing);
   return { inserted, deleted: toDelete.length };
 }
