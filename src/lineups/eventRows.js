@@ -19,10 +19,19 @@ export function buildEventRowsFromRest(fixtureId, sideRef, { goals, cards, subst
     const assist = isHomeField ? g.homeAssist : g.awayAssist;
     if (!rawName) continue;
     const isOwnGoal = /\(o\.g\.\)/i.test(rawName);
+    // Confirmed live (diagnosePenaltyGoalFormat.js): unlike an own goal
+    // (flagged via a "(o.g.)" suffix baked into the scorer name itself),
+    // GOAL API flags a penalty conversion via this separate `info` field
+    // ("Penalty" vs null for every other goal) -- was never read before,
+    // so every penalty silently showed as a plain "Goal" in the app
+    // despite the frontend (FixtureDetailOverlay.jsx's own EVENT_ICON/
+    // EVENT_LABEL_KEY maps, translations.js's own `penalty` string)
+    // already being fully built to display it distinctly.
+    const isPenalty = !isOwnGoal && g.info === 'Penalty';
     rows.push({
       fixture_id: fixtureId,
       ...sideRef(isHomeField),
-      type: isOwnGoal ? 'Own Goal' : 'Goal',
+      type: isOwnGoal ? 'Own Goal' : isPenalty ? 'Penalty' : 'Goal',
       minute: String(g.time ?? ''),
       player: rawName,
       assist: assist || null,
