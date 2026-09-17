@@ -19,7 +19,7 @@ export function useNewsArticles(leagueSlug) {
   const buildQuery = useCallback(() => {
     return supabase
       .from('news_articles')
-      .select('id, source, title, teaser, image_url, source_url, published_at, ai_summary_de, ai_summary_en, ai_summary_it, ai_summary_fr, ai_summary_es')
+      .select('id, source, title, title_de, title_en, title_it, title_fr, title_es, image_url, source_url, published_at, ai_summary_de, ai_summary_en, ai_summary_it, ai_summary_fr, ai_summary_es')
       .eq('league_id', leagueId)
       .order('published_at', { ascending: false })
       .limit(PAGE_SIZE);

@@ -88,11 +88,11 @@ async function scrapeSource(supabase, source, allClubs) {
     // silently lose the article (matches runNewsScraper.js's own ordering
     // intent), but AFTER the relevance gate above, so an irrelevant item
     // never costs an API call.
-    let summary = null;
+    let llmResult = null;
     try {
-      summary = await llmSummarizeNews(item.title, item.summary);
+      llmResult = await llmSummarizeNews(item.title, item.summary);
     } catch (err) {
-      console.warn(`[${source.sourceKey}] LLM summarization failed, storing without AI summary:`, err.message);
+      console.warn(`[${source.sourceKey}] LLM summarization failed, storing without AI summary/translated title:`, err.message);
     }
 
     await markSeen(supabase, source.sourceKey, externalId);
@@ -124,11 +124,16 @@ async function scrapeSource(supabase, source, allClubs) {
           source_url: item.link,
           published_at: item.publishedAt,
           external_id: externalId,
-          ai_summary_de: summary?.de ?? null,
-          ai_summary_en: summary?.en ?? null,
-          ai_summary_it: summary?.it ?? null,
-          ai_summary_fr: summary?.fr ?? null,
-          ai_summary_es: summary?.es ?? null,
+          title_de: llmResult?.title?.de ?? null,
+          title_en: llmResult?.title?.en ?? null,
+          title_it: llmResult?.title?.it ?? null,
+          title_fr: llmResult?.title?.fr ?? null,
+          title_es: llmResult?.title?.es ?? null,
+          ai_summary_de: llmResult?.summary?.de ?? null,
+          ai_summary_en: llmResult?.summary?.en ?? null,
+          ai_summary_it: llmResult?.summary?.it ?? null,
+          ai_summary_fr: llmResult?.summary?.fr ?? null,
+          ai_summary_es: llmResult?.summary?.es ?? null,
         },
         { onConflict: 'source,external_id,league_id' }
       );

@@ -1,12 +1,27 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
-// Same Gemini free-tier approach as llmExtract.js (transfers), but a much
-// simpler schema -- News doesn't extract player/club/direction, just a
-// short summary in every app language, since the card itself already shows
-// the real headline/teaser/source and deep-links to the original article.
+// Same Gemini free-tier approach as llmExtract.js (transfers). Returns both
+// a translated headline and a summary in every app language, in ONE call
+// (no extra API requests over the summary-only version) -- confirmed-live
+// user feedback: showing the original-language headline above an
+// already-translated summary read as inconsistent (news-card list AND the
+// AI-summary overlay both used the raw, untranslated `title`).
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
+    title: {
+      type: Type.OBJECT,
+      description:
+        "A natural, idiomatic headline translation into EACH of the 5 languages below -- read as a real headline written in that language, not a stiff word-for-word translation. Keep player/club names as they commonly appear in football media (don't translate those).",
+      properties: {
+        de: { type: Type.STRING, description: 'German headline.' },
+        en: { type: Type.STRING, description: 'English headline.' },
+        it: { type: Type.STRING, description: 'Italian headline.' },
+        fr: { type: Type.STRING, description: 'French headline.' },
+        es: { type: Type.STRING, description: 'Spanish headline.' },
+      },
+      required: ['de', 'en', 'it', 'fr', 'es'],
+    },
     summary: {
       type: Type.OBJECT,
       description:
@@ -21,10 +36,10 @@ const RESPONSE_SCHEMA = {
       required: ['de', 'en', 'it', 'fr', 'es'],
     },
   },
-  required: ['summary'],
+  required: ['title', 'summary'],
 };
 
-const SYSTEM_INSTRUCTION = `You summarize a single football (soccer) news article, given its headline and a short teaser/snippet, written in Italian, German, English, French, or Spanish. Write a concise, factual summary of what the article actually says -- not a translation or rephrasing of the headline alone. Use player/club names as they commonly appear in football media (don't translate those).`;
+const SYSTEM_INSTRUCTION = `You process a single football (soccer) news article, given its headline and a short teaser/snippet, written in Italian, German, English, French, or Spanish. Produce (1) a natural headline translation into each of the 5 target languages, and (2) a concise, factual summary of what the article actually says -- not a translation or rephrasing of the headline alone. Use player/club names as they commonly appear in football media (don't translate those).`;
 
 let client;
 function getClient() {
@@ -82,5 +97,5 @@ export async function llmSummarizeNews(title, teaser) {
   if (!response.text) {
     throw new Error('LLM summarization returned no text');
   }
-  return JSON.parse(response.text).summary;
+  return JSON.parse(response.text);
 }
