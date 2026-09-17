@@ -38,13 +38,17 @@ async function main() {
       `and(home_club_id.eq.${udinese.id},away_club_id.eq.${inter.id}),and(home_club_id.eq.${inter.id},away_club_id.eq.${udinese.id})`
     )
     .order('kickoff_at', { ascending: false })
-    .limit(3);
+    .limit(5);
   if (fixturesErr) throw fixturesErr;
   console.log('Recent Inter-Udinese fixtures:', fixtures);
 
-  const fixture = fixtures[0];
+  // .order(kickoff_at desc) alone can surface a future rematch (e.g. next
+  // season's already-scheduled fixture) ahead of the one actually just
+  // played -- what the user means by "the last Inter game" is the most
+  // recent FINISHED one, not merely the most recent row.
+  const fixture = fixtures.find((f) => f.status === 'finished');
   if (!fixture) {
-    console.log('No Inter-Udinese fixture found.');
+    console.log('No finished Inter-Udinese fixture found.');
     return;
   }
 
