@@ -41,6 +41,10 @@ export const PROVIDER_INFO = {
     label: 'NOW',
     logoUrl: 'https://eu-images.contentstack.com/v3/assets/bltcc7a7ffd2fbf71f5/blt7b99fc273b8208cf/65a7e8a05ee0e2040acb0676/NOW_logo.png',
   },
+  rtlplus: {
+    label: 'RTL+',
+    logoUrl: 'https://assets.goal.com/images/v3/bltc875439427475ef4/RTL+%20Logo.jpg',
+  },
 };
 
 // Berlin-local weekday, independent of the viewer's own device timezone --
@@ -77,6 +81,26 @@ export function getBroadcasters(leagueSlug, kickoffAtIso, dbBroadcasters) {
       return kickoffAtIso ? bundesligaBroadcasters(kickoffAtIso) : [];
     case 'serie-a':
       return Array.isArray(dbBroadcasters) ? dbBroadcasters : [];
+    // Confirmed live (goal.com/de's own current-season TV-Guide pages,
+    // 2026-08): RTL+ carries EVERY Europa League/Conference League match in
+    // its streaming catalogue -- the free-TV picks on RTL/Nitro are a
+    // subset of that same RTL+ content, not a second competing provider
+    // with a different match selection -- so both are single-provider-
+    // exclusive, same reasoning as La Liga/Ligue 1.
+    case 'europa-league':
+    case 'conference-league':
+      return ['rtlplus'];
+    // Champions League is DAZN for the huge majority of matches, but one
+    // Tuesday match per matchday is picked ad hoc for an Amazon Prime
+    // Video exclusive (no day/time rule predicts which one -- confirmed
+    // live via web research, e.g. matchday 1's exclusive was Dortmund vs
+    // Villarreal, a Tuesday fixture, while every other Tuesday match that
+    // same week stayed on DAZN). Defaulting to DAZN here is right for
+    // every Wednesday match and most Tuesday ones; the rare Tuesday
+    // Amazon-exclusive shows the wrong pill until this gets its own
+    // per-fixture data source (same kind of pipeline as Serie A's).
+    case 'champions-league':
+      return ['dazn'];
     default:
       return [];
   }

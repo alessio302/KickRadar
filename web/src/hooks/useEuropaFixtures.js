@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
+import { getBroadcasters } from '../lib/broadcasters.js';
 
 const SLUGS = ['champions-league', 'europa-league', 'conference-league'];
 const PAST_WINDOW_DAYS = 7;
@@ -36,9 +37,10 @@ async function loadGrouped(leagues) {
   if (error) throw error;
 
   const grouped = {};
-  for (const f of fixtures ?? []) {
-    const slug = slugById.get(f.league_id);
+  for (const raw of fixtures ?? []) {
+    const slug = slugById.get(raw.league_id);
     if (!slug) continue;
+    const f = { ...raw, displayBroadcasters: getBroadcasters(slug, raw.kickoff_at) };
     (grouped[slug] = grouped[slug] || []).push(f);
   }
   return grouped;
