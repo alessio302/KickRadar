@@ -1,0 +1,27 @@
+name: Backfill news article summaries (one-off)
+
+# One-off corrective pass (see src/news/backfillNewsSummaries.js) -- manual
+# trigger only. Fills in ai_summary_* for news_articles rows stored before
+# the Gemini model switch (gemini-3.6-flash -> gemini-3.5-flash-lite,
+# 20 RPD vs 500 RPD free-tier cap) left them permanently null.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    # Same Gemini throttle as the main scraper (6.5s/call) -- ~250 rows
+    # could take close to 30 minutes.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/news/backfillNewsSummaries.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
