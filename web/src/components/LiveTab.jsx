@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Radio } from 'lucide-react';
 import FixtureRow from './FixtureRow.jsx';
+import { PROVIDER_INFO } from '../lib/broadcasters.js';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
@@ -32,6 +33,36 @@ import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 // that component's own TeamRow, just resolved off different fields --
 // mirrors EuropaTab.jsx's own EuropaFixtureRow, condensed to this list's
 // tighter row height.
+// Same square-logo treatment as FixtureRow.jsx (domestic)'s own
+// BroadcasterLogos -- duplicated rather than shared, matching this file's
+// existing EuropaLiveRow/EuropaTab.jsx split for European-fixture-specific
+// rendering (team_name-keyed fields, no clubs table row).
+function BroadcasterLogos({ providers, theme }) {
+  if (!providers?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+      {providers.slice(0, 3).map((key) => {
+        const info = PROVIDER_INFO[key];
+        if (!info) return null;
+        return (
+          <img
+            key={key}
+            src={info.logoUrl}
+            alt={info.label}
+            title={info.label}
+            style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '3px', background: theme.border }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// Confirmed live/user-reported: this row never showed the broadcaster
+// badge FixtureRow.jsx (domestic) already had -- a separate compact
+// component for the exact same reason as its own TeamRow (team_name-keyed
+// fields, no shared import), so it needed its own copy of the badge too,
+// not just the domestic side's.
 function EuropaLiveRow({ theme, fixture, onSelectFixture }) {
   return (
     <div
@@ -48,10 +79,11 @@ function EuropaLiveRow({ theme, fixture, onSelectFixture }) {
       }}
     >
       <span aria-hidden="true" style={{ width: '3px', borderRadius: '2px', background: theme.danger, flexShrink: 0 }} />
-      <div style={{ width: '32px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+      <div style={{ width: '40px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: theme.danger, whiteSpace: 'nowrap' }}>
           {fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : '●'}
         </span>
+        <BroadcasterLogos providers={fixture.displayBroadcasters} theme={theme} />
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         {[

@@ -61,6 +61,15 @@ function TeamRow({ club, theme, score, isLive }) {
 // first real run): a co-exclusive Serie A match can be DAZN+Sky+NOW, not
 // just 2 -- capped at 3 to show every real case seen without an unbounded
 // row.
+//
+// Square (not the earlier 17x12 rectangle) -- confirmed live/user-reported:
+// every one of these logo assets (DAZN/Sky/NOW/RTL+, all hotlinked from
+// goal.com) is itself a square 72x72 image, so forcing a wide-short box
+// squeezed a centered square logo into an aspect ratio it was never
+// designed for, especially bad for RTL+'s own logo (real letterforms, not
+// just a wordmark shape) -- nearly illegible at that size. 18x18 square
+// still fits 3 across (18*3 + 2*3px gaps = 60px) inside the row's existing
+// 56-62px status column without widening it meaningfully.
 function BroadcasterLogos({ providers, theme }) {
   if (!providers?.length) return null;
   return (
@@ -74,7 +83,7 @@ function BroadcasterLogos({ providers, theme }) {
             src={info.logoUrl}
             alt={info.label}
             title={info.label}
-            style={{ width: '17px', height: '12px', objectFit: 'contain', borderRadius: '2px', background: theme.border }}
+            style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '3px', background: theme.border }}
           />
         );
       })}
@@ -169,7 +178,7 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           A true fixed width keeps this column identical regardless of
           which status text a given row happens to show. Width scaled down
           from 66px alongside the 13px->11px font shrink. */}
-      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <div style={{ width: '60px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
