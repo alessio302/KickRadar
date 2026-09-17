@@ -30,8 +30,12 @@ export const PROVIDER_INFO = {
   },
   sky: {
     label: 'Sky',
-    logoUrl:
-      'https://assets.goal.com/images/v3/blt52fd4981ccab44fe/crop/MM5DCMRQGA5DMNZVHJXG653FHIYDUMRSGM======/sky-wow-logo.jpg?quality=60&auto=webp&format=pjpg',
+    // Confirmed-live user feedback: the combined "Sky WOW" graphic
+    // (goal.com's own sky-wow-logo.jpg -- WOW is Sky's streaming-only
+    // access brand, not a separate channel) read as illegible/ambiguous
+    // ("WOW" misread as "NOW") at this pill's small size. This is a plain
+    // "Sky Sport" logo, no second brand mixed in.
+    logoUrl: 'https://eu-images.contentstack.com/v3/assets/bltcc7a7ffd2fbf71f5/blt1f8bf17a441e7087/64e5d5325e6a952679d12bfe/Sky_Sport_logo.png',
   },
   now: {
     label: 'NOW',
