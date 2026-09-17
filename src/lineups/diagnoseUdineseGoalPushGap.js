@@ -64,17 +64,32 @@ async function main() {
     .order('id', { ascending: true });
   if (eventsErr) throw eventsErr;
 
+  const interScore = udineseIsHome ? fixture.away_score : fixture.home_score;
+  console.log(`Inter recorded score: ${interScore}`);
+  console.log(`\nAll ${events.length} match_events rows for this fixture:`);
+  for (const e of events) console.log(` - club_id=${e.club_id} team_name=${e.team_name ?? ''} ${e.type} ${e.minute}' ${e.player} (event_key=${e.event_key})`);
+
   const udineseGoalTypes = new Set(['Goal', 'Own Goal', 'Penalty']);
   const udineseGoals = events.filter((e) => e.club_id === udinese.id && udineseGoalTypes.has(e.type));
+  const interGoals = events.filter((e) => e.club_id === inter.id && udineseGoalTypes.has(e.type));
   console.log(`\nmatch_events rows for Udinese goals (${udineseGoals.length}):`);
   for (const g of udineseGoals) console.log(` - ${g.type} ${g.minute}' ${g.player} (event_key=${g.event_key})`);
+  console.log(`\nmatch_events rows for Inter goals (${interGoals.length}):`);
+  for (const g of interGoals) console.log(` - ${g.type} ${g.minute}' ${g.player} (event_key=${g.event_key})`);
 
   if (udineseGoals.length !== udineseScore) {
     console.log(
       `\n!!! MISMATCH: fixtures.${udineseIsHome ? 'home_score' : 'away_score'}=${udineseScore} but only ${udineseGoals.length} Goal-type match_events rows exist for Udinese. A real goal likely never got its own row (content-key dedup collision in matchEventsReconciler.js, or an event type/side classification miss).`
     );
   } else {
-    console.log('\nGoal row count matches recorded score -- all goals ARE stored in match_events.');
+    console.log('\nUdinese goal row count matches recorded score -- all goals ARE stored in match_events.');
+  }
+  if (interGoals.length !== interScore) {
+    console.log(
+      `\n!!! MISMATCH: fixtures.${udineseIsHome ? 'away_score' : 'home_score'}=${interScore} but only ${interGoals.length} Goal-type match_events rows exist for Inter. A real goal likely never got its own row.`
+    );
+  } else {
+    console.log('\nInter goal row count matches recorded score -- all goals ARE stored in match_events.');
   }
 
   // Content-key collision check across ALL of this fixture's events (not
@@ -110,11 +125,21 @@ async function main() {
   for (const g of udineseGoals) {
     console.log(` - ${g.type} ${g.minute}' ${g.player}: claimed=${notifiedKeys.has(g.event_key)}`);
   }
+  console.log('\nPer-Inter-goal claim status:');
+  for (const g of interGoals) {
+    console.log(` - ${g.type} ${g.minute}' ${g.player}: claimed=${notifiedKeys.has(g.event_key)}`);
+  }
 
   const unclaimed = udineseGoals.filter((g) => !notifiedKeys.has(g.event_key));
   if (unclaimed.length > 0) {
     console.log(
       `\n!!! ${unclaimed.length} Udinese goal row(s) exist in match_events but were NEVER claimed in notified_match_events -- these never triggered sendPushToFixtureFavoriters at all (a bug/exception in notifyFavoritedFixtureEvents, or the insert claim itself failing silently).`
+    );
+  }
+  const interUnclaimed = interGoals.filter((g) => !notifiedKeys.has(g.event_key));
+  if (interUnclaimed.length > 0) {
+    console.log(
+      `\n!!! ${interUnclaimed.length} Inter goal row(s) exist in match_events but were NEVER claimed in notified_match_events.`
     );
   }
 }
