@@ -239,7 +239,27 @@ async function pollOnce(supabase, clubById) {
       if (refereeErr) console.error(`Failed to update referee for match ${m.id}:`, refereeErr.message);
     }
 
-    if (m.status !== 'IN_PLAY' && m.status !== 'PAUSED' && m.status !== 'FINISHED') continue;
+    // Confirmed live (2026-09-17, Levante-Athletic Club): this used to only
+    // ever look at IN_PLAY/PAUSED/FINISHED, silently ignoring POSTPONED/
+    // SUSPENDED/CANCELLED entirely -- a real postponement (football-data.org
+    // reported this exact match POSTPONED, not IN_PLAY) never reached the
+    // write below at all, leaving the fixture stuck at whatever status it
+    // last had ('live', from kickoff) forever. Worse, since our own DB never
+    // changed, hasFixtureNeedingAttention() kept seeing it as needing
+    // attention on every future run/poll tick indefinitely -- the same stuck
+    // row that motivated the date-range fix above also caused this file's
+    // own poll loop to never stop finding "something to do" for a match
+    // that had, in football-data.org's own words, stopped being a thing.
+    if (
+      m.status !== 'IN_PLAY' &&
+      m.status !== 'PAUSED' &&
+      m.status !== 'FINISHED' &&
+      m.status !== 'POSTPONED' &&
+      m.status !== 'SUSPENDED' &&
+      m.status !== 'CANCELLED'
+    ) {
+      continue;
+    }
 
     const newStatus = STATUS_MAP[m.status] || 'live';
     const homeScore = m.score?.fullTime?.home ?? null;
@@ -252,7 +272,19 @@ async function pollOnce(supabase, clubById) {
       .maybeSingle();
     if (currentErr) {
       console.error(`Failed to read current status for match ${m.id}:`, currentErr.message);
-    } else if (current && STATUS_RANK[newStatus] < STATUS_RANK[current.status]) {
+    } else if (
+      current &&
+      STATUS_RANK[newStatus] < STATUS_RANK[current.status] &&
+      newStatus !== 'postponed' &&
+      newStatus !== 'cancelled'
+    ) {
+      // "Never walk it backwards" only makes sense between the normal
+      // scheduled->live->finished progression, where a lower rank really
+      // does mean "a slower source hasn't caught up yet" -- postponed/
+      // cancelled are a different kind of transition entirely (the match
+      // isn't following that progression at all anymore) and are always
+      // real, authoritative corrections from football-data.org whenever
+      // they show up, not a stale race to guard against.
       continue; // already further along by a faster source (the webhook) -- never walk it backwards
     }
 
