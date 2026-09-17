@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useEuropaFixtures } from '../hooks/useEuropaFixtures.js';
+import { PROVIDER_INFO } from '../lib/broadcasters.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import { UEFA_COMPETITIONS, adjacentCompetition } from '../lib/leagues.js';
@@ -288,6 +289,31 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
   );
 }
 
+// Duplicated from FixtureRow.jsx (domestic)'s own BroadcasterLogos rather
+// than a shared import -- same "separate copy, not a shared component"
+// convention this file's own TeamRow already follows for European
+// fixtures (see that component's comment).
+function BroadcasterLogos({ providers, theme }) {
+  if (!providers?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+      {providers.slice(0, 3).map((key) => {
+        const info = PROVIDER_INFO[key];
+        if (!info) return null;
+        return (
+          <img
+            key={key}
+            src={info.logoUrl}
+            alt={info.label}
+            title={info.label}
+            style={{ width: '17px', height: '12px', objectFit: 'contain', borderRadius: '2px', background: theme.border }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // LiveScore-style layout (2026-09-11), same redesign and same reasoning as
 // FixtureRow.jsx (domestic) -- see that file's own top comment for the
 // full writeup. Two full-width stacked team rows instead of one shared
@@ -342,10 +368,11 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
       }}
     >
       <span aria-hidden="true" style={{ width: '3px', borderRadius: '2px', background: isLive ? theme.danger : 'transparent', flexShrink: 0 }} />
-      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
+        {!isFinished && <BroadcasterLogos providers={fixture.displayBroadcasters} theme={theme} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         <TeamRow
