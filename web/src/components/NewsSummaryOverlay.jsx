@@ -10,6 +10,10 @@ const DISMISS_THRESHOLD_PX = 100;
 
 export default function NewsSummaryOverlay({ theme, t, language, article, onClose }) {
   const summaryText = article[`ai_summary_${language}`];
+  // Same translated-headline-with-fallback logic as NewsCard.jsx -- keeps
+  // the headline shown here consistent with the (already translated)
+  // summary right below it.
+  const title = article[`title_${language}`] ?? article.title;
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef(null);
@@ -80,7 +84,7 @@ export default function NewsSummaryOverlay({ theme, t, language, article, onClos
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px 4px' }}>
-          <p style={{ fontSize: '16.5px', fontWeight: 800, lineHeight: 1.3, margin: '0 0 12px' }}>{article.title}</p>
+          <p style={{ fontSize: '16.5px', fontWeight: 800, lineHeight: 1.3, margin: '0 0 12px' }}>{title}</p>
 
           {/* "AI Summary" is deliberately never translated -- stays literal
               in every app language, same as TransferSummaryOverlay.jsx. */}
