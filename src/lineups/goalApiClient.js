@@ -74,6 +74,37 @@ async function recordUsage() {
   }
 }
 
+// Confirmed live (2026-09-16): goal_api_usage.request_count hit 2955 for a
+// single day -- nearly 3x the documented 1,000/day FREE-plan cap -- because
+// nothing anywhere checked this table before spending more budget. Once
+// the real cap is exhausted, every subsequent call() here 429s, RETRIES
+// (still counted by recordUsage() above -- a 429 costs budget same as a
+// success), and 429s again, digging the day deeper past the limit on every
+// single attempt instead of just failing once. Meanwhile the calling job
+// (confirmed live: syncLiveEvents.js) kept running its full ~14-minute
+// self-loop on its normal 15-min schedule regardless, accomplishing
+// nothing every single tick with no visible signal that anything was
+// wrong -- from the user's side this looked identical to "live events
+// silently stopped working," not "the daily quota is spent." Callers that
+// do real, avoidable-if-exhausted work (a whole WS session, a resolve-then-
+// subscribe batch) should check this FIRST and skip the entire run with a
+// clear log line instead of finding out via a wave of 429s partway through.
+// 950 (not 1000) leaves a small buffer for whatever's still mid-flight
+// elsewhere sharing this same key when the check runs.
+const DAILY_BUDGET_SAFETY_MARGIN = 50;
+const DOCUMENTED_DAILY_LIMIT = 1000;
+
+export async function hasGoalApiBudgetRemaining() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await getSupabaseClient().from('goal_api_usage').select('request_count').eq('day', today).maybeSingle();
+  if (error) {
+    console.error('Failed to read GOAL API usage, proceeding optimistically:', error.message);
+    return true; // never let a usage-check failure be the reason real work doesn't happen
+  }
+  const used = data?.request_count ?? 0;
+  return used < DOCUMENTED_DAILY_LIMIT - DAILY_BUDGET_SAFETY_MARGIN;
+}
+
 async function call(path, params = {}) {
   const apiKey = process.env.GOAL_API_KEY;
   if (!apiKey) {
