@@ -1,5 +1,6 @@
 import { Star } from 'lucide-react';
 import ClubJersey from './ClubJersey.jsx';
+import { PROVIDER_INFO } from '../lib/broadcasters.js';
 
 // Fixed gold, not theme.accent -- confirmed live that using the theme
 // accent made the favorited indicator blend into the (also accent-colored)
@@ -48,6 +49,34 @@ function TeamRow({ club, theme, score, isLive }) {
           {score}
         </span>
       )}
+    </div>
+  );
+}
+
+// Small logo row under the kickoff time/status label -- lives in that same
+// fixed-width column rather than a 3rd full-width row under the two teams,
+// so a fixture with no broadcaster info (not yet resolved, or a league this
+// app doesn't have broadcast data for at all) takes up exactly the same
+// row height as one that has it. Two logos side by side covers every real
+// case seen so far (a Serie A co-exclusive match is DAZN+Sky, never 3+) --
+// capped at 2 defensively in case that ever changes.
+function BroadcasterLogos({ providers, theme }) {
+  if (!providers?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+      {providers.slice(0, 2).map((key) => {
+        const info = PROVIDER_INFO[key];
+        if (!info) return null;
+        return (
+          <img
+            key={key}
+            src={info.logoUrl}
+            alt={info.label}
+            title={info.label}
+            style={{ width: '20px', height: '12px', objectFit: 'contain', borderRadius: '2px', background: theme.border }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -139,10 +168,11 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           A true fixed width keeps this column identical regardless of
           which status text a given row happens to show. Width scaled down
           from 66px alongside the 13px->11px font shrink. */}
-      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
+        {!isFinished && <BroadcasterLogos providers={fixture.displayBroadcasters} theme={theme} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} isLive={isLive} />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { useLeagueId } from './useLeagueId.js';
+import { getBroadcasters } from '../lib/broadcasters.js';
 
 // How far back to include already-played fixtures. syncFixturesForLeague
 // (src/football-api/syncFixtures.js) now syncs the WHOLE current season in
@@ -24,10 +25,14 @@ const cache = new Map();
 // used for the Realtime update below, so a live score/status change
 // doesn't need a full refetch (which would also reset scroll position and
 // briefly show a loading state for an update that's really just one row).
-function applyFixtureUpdate(matchdays, updated) {
+function applyFixtureUpdate(matchdays, updated, leagueSlug) {
   return matchdays.map((group) => ({
     ...group,
-    games: group.games.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)),
+    games: group.games.map((f) =>
+      f.id === updated.id
+        ? { ...f, ...updated, displayBroadcasters: getBroadcasters(leagueSlug, updated.kickoff_at ?? f.kickoff_at, updated.broadcasters ?? f.broadcasters) }
+        : f
+    ),
   }));
 }
 
@@ -39,9 +44,10 @@ function applyFixtureUpdate(matchdays, updated) {
 // alone showed "2ª giornata" above "1ª giornata" with genuinely earlier
 // dates. games within each group are already ascending by kickoff_at from
 // the query's own .order() below, so games[0] is that group's earliest.
-function groupByMatchday(rows) {
+function groupByMatchday(rows, leagueSlug) {
   const byMatchday = new Map();
-  for (const fixture of rows) {
+  for (const raw of rows) {
+    const fixture = { ...raw, displayBroadcasters: getBroadcasters(leagueSlug, raw.kickoff_at, raw.broadcasters) };
     const key = fixture.matchday ?? 0;
     if (!byMatchday.has(key)) byMatchday.set(key, []);
     byMatchday.get(key).push(fixture);
@@ -87,7 +93,7 @@ export function useFixtures(leagueSlug) {
     const cutoff = new Date(Date.now() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
     return supabase
       .from('fixtures')
-      .select('id, matchday, home_club_id, away_club_id, kickoff_at, kickoff_confirmed, status, home_score, away_score, referee, live_minute, highlight_video_url')
+      .select('id, matchday, home_club_id, away_club_id, kickoff_at, kickoff_confirmed, status, home_score, away_score, referee, live_minute, highlight_video_url, broadcasters')
       .eq('league_id', leagueId)
       .gte('kickoff_at', cutoff)
       .order('kickoff_at', { ascending: true });
@@ -110,7 +116,7 @@ export function useFixtures(leagueSlug) {
         console.error('Failed to load fixtures for league', leagueSlug, error);
         if (!cached) setMatchdays([]);
       } else {
-        const grouped = groupByMatchday(data);
+        const grouped = groupByMatchday(data, leagueSlug);
         cache.set(leagueId, grouped);
         setMatchdays(grouped);
       }
@@ -131,7 +137,7 @@ export function useFixtures(leagueSlug) {
         (payload) => {
           if (cancelled) return;
           setMatchdays((prev) => {
-            const next = applyFixtureUpdate(prev, payload.new);
+            const next = applyFixtureUpdate(prev, payload.new, leagueSlug);
             cache.set(leagueId, next);
             return next;
           });
@@ -155,7 +161,7 @@ export function useFixtures(leagueSlug) {
     if (error) {
       console.error('Failed to refresh fixtures for league', leagueSlug, error);
     } else {
-      const grouped = groupByMatchday(data);
+      const grouped = groupByMatchday(data, leagueSlug);
       cache.set(leagueId, grouped);
       setMatchdays(grouped);
     }

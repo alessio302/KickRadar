@@ -1,0 +1,28 @@
+name: Broadcasters sync
+
+on:
+  schedule:
+    # Twice a day -- goal.com/it's own broadcaster overview only fills in a
+    # given matchday's providers "from the Wednesday before" (per the
+    # league's own EPG release cadence, see PR discussion), so there's
+    # nothing to gain from polling more often than that. 06:00/18:00 UTC
+    # catches a same-day update well before evening kickoffs either way.
+    - cron: '0 6,18 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node src/football-api/syncSerieABroadcasters.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
