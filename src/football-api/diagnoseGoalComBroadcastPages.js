@@ -10,6 +10,14 @@
 // (2) the pages are reachable or blocked, (3) what the actual response
 // looks like -- a real per-match list, or something empty of the useful
 // text.
+//
+// Round 2 (user follow-up): not just "Sky vs DAZN" but the SPECIFIC channel
+// (e.g. "Sky Sport Bundesliga 1" not just "Sky", "Sky Sport Uno" for Italy)
+// and whether a usable logo image accompanies each broadcaster mention.
+// Dumps the FULL visible text (no 2500-char cutoff this time) for the two
+// most fixture-dense pages, greps for numbered-channel patterns, and lists
+// every <img> near a Sky/DAZN/Prime mention so we can see what logo assets
+// (if any) the page actually embeds.
 const CANDIDATE_URLS = [
   'https://www.goal.com/it/notizie/calendario-serie-a-dove-vedere-le-partite-su-sky-dazn/15xq0ezenmop915t22cio9f74h',
   'https://www.goal.com/de/meldungen/fussball-heute-im-tv-und-im-live-stream-top-spiele/5681oylra2dy1htomenl3fsww',
@@ -21,10 +29,14 @@ async function checkRobots() {
   const res = await fetch('https://www.goal.com/robots.txt');
   const text = await res.text();
   console.log(`robots.txt status=${res.status}, length=${text.length}`);
-  console.log(text.slice(0, 3000));
 }
 
-async function checkPage(url) {
+function extractBroadcastImages(html) {
+  const imgs = [...html.matchAll(/<img[^>]+>/gi)].map((m) => m[0]);
+  return imgs.filter((tag) => /sky|dazn|prime|amazon|wow|logo/i.test(tag));
+}
+
+async function checkPage(url, { fullText = false } = {}) {
   console.log(`\n=== ${url} ===`);
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KickRadarDiagnose/1.0)' } });
@@ -37,7 +49,14 @@ async function checkPage(url) {
       .replace(/\s+/g, ' ')
       .trim();
     console.log(`visible-text length=${text.length}`);
-    console.log(text.slice(0, 2500));
+    console.log(fullText ? text : text.slice(0, 1500));
+
+    const channelMentions = text.match(/(Sky Sport[\w äöü]*\d*|DAZN\s?\d|Amazon Prime[\w äöü]*|Sky Sport (Uno|Bundesliga|Calcio|Football|Premier League)[\w äöü]*\d*)/gi) || [];
+    console.log(`\nnumbered/named-channel mentions (raw, may repeat): ${[...new Set(channelMentions)].join(' | ') || 'NONE FOUND'}`);
+
+    const broadcastImgs = extractBroadcastImages(html);
+    console.log(`\nbroadcast-related <img> tags found: ${broadcastImgs.length}`);
+    broadcastImgs.slice(0, 10).forEach((tag) => console.log(`  ${tag}`));
   } catch (err) {
     console.log(`fetch failed: ${err.message}`);
   }
@@ -45,9 +64,10 @@ async function checkPage(url) {
 
 async function main() {
   await checkRobots();
-  for (const url of CANDIDATE_URLS) {
-    await checkPage(url);
-  }
+  await checkPage(CANDIDATE_URLS[0], { fullText: true }); // Serie A
+  await checkPage(CANDIDATE_URLS[3], { fullText: true }); // Bundesliga matchday (most fixture-dense)
+  await checkPage(CANDIDATE_URLS[1]); // daily overview
+  await checkPage(CANDIDATE_URLS[2]); // Champions League
 }
 
 main()
