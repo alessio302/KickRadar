@@ -57,14 +57,15 @@ function TeamRow({ club, theme, score, isLive }) {
 // fixed-width column rather than a 3rd full-width row under the two teams,
 // so a fixture with no broadcaster info (not yet resolved, or a league this
 // app doesn't have broadcast data for at all) takes up exactly the same
-// row height as one that has it. Two logos side by side covers every real
-// case seen so far (a Serie A co-exclusive match is DAZN+Sky, never 3+) --
-// capped at 2 defensively in case that ever changes.
+// row height as one that has it. Confirmed live (syncSerieABroadcasters.js's
+// first real run): a co-exclusive Serie A match can be DAZN+Sky+NOW, not
+// just 2 -- capped at 3 to show every real case seen without an unbounded
+// row.
 function BroadcasterLogos({ providers, theme }) {
   if (!providers?.length) return null;
   return (
     <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
-      {providers.slice(0, 2).map((key) => {
+      {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
         return (
@@ -73,7 +74,7 @@ function BroadcasterLogos({ providers, theme }) {
             src={info.logoUrl}
             alt={info.label}
             title={info.label}
-            style={{ width: '20px', height: '12px', objectFit: 'contain', borderRadius: '2px', background: theme.border }}
+            style={{ width: '17px', height: '12px', objectFit: 'contain', borderRadius: '2px', background: theme.border }}
           />
         );
       })}
