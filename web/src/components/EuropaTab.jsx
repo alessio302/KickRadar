@@ -292,36 +292,17 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
 // Duplicated from FixtureRow.jsx (domestic)'s own BroadcasterLogos rather
 // than a shared import -- same "separate copy, not a shared component"
 // convention this file's own TeamRow already follows for European
-// fixtures (see that component's comment). Plain colored text, not a logo
-// image -- same fix as FixtureRow.jsx's own (see its comment and
-// broadcasters.js's PROVIDER_INFO): the hotlinked logo assets were
-// unreliable at this size (one failed to load, others rendered squeezed).
+// fixtures (see that component's comment). Real logos, self-hosted -- see
+// FixtureRow.jsx's own comment and broadcasters.js's PROVIDER_INFO for the
+// full reasoning (fixed height, auto width, not a fixed square box).
 function BroadcasterLogos({ providers }) {
   if (!providers?.length) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px', maxWidth: '60px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px', marginTop: '3px', maxWidth: '64px' }}>
       {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
-        return (
-          <span
-            key={key}
-            title={info.label}
-            style={{
-              fontSize: '8px',
-              fontWeight: 800,
-              lineHeight: '11px',
-              letterSpacing: '0.01em',
-              padding: '0 3px',
-              borderRadius: '3px',
-              background: info.bg,
-              color: info.fg,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {info.label}
-          </span>
-        );
+        return <img key={key} src={info.logoUrl} alt={info.label} title={info.label} style={{ height: '16px', width: 'auto', objectFit: 'contain' }} />;
       })}
     </div>
   );

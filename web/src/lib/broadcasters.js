@@ -20,22 +20,23 @@
 // scraping goal.com/it's own per-matchday broadcaster table -- see that
 // file for the full reasoning.
 //
-// Plain text pills in each brand's own color, NOT hotlinked logo images --
-// confirmed-live user feedback (twice): goal.com's hotlinked logo assets
-// were unreliable at this pill's small size in practice -- one (Sky) simply
-// failed to load (blank box), and the others rendered squeezed/blurry even
-// after switching to a square aspect ratio, because the actual asset
-// dimensions/CDN behavior didn't match what the source page's own <img>
-// width/height attributes implied. A colored text badge has no loading
-// dependency at all and stays legible at any size this pill is ever
-// rendered at. Colors are each brand's own primary color (DAZN black, Sky
-// blue, NOW black, RTL+ red) -- not pulled from anywhere in the app's own
-// existing theme.
+// Real provider logos, self-hosted in our own Supabase Storage bucket
+// (broadcaster-logos) -- NOT hotlinked from goal.com. Confirmed live/user-
+// reported: hotlinking them directly was unreliable in the browser (Sky's
+// logo failed to load entirely, most likely goal.com's CDN enforcing
+// referrer-based hotlink protection against a cross-origin <img> request
+// from our own domain). uploadBroadcasterLogos.js downloaded each one
+// server-side ONCE (no browser Referer issue there) and uploaded it to our
+// own bucket, so the app now serves them from a URL we control permanently.
+// A prior revision briefly replaced these with plain colored text badges --
+// reverted per explicit user direction: keep the real logos, fix the
+// hosting instead of dropping them.
+const LOGO_BASE = 'https://inwncmfpcjbebwivmovc.supabase.co/storage/v1/object/public/broadcaster-logos';
 export const PROVIDER_INFO = {
-  dazn: { label: 'DAZN', bg: '#000000', fg: '#FFFFFF' },
-  sky: { label: 'Sky', bg: '#0072C9', fg: '#FFFFFF' },
-  now: { label: 'NOW', bg: '#000000', fg: '#00E6C3' },
-  rtlplus: { label: 'RTL+', bg: '#E2001A', fg: '#FFFFFF' },
+  dazn: { label: 'DAZN', logoUrl: `${LOGO_BASE}/dazn.png` },
+  sky: { label: 'Sky', logoUrl: `${LOGO_BASE}/sky.png` },
+  now: { label: 'NOW', logoUrl: `${LOGO_BASE}/now.png` },
+  rtlplus: { label: 'RTL+', logoUrl: `${LOGO_BASE}/rtlplus.jpg` },
 };
 
 // Berlin-local weekday, independent of the viewer's own device timezone --

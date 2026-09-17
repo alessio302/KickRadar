@@ -53,7 +53,7 @@ function TeamRow({ club, theme, score, isLive }) {
   );
 }
 
-// Small badge row under the kickoff time/status label -- lives in that same
+// Small logo row under the kickoff time/status label -- lives in that same
 // fixed-width column rather than a 3rd full-width row under the two teams,
 // so a fixture with no broadcaster info (not yet resolved, or a league this
 // app doesn't have broadcast data for at all) takes up exactly the same
@@ -62,39 +62,25 @@ function TeamRow({ club, theme, score, isLive }) {
 // just 2 -- capped at 3 to show every real case seen without an unbounded
 // row.
 //
-// Plain colored text, not a logo image -- confirmed live/user-reported
-// TWICE: goal.com's hotlinked logo assets were unreliable at this size (Sky
-// failed to load entirely; the others rendered squeezed/blurry even after
-// matching their claimed square aspect ratio). See broadcasters.js's own
-// PROVIDER_INFO comment for the full reasoning. flexWrap lets a 3-provider
-// row (rare, Serie A only) wrap to a 2nd line rather than shrinking each
-// badge's text to fit -- legibility over a strict one-line cap.
+// Real logos, self-hosted (see broadcasters.js's PROVIDER_INFO) -- a prior
+// square-crop attempt (fixed width AND height) still looked wrong:
+// confirmed live/user-reported the actual rendered mark stayed tiny even
+// though the box grew, because some of these source images carry their own
+// internal padding/whitespace around the mark at a non-square aspect ratio,
+// so constraining both dimensions just added more empty space, not a
+// bigger visible logo. Fixed HEIGHT only, auto width (objectFit: contain
+// still preserves the source aspect ratio, but nothing here forces it into
+// a box narrower than it wants) -- each logo renders at whatever width it
+// actually needs to be legible at that height. flexWrap lets a 3-provider
+// row (rare, Serie A only) wrap to a 2nd line instead of squeezing.
 function BroadcasterLogos({ providers }) {
   if (!providers?.length) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px', maxWidth: '60px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px', marginTop: '3px', maxWidth: '64px' }}>
       {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
-        return (
-          <span
-            key={key}
-            title={info.label}
-            style={{
-              fontSize: '8px',
-              fontWeight: 800,
-              lineHeight: '11px',
-              letterSpacing: '0.01em',
-              padding: '0 3px',
-              borderRadius: '3px',
-              background: info.bg,
-              color: info.fg,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {info.label}
-          </span>
-        );
+        return <img key={key} src={info.logoUrl} alt={info.label} title={info.label} style={{ height: '16px', width: 'auto', objectFit: 'contain' }} />;
       })}
     </div>
   );
