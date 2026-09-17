@@ -84,10 +84,21 @@ export default function NewsCard({ theme, t, language, article, onOpenSummary })
             href={article.source_url}
             target="_blank"
             rel="noreferrer"
-            title={t.transfers.readOriginal}
-            style={{ color: theme.textMuted, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', textDecoration: 'none' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '11px',
+              fontWeight: 700,
+              color: theme.textMuted,
+              background: theme.border,
+              border: 'none',
+              borderRadius: '999px',
+              padding: '4px 9px 4px 7px',
+              textDecoration: 'none',
+            }}
           >
-            <ExternalLink size={13} />
+            <ExternalLink size={12} /> {t.transfers.readOriginal}
           </a>
         </div>
       </div>
