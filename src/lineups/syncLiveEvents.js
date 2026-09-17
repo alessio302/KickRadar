@@ -57,7 +57,7 @@
 // writes status/score for it.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES, UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getLeagueFixtures, getWsToken, GOAL_API_WS_URL } from './goalApiClient.js';
+import { getLeagueFixtures, getWsToken, GOAL_API_WS_URL, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
 import { insertNewMatchEvents } from './matchEventsReconciler.js';
@@ -646,6 +646,17 @@ export async function syncLiveEvents() {
 
   const candidates = await findCandidateFixtures(supabase);
   if (candidates.length === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };
+
+  // Checked here, before resolveGoalApiIds() (a real GOAL API call for any
+  // not-yet-cached candidate) or getWsToken() (always a real call) spend
+  // any of a possibly-already-exhausted daily budget -- see
+  // hasGoalApiBudgetRemaining()'s own comment for what this replaces (a
+  // run that self-loops its full ~14-minute budget doing nothing but
+  // collecting 429s, invisibly, every 15 minutes).
+  if (!(await hasGoalApiBudgetRemaining())) {
+    console.error('Live events: GOAL API daily budget exhausted, skipping this run entirely.');
+    return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0, skippedBudget: true };
+  }
 
   const resolved = await resolveGoalApiIds(supabase, candidates);
   if (resolved.size === 0) return { subscribed: 0, updatesHandled: 0, rowsWritten: 0, droppedForCapacity: 0, reconnects: 0 };

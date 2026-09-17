@@ -158,6 +158,28 @@ async function notifyFixtureStatusChange(supabase, clubById, fixtureRow, leagueS
   }
 }
 
+// Confirmed live (2026-09-17, Levante-Athletic Club, kicked off
+// 2026-09-16 19:30 UTC): this used to hardcode `dateFrom=dateTo=today`,
+// meaning any fixture still `status='live'` in our own DB at the moment
+// the UTC date rolls over becomes permanently invisible to this poll --
+// every future run only ever asks football-data.org for "today"'s
+// matches, which by definition no longer includes a match that kicked off
+// the day before. If the goal-api-webhook (the primary status writer)
+// also missed that match's finish for any reason, nothing else ever
+// corrects it -- this backstop poll is the only thing that's supposed to,
+// and it was structurally unable to. dateFrom now reaches back to the
+// earliest kickoff_at among fixtures we still hold as 'live', so a stale
+// leftover from a prior day gets re-fetched (and, once football-data.org
+// confirms it's actually FINISHED, corrected) on the very next run instead
+// of never again.
+async function computeDateRange(supabase) {
+  const today = toDateString(new Date());
+  const { data, error } = await supabase.from('fixtures').select('kickoff_at').eq('status', 'live').order('kickoff_at', { ascending: true }).limit(1);
+  if (error) throw error;
+  const earliestLiveDate = data[0] ? toDateString(new Date(data[0].kickoff_at)) : today;
+  return { dateFrom: earliestLiveDate < today ? earliestLiveDate : today, dateTo: today };
+}
+
 // Deliberately not scoped to status=LIVE -- a match that just finished
 // would silently drop out of that filter on the very next poll, leaving
 // its final score/status un-written until the next 4x-daily fixtures-sync
@@ -165,11 +187,11 @@ async function notifyFixtureStatusChange(supabase, clubById, fixtureRow, leagueS
 // league's full match list once and updating every live-or-finished row in
 // it catches that transition for free, no cross-poll state needed.
 async function pollOnce(supabase, clubById) {
-  const date = toDateString(new Date());
+  const { dateFrom, dateTo } = await computeDateRange(supabase);
   const matches = [];
   for (const league of LEAGUES) {
     try {
-      const leagueMatches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom: date, dateTo: date });
+      const leagueMatches = await getMatches({ competitionId: league.externalCompetitionId, dateFrom, dateTo });
       // Tagged with this league's own slug now, before the per-league
       // arrays get flattened into one below -- notifyFixtureStatusChange()
       // needs it for the push payload's deep-link URL, and there's no other
