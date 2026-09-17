@@ -34,3 +34,17 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOAL_API_KEY: ${{ secrets.GOAL_API_KEY }}
+          # Confirmed live 2026-09-14 (Inter 5-3 Udinese): missing here meant
+          # every goal/card/sub this file's own WebSocket path detected first
+          # (insertNewMatchEvents() -> notifyFavoritedFixtureEvents()) threw
+          # "Missing VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY env vars" on its push
+          # attempt -- caught and logged, not fatal to the run, but the
+          # notification itself never went out. All 5 of Inter's goals and
+          # one of Udinese's three were WS-first that match and got silently
+          # dropped this way; only the two goals the slower REST reconciler
+          # (lineups-sync.yml, which already has these two secrets) picked up
+          # first actually reached anyone. Same fix already applied to
+          # lineups-sync.yml and lineups-sync-european.yml -- this file was
+          # just missed.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
