@@ -292,7 +292,9 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
 // Duplicated from FixtureRow.jsx (domestic)'s own BroadcasterLogos rather
 // than a shared import -- same "separate copy, not a shared component"
 // convention this file's own TeamRow already follows for European
-// fixtures (see that component's comment).
+// fixtures (see that component's comment). Square, not a wide-short
+// rectangle -- same fix as FixtureRow.jsx's own (see its comment): every
+// logo asset here is itself a square 72x72 source image.
 function BroadcasterLogos({ providers, theme }) {
   if (!providers?.length) return null;
   return (
@@ -306,7 +308,7 @@ function BroadcasterLogos({ providers, theme }) {
             src={info.logoUrl}
             alt={info.label}
             title={info.label}
-            style={{ width: '17px', height: '12px', objectFit: 'contain', borderRadius: '2px', background: theme.border }}
+            style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '3px', background: theme.border }}
           />
         );
       })}
@@ -368,7 +370,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
       }}
     >
       <span aria-hidden="true" style={{ width: '3px', borderRadius: '2px', background: isLive ? theme.danger : 'transparent', flexShrink: 0 }} />
-      <div style={{ width: '56px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <div style={{ width: '60px', flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
