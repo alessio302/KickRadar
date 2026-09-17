@@ -292,24 +292,35 @@ function TeamRow({ badgeUrl, name, theme, score, isLive }) {
 // Duplicated from FixtureRow.jsx (domestic)'s own BroadcasterLogos rather
 // than a shared import -- same "separate copy, not a shared component"
 // convention this file's own TeamRow already follows for European
-// fixtures (see that component's comment). Square, not a wide-short
-// rectangle -- same fix as FixtureRow.jsx's own (see its comment): every
-// logo asset here is itself a square 72x72 source image.
-function BroadcasterLogos({ providers, theme }) {
+// fixtures (see that component's comment). Plain colored text, not a logo
+// image -- same fix as FixtureRow.jsx's own (see its comment and
+// broadcasters.js's PROVIDER_INFO): the hotlinked logo assets were
+// unreliable at this size (one failed to load, others rendered squeezed).
+function BroadcasterLogos({ providers }) {
   if (!providers?.length) return null;
   return (
-    <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px', maxWidth: '60px' }}>
       {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
         return (
-          <img
+          <span
             key={key}
-            src={info.logoUrl}
-            alt={info.label}
             title={info.label}
-            style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '3px', background: theme.border }}
-          />
+            style={{
+              fontSize: '8px',
+              fontWeight: 800,
+              lineHeight: '11px',
+              letterSpacing: '0.01em',
+              padding: '0 3px',
+              borderRadius: '3px',
+              background: info.bg,
+              color: info.fg,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {info.label}
+          </span>
         );
       })}
     </div>
@@ -374,7 +385,7 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
         <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
-        {!isFinished && <BroadcasterLogos providers={fixture.displayBroadcasters} theme={theme} />}
+        {!isFinished && <BroadcasterLogos providers={fixture.displayBroadcasters} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         <TeamRow
