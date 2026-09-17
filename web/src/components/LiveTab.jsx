@@ -33,38 +33,20 @@ import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 // that component's own TeamRow, just resolved off different fields --
 // mirrors EuropaTab.jsx's own EuropaFixtureRow, condensed to this list's
 // tighter row height.
-// Same colored-text-badge treatment as FixtureRow.jsx (domestic)'s own
+// Same real-logo treatment as FixtureRow.jsx (domestic)'s own
 // BroadcasterLogos -- duplicated rather than shared, matching this file's
 // existing EuropaLiveRow/EuropaTab.jsx split for European-fixture-specific
-// rendering (team_name-keyed fields, no clubs table row). Text, not a logo
-// image -- see FixtureRow.jsx's own comment and broadcasters.js's
-// PROVIDER_INFO: the hotlinked logo assets were unreliable at this size.
+// rendering (team_name-keyed fields, no clubs table row). Self-hosted
+// logos, fixed height/auto width -- see FixtureRow.jsx's own comment and
+// broadcasters.js's PROVIDER_INFO for the full reasoning.
 function BroadcasterLogos({ providers }) {
   if (!providers?.length) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px', maxWidth: '60px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px', marginTop: '3px', maxWidth: '64px' }}>
       {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
-        return (
-          <span
-            key={key}
-            title={info.label}
-            style={{
-              fontSize: '8px',
-              fontWeight: 800,
-              lineHeight: '11px',
-              letterSpacing: '0.01em',
-              padding: '0 3px',
-              borderRadius: '3px',
-              background: info.bg,
-              color: info.fg,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {info.label}
-          </span>
-        );
+        return <img key={key} src={info.logoUrl} alt={info.label} title={info.label} style={{ height: '16px', width: 'auto', objectFit: 'contain' }} />;
       })}
     </div>
   );
