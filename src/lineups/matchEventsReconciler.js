@@ -41,8 +41,25 @@ function parseMinuteValue(minute) {
   return base + (Number.isNaN(extra) ? 0 : extra);
 }
 
+// A goal, own goal, and penalty are all still the same real kind of event
+// (one team's score going up) for matching purposes -- added once
+// syncLiveEvents.js's fast WS path and eventRows.js's own REST path both
+// started distinguishing "Penalty" from a plain "Goal" (see this file's
+// own git history / eventRows.js's own comment): the WS often can't tell
+// a penalty apart at push time (or its own payload just doesn't carry the
+// field), but the slower authoritative REST snapshot always can. Without
+// this, the two writers disagreeing on the exact type for the SAME real
+// goal (WS says "Goal", REST later says "Penalty") would make isSameEvent
+// return false and duplicate that goal in the timeline -- exactly the
+// class of bug the minute-tolerance fix above exists to prevent, just
+// triggered by type disagreement instead of a minute correction.
+const GOAL_TYPES = new Set(['Goal', 'Own Goal', 'Penalty']);
+function typeFamily(type) {
+  return GOAL_TYPES.has(type) ? 'goal' : type;
+}
+
 function isSameEvent(a, b) {
-  if (a.type !== b.type) return false;
+  if (typeFamily(a.type) !== typeFamily(b.type)) return false;
   if (a.player !== b.player) return false;
   if ((a.substituted ?? '') !== (b.substituted ?? '')) return false;
   const minuteA = parseMinuteValue(a.minute);
@@ -126,6 +143,23 @@ export async function reconcileMatchEvents(supabase, fixtureId, leagueSlug, fres
       .delete()
       .in('id', toDelete.map((r) => r.id));
     if (deleteErr) console.error(`Failed to delete retracted events for fixture ${fixtureId}:`, deleteErr.message);
+  }
+
+  // Upgrades an already-stored generic "Goal" row to the more specific
+  // "Penalty"/"Own Goal" REST now reports for that same real event --
+  // isSameEvent() above treats all three as the same goal-family event
+  // (so this never duplicates), but a same-family match alone never
+  // corrects the stored type, only skips re-inserting it. Without this, a
+  // penalty the fast WS path first wrote as a plain "Goal" (its own
+  // payload not confirmed to always carry GOAL API's penalty flag) would
+  // stay mislabeled for the rest of the match even once REST's
+  // authoritative snapshot knows better.
+  for (const fresh of freshRows) {
+    if (fresh.type === 'Goal') continue; // nothing more specific to upgrade TO
+    const stale = existing.find((e) => isSameEvent(e, fresh) && e.type !== fresh.type);
+    if (!stale) continue;
+    const { error: upgradeErr } = await supabase.from('match_events').update({ type: fresh.type }).eq('id', stale.id);
+    if (upgradeErr) console.error(`Failed to upgrade event type for fixture ${fixtureId}:`, upgradeErr.message);
   }
 
   const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existing);

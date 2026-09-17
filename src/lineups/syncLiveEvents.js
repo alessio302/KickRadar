@@ -363,10 +363,17 @@ function buildLiveEventRows(fixtureId, info, data) {
     const assist = isHomeField ? g.home_assist : g.away_assist;
     if (!rawName) continue;
     const isOwnGoal = /\(o\.g\.\)/i.test(rawName);
+    // Same `info` field REST's own /fixtures/:id/events response carries
+    // ("Penalty" vs null, confirmed live via diagnosePenaltyGoalFormat.js)
+    // -- checked defensively here since this WS payload's own field names
+    // otherwise differ (snake_case) from REST's camelCase shape, and
+    // hasn't been directly confirmed present on a live WS push; if it's
+    // ever absent this just stays falsy, same behavior as before.
+    const isPenalty = !isOwnGoal && g.info === 'Penalty';
     rows.push({
       fixture_id: fixtureId,
       ...sideRef(info, isHomeField),
-      type: isOwnGoal ? 'Own Goal' : 'Goal',
+      type: isOwnGoal ? 'Own Goal' : isPenalty ? 'Penalty' : 'Goal',
       minute: String(g.time ?? ''),
       player: rawName,
       assist: assist || null,
