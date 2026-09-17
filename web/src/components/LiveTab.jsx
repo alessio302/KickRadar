@@ -33,25 +33,37 @@ import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 // that component's own TeamRow, just resolved off different fields --
 // mirrors EuropaTab.jsx's own EuropaFixtureRow, condensed to this list's
 // tighter row height.
-// Same square-logo treatment as FixtureRow.jsx (domestic)'s own
+// Same colored-text-badge treatment as FixtureRow.jsx (domestic)'s own
 // BroadcasterLogos -- duplicated rather than shared, matching this file's
 // existing EuropaLiveRow/EuropaTab.jsx split for European-fixture-specific
-// rendering (team_name-keyed fields, no clubs table row).
-function BroadcasterLogos({ providers, theme }) {
+// rendering (team_name-keyed fields, no clubs table row). Text, not a logo
+// image -- see FixtureRow.jsx's own comment and broadcasters.js's
+// PROVIDER_INFO: the hotlinked logo assets were unreliable at this size.
+function BroadcasterLogos({ providers }) {
   if (!providers?.length) return null;
   return (
-    <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px', maxWidth: '60px' }}>
       {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
         return (
-          <img
+          <span
             key={key}
-            src={info.logoUrl}
-            alt={info.label}
             title={info.label}
-            style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '3px', background: theme.border }}
-          />
+            style={{
+              fontSize: '8px',
+              fontWeight: 800,
+              lineHeight: '11px',
+              letterSpacing: '0.01em',
+              padding: '0 3px',
+              borderRadius: '3px',
+              background: info.bg,
+              color: info.fg,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {info.label}
+          </span>
         );
       })}
     </div>
@@ -83,7 +95,7 @@ function EuropaLiveRow({ theme, fixture, onSelectFixture }) {
         <span style={{ fontSize: '11px', fontWeight: 700, color: theme.danger, whiteSpace: 'nowrap' }}>
           {fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : '●'}
         </span>
-        <BroadcasterLogos providers={fixture.displayBroadcasters} theme={theme} />
+        <BroadcasterLogos providers={fixture.displayBroadcasters} />
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         {[

@@ -53,7 +53,7 @@ function TeamRow({ club, theme, score, isLive }) {
   );
 }
 
-// Small logo row under the kickoff time/status label -- lives in that same
+// Small badge row under the kickoff time/status label -- lives in that same
 // fixed-width column rather than a 3rd full-width row under the two teams,
 // so a fixture with no broadcaster info (not yet resolved, or a league this
 // app doesn't have broadcast data for at all) takes up exactly the same
@@ -62,29 +62,38 @@ function TeamRow({ club, theme, score, isLive }) {
 // just 2 -- capped at 3 to show every real case seen without an unbounded
 // row.
 //
-// Square (not the earlier 17x12 rectangle) -- confirmed live/user-reported:
-// every one of these logo assets (DAZN/Sky/NOW/RTL+, all hotlinked from
-// goal.com) is itself a square 72x72 image, so forcing a wide-short box
-// squeezed a centered square logo into an aspect ratio it was never
-// designed for, especially bad for RTL+'s own logo (real letterforms, not
-// just a wordmark shape) -- nearly illegible at that size. 18x18 square
-// still fits 3 across (18*3 + 2*3px gaps = 60px) inside the row's existing
-// 56-62px status column without widening it meaningfully.
-function BroadcasterLogos({ providers, theme }) {
+// Plain colored text, not a logo image -- confirmed live/user-reported
+// TWICE: goal.com's hotlinked logo assets were unreliable at this size (Sky
+// failed to load entirely; the others rendered squeezed/blurry even after
+// matching their claimed square aspect ratio). See broadcasters.js's own
+// PROVIDER_INFO comment for the full reasoning. flexWrap lets a 3-provider
+// row (rare, Serie A only) wrap to a 2nd line rather than shrinking each
+// badge's text to fit -- legibility over a strict one-line cap.
+function BroadcasterLogos({ providers }) {
   if (!providers?.length) return null;
   return (
-    <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px', maxWidth: '60px' }}>
       {providers.slice(0, 3).map((key) => {
         const info = PROVIDER_INFO[key];
         if (!info) return null;
         return (
-          <img
+          <span
             key={key}
-            src={info.logoUrl}
-            alt={info.label}
             title={info.label}
-            style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '3px', background: theme.border }}
-          />
+            style={{
+              fontSize: '8px',
+              fontWeight: 800,
+              lineHeight: '11px',
+              letterSpacing: '0.01em',
+              padding: '0 3px',
+              borderRadius: '3px',
+              background: info.bg,
+              color: info.fg,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {info.label}
+          </span>
         );
       })}
     </div>
@@ -182,7 +191,7 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
         <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? theme.danger : isFinished ? theme.textMuted : theme.accent, whiteSpace: 'nowrap' }}>
           {statusLabel}
         </span>
-        {!isFinished && <BroadcasterLogos providers={fixture.displayBroadcasters} theme={theme} />}
+        {!isFinished && <BroadcasterLogos providers={fixture.displayBroadcasters} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center' }}>
         <TeamRow club={clubsById.get(fixture.home_club_id)} theme={theme} score={showScore ? fixture.home_score : null} isLive={isLive} />

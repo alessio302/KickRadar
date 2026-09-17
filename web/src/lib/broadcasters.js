@@ -20,31 +20,22 @@
 // scraping goal.com/it's own per-matchday broadcaster table -- see that
 // file for the full reasoning.
 //
-// Logo URLs are goal.com's own hosted assets (hotlinked, same pattern this
-// app already uses for club crests/badges via football-data.org/GOAL API's
-// CDNs) -- confirmed reachable via diagnoseGoalComBroadcastPages.js.
+// Plain text pills in each brand's own color, NOT hotlinked logo images --
+// confirmed-live user feedback (twice): goal.com's hotlinked logo assets
+// were unreliable at this pill's small size in practice -- one (Sky) simply
+// failed to load (blank box), and the others rendered squeezed/blurry even
+// after switching to a square aspect ratio, because the actual asset
+// dimensions/CDN behavior didn't match what the source page's own <img>
+// width/height attributes implied. A colored text badge has no loading
+// dependency at all and stays legible at any size this pill is ever
+// rendered at. Colors are each brand's own primary color (DAZN black, Sky
+// blue, NOW black, RTL+ red) -- not pulled from anywhere in the app's own
+// existing theme.
 export const PROVIDER_INFO = {
-  dazn: {
-    label: 'DAZN',
-    logoUrl: 'https://eu-images.contentstack.com/v3/assets/bltcc7a7ffd2fbf71f5/blt2a657c326f3152f3/65709dfdfcc91a04075bd960/DAZN.png',
-  },
-  sky: {
-    label: 'Sky',
-    // Confirmed-live user feedback: the combined "Sky WOW" graphic
-    // (goal.com's own sky-wow-logo.jpg -- WOW is Sky's streaming-only
-    // access brand, not a separate channel) read as illegible/ambiguous
-    // ("WOW" misread as "NOW") at this pill's small size. This is a plain
-    // "Sky Sport" logo, no second brand mixed in.
-    logoUrl: 'https://eu-images.contentstack.com/v3/assets/bltcc7a7ffd2fbf71f5/blt1f8bf17a441e7087/64e5d5325e6a952679d12bfe/Sky_Sport_logo.png',
-  },
-  now: {
-    label: 'NOW',
-    logoUrl: 'https://eu-images.contentstack.com/v3/assets/bltcc7a7ffd2fbf71f5/blt7b99fc273b8208cf/65a7e8a05ee0e2040acb0676/NOW_logo.png',
-  },
-  rtlplus: {
-    label: 'RTL+',
-    logoUrl: 'https://assets.goal.com/images/v3/bltc875439427475ef4/RTL+%20Logo.jpg',
-  },
+  dazn: { label: 'DAZN', bg: '#000000', fg: '#FFFFFF' },
+  sky: { label: 'Sky', bg: '#0072C9', fg: '#FFFFFF' },
+  now: { label: 'NOW', bg: '#000000', fg: '#00E6C3' },
+  rtlplus: { label: 'RTL+', bg: '#E2001A', fg: '#FFFFFF' },
 };
 
 // Berlin-local weekday, independent of the viewer's own device timezone --
