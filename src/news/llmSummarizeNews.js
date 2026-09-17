@@ -58,7 +58,15 @@ async function throttle() {
 
 export async function llmSummarizeNews(title, teaser) {
   const ai = getClient();
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  // Confirmed live (this project's own AI Studio quota page, 2026-09-17):
+  // gemini-3.6-flash's free-tier daily cap is 20 RPD -- far too low for
+  // News's volume (150-200+ summarizable items/day), and it's what
+  // exhausted the quota on this pipeline's very first real run (every
+  // summary silently came back null). gemini-3.5-flash-lite's free-tier
+  // cap is 500 RPD on the same account/project -- 25x more headroom,
+  // comfortably covers current volume, still $0. (gemini-3.1-flash-lite
+  // shows the same 500 RPD if this one ever gets deprecated.)
+  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
   await throttle();
   const response = await ai.models.generateContent({
