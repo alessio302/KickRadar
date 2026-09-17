@@ -1,0 +1,14 @@
+-- "Wo läuft das Spiel?" pill on fixture cards. Only Serie A actually needs
+-- a stored per-fixture value -- Premier League/La Liga/Ligue 1 are single-
+-- provider-exclusive in Germany and Bundesliga is deterministic by kickoff
+-- weekday, so those 4 leagues compute it client-side from data already on
+-- the row (see web/src/lib/broadcasters.js). Serie A genuinely has
+-- co-exclusive matches (DAZN AND Sky Italia showing the same match) that
+-- isn't reducible to a rule, so that one league's rows get a real value
+-- here, written by src/football-api/syncSerieABroadcasters.js.
+--
+-- jsonb array of provider keys (e.g. '["dazn"]' or '["dazn","sky"]'), not a
+-- single text column -- co-exclusivity is the whole reason this table
+-- exists instead of a static rule, so the shape has to support more than
+-- one value per fixture from day one.
+alter table fixtures add column if not exists broadcasters jsonb not null default '[]'::jsonb;

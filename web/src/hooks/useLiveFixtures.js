@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
+import { getBroadcasters } from '../lib/broadcasters.js';
 
 // Cross-league: LiveTab.jsx shows whatever is live right now regardless of
 // which league is currently selected in LigenTab, so this queries
@@ -29,7 +30,7 @@ const load = async (setFixtures, setLoading, cancelledRef) => {
       supabase
         .from('fixtures')
         .select(
-          'id, league_id, matchday, home_club_id, away_club_id, kickoff_at, kickoff_confirmed, status, home_score, away_score, referee, live_minute, highlight_video_url'
+          'id, league_id, matchday, home_club_id, away_club_id, kickoff_at, kickoff_confirmed, status, home_score, away_score, referee, live_minute, highlight_video_url, broadcasters'
         )
         .eq('status', 'live')
         // Excludes UEFA competitions -- they carry no home_club_id/
@@ -55,12 +56,16 @@ const load = async (setFixtures, setLoading, cancelledRef) => {
   const clubsById = new Map(clubs.map((c) => [c.id, c]));
   const leagueSlugById = new Map(leagues.map((l) => [l.id, l.slug]));
   setFixtures(
-    liveRows.map((f) => ({
-      ...f,
-      leagueSlug: leagueSlugById.get(f.league_id),
-      homeClub: clubsById.get(f.home_club_id),
-      awayClub: clubsById.get(f.away_club_id),
-    }))
+    liveRows.map((f) => {
+      const leagueSlug = leagueSlugById.get(f.league_id);
+      return {
+        ...f,
+        leagueSlug,
+        homeClub: clubsById.get(f.home_club_id),
+        awayClub: clubsById.get(f.away_club_id),
+        displayBroadcasters: getBroadcasters(leagueSlug, f.kickoff_at, f.broadcasters),
+      };
+    })
   );
   setLoading(false);
 };
