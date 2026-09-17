@@ -26,6 +26,39 @@ function ensureConfigured() {
   configured = true;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Diagnosed 2026-09-17: a user missed one of three Udinese goal
+// notifications during an Inter match even though all three were detected,
+// claimed in notified_match_events, and had sendNotification called for
+// them -- confirmed no retraction, no dedup collision, no missing claim.
+// The only place left for a real, already-attempted send to vanish is a
+// single-shot webpush.sendNotification call for anything other than a
+// 404/410 (dead subscription): a push service (FCM/APNs) hiccup, timeout,
+// or 5xx was previously just logged and dropped, with no way to ever
+// recover that specific event's notification. Two retries with a brief
+// backoff covers a transient failure without holding up the caller
+// meaningfully (this runs from a batch job, not a request handler).
+const SEND_RETRY_DELAYS_MS = [500, 1500];
+
+async function sendOnceWithRetry(sub, payload) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify(payload)
+      );
+      return { ok: true };
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) return { ok: false, stale: true };
+      if (attempt >= SEND_RETRY_DELAYS_MS.length) return { ok: false, stale: false, err };
+      await sleep(SEND_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+
 async function sendToSubscriptions(supabase, subs, payload) {
   if (subs.length === 0) return { sent: 0, failed: 0, removed: 0 };
 
@@ -34,19 +67,14 @@ async function sendToSubscriptions(supabase, subs, payload) {
   const staleIds = [];
 
   for (const sub of subs) {
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify(payload)
-      );
+    const result = await sendOnceWithRetry(sub, payload);
+    if (result.ok) {
       sent += 1;
-    } catch (err) {
-      if (err.statusCode === 404 || err.statusCode === 410) {
-        staleIds.push(sub.id);
-      } else {
-        failed += 1;
-        console.error('Push send failed:', err.message);
-      }
+    } else if (result.stale) {
+      staleIds.push(sub.id);
+    } else {
+      failed += 1;
+      console.error('Push send failed:', result.err.message);
     }
   }
 
