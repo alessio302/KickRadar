@@ -70,29 +70,44 @@ function isSameEvent(a, b) {
 
 import { notifyFavoritedFixtureEvents } from './matchEventNotifier.js';
 
-function dedupeWithinBatch(rows) {
-  const deduped = [];
-  for (const row of rows) {
-    if (!deduped.some((r) => isSameEvent(r, row))) deduped.push(row);
-  }
-  return deduped;
-}
+// Confirmed live (2026-09-18, diagnoseMatchEventsDuplication.js): doing
+// the "does this already exist?" check and the insert as two separate
+// round-trips from application code -- even with isSameEvent() itself
+// being perfectly correct -- can never be race-safe against the OTHER
+// writer doing its own check-then-insert for the same fixture at nearly
+// the same moment (syncLiveEvents.js's WS path and syncLineups.js's/
+// syncEuropeanLineups.js's REST path are two independent processes with
+// no shared lock). Confirmed live: duplicated rows' `player` values were
+// byte-identical between the two writers (ruling out a string-formatting
+// mismatch, the first hypothesis), and each duplicate pair's two
+// created_at timestamps were only minutes apart -- exactly the shape of
+// "both writers' reads happened before either one's write landed."
+//
+// insert_new_match_events() (sql/062) moves the whole check-and-insert
+// into one Postgres function holding a pg_advisory_xact_lock scoped to
+// fixture_id, so the two writers now genuinely serialize instead of
+// racing. dedupeWithinBatch() is no longer needed here -- the RPC already
+// checks each row in `p_rows` against both the table AND earlier rows in
+// the same call, in order, inside that same lock.
+async function insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows) {
+  if (freshRows.length === 0) return 0;
 
-async function insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existingRows) {
-  const toInsert = dedupeWithinBatch(freshRows).filter((r) => !existingRows.some((e) => isSameEvent(e, r)));
-  if (toInsert.length === 0) return 0;
-
-  const { error } = await supabase.from('match_events').upsert(toInsert, { onConflict: 'fixture_id,event_key' });
+  const { data: inserted, error } = await supabase.rpc('insert_new_match_events', {
+    p_fixture_id: fixtureId,
+    p_rows: freshRows,
+  });
   if (error) {
     console.error(`Failed to store new events for fixture ${fixtureId}:`, error.message);
     return 0;
   }
+  if (!inserted || inserted.length === 0) return 0;
+
   try {
-    await notifyFavoritedFixtureEvents(supabase, fixtureId, leagueSlug, toInsert);
+    await notifyFavoritedFixtureEvents(supabase, fixtureId, leagueSlug, inserted);
   } catch (err) {
     console.error(`Failed to notify favorited-fixture events for fixture ${fixtureId}:`, err.message);
   }
-  return toInsert.length;
+  return inserted.length;
 }
 
 // Fast-path writer's own call (syncLiveEvents.js, once per match_update):
@@ -104,16 +119,7 @@ async function insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, ex
 // is never safe here the way it safely is for reconcileMatchEvents()'s own
 // periodic, authoritative REST snapshot below.
 export async function insertNewMatchEvents(supabase, fixtureId, leagueSlug, freshRows) {
-  if (freshRows.length === 0) return { inserted: 0 };
-  const { data: existing, error } = await supabase
-    .from('match_events')
-    .select('type, minute, player, substituted')
-    .eq('fixture_id', fixtureId);
-  if (error) {
-    console.error(`Failed to read existing match_events for fixture ${fixtureId}:`, error.message);
-    return { inserted: 0 };
-  }
-  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existing);
+  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows);
   return { inserted };
 }
 
@@ -162,6 +168,6 @@ export async function reconcileMatchEvents(supabase, fixtureId, leagueSlug, fres
     if (upgradeErr) console.error(`Failed to upgrade event type for fixture ${fixtureId}:`, upgradeErr.message);
   }
 
-  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows, existing);
+  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows);
   return { inserted, deleted: toDelete.length };
 }
