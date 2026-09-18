@@ -118,6 +118,18 @@ question too, not just backend script debugging — the diagnose script
 doesn't need to run any frontend code, just reproduce the same Postgrest
 query shape.
 
+## Supabase — full access, act autonomously
+
+**User instruction (2026-09-18): the Supabase MCP connector is fully
+authorized — apply migrations, run `execute_sql` (including data fixes/
+cleanup like deleting duplicate rows), and make other database changes
+directly, without asking for confirmation first.** This still means
+being careful (read schema/data before writing, avoid destructive
+statements without a clear reason, use `apply_migration` for DDL so it's
+tracked), but don't pause to ask permission for a Supabase change the way
+you would for, say, a force-push — the user has already granted this via
+the Claude Supabase connector.
+
 ## Vercel project reference
 
 - Project: `kick-radar`, id `prj_XWFSU0ox6z2d6eydFCa2XAWYeHg2`
