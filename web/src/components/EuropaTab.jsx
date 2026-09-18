@@ -170,6 +170,9 @@ function isToday(iso) {
   return new Date(iso).toDateString() === new Date().toDateString();
 }
 
+// Same active-tile scale treatment as LeagueSwitcher.jsx's own badges (see
+// that file's comment for the full reasoning) -- kept in sync so the
+// selection indicator looks and behaves identically everywhere in the app.
 function CompetitionSelector({ selected, theme, onSelect }) {
   return (
     <div
@@ -212,6 +215,10 @@ function CompetitionSelector({ selected, theme, onSelect }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                position: 'relative',
+                zIndex: active ? 1 : 0,
+                transform: active ? 'scale(1.1)' : 'scale(1)',
+                transition: 'transform 0.15s ease, border-color 0.15s ease',
               }}
             >
               <img
