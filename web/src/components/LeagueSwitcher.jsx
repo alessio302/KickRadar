@@ -64,22 +64,23 @@ const BADGE_PADDING = 6;
 // comment), so the active tile's border sits between two different
 // backgrounds at once: the tile's own fixed-white fill on the inside, and
 // theme.bg (which itself flips between white and black across light/dark
-// mode) on the outside. Tried marking "active" purely via border colour
-// first (theme.accent, then a mono-only two-colour ring as a follow-up
-// fix) -- confirmed live, twice, that this needs either a colour that
-// contrasts with BOTH a white fill and a sometimes-black page (true for
-// every saturated accent, never true for Mono's own black/white extremes)
-// or an increasingly special-cased per-accent/per-theme ring, which made
-// Mono visibly inconsistent with every other accent colour.
+// mode) on the outside. Originally used the app's own theme.accent here --
+// confirmed live, twice, that this needs a colour that contrasts with BOTH
+// a white fill and a sometimes-black page, which every saturated accent
+// manages but Mono's own black/white extremes never can, and patching that
+// with per-accent/per-theme branching just made Mono look inconsistent
+// with every other accent.
 //
-// A slight scale-up on the active tile sidesteps all of that: it doesn't
-// depend on any colour contrasting against anything, so the exact same
-// rule reads identically for every accent colour in both themes, with no
-// per-palette branching at all. The border stays a single, uniform
-// `theme.accent`/`theme.border` swap like every other selection indicator
-// in the app (League and even Mono's black/white border reads fine here
-// once size is doing the actual signalling) -- it's now just a secondary
-// reinforcement, not the only cue.
+// Fixed with two independent changes: the border now uses each league's own
+// fixed brand colour (l.color, e.g. Bundesliga's red) instead of the theme
+// accent at all -- same choice EuropaTab.jsx's own CompetitionSelector
+// already made for UCL/UEL/UECL's blue/orange/green borders, applied here
+// for consistency, and it sidesteps the Mono problem entirely since the
+// user's Akzentfarbe setting no longer enters into it. On top of that, the
+// active tile also scales up slightly, which doesn't depend on colour
+// contrast either -- a second, independent cue in case a given league's
+// brand colour ever turns out too dark against a particular background
+// (not a cue that needs the border colour to be doing its job perfectly).
 const ACTIVE_SCALE = 1.1;
 
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
@@ -115,7 +116,7 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 height: `${BADGE_SIZE}px`,
                 borderRadius: '10px',
                 background: '#FFFFFF',
-                border: `2px solid ${active ? theme.accent : theme.border}`,
+                border: `2px solid ${active ? l.color : theme.border}`,
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 padding: `${BADGE_PADDING}px`,
