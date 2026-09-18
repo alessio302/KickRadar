@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react';
-import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import QuickFilters from './QuickFilters.jsx';
 import TransferCard from './TransferCard.jsx';
@@ -75,7 +74,6 @@ export default function TransfersTab({
   t,
   language,
   league,
-  onSelectLeague,
   onSwipeLeague,
   favoriteClub,
   quickFilters,
@@ -123,8 +121,6 @@ export default function TransfersTab({
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
         <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
-          <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
-
           <QuickFilters
             theme={theme}
             t={t}
