@@ -20,6 +20,20 @@ const parser = new Parser({
   },
 });
 
+// Confirmed live (diagnoseNewsImageLoading.js): marca-general's inline
+// <img> sniff below picked up an imrworldwide.com (Nielsen) ad-tracking
+// pixel instead of a real thumbnail -- publishers often embed one of these
+// directly in an article's content:encoded HTML, ahead of or instead of
+// any real image. Loads fine (200, image/gif) so NewsCard.jsx's onError
+// never catches it, it just renders as an invisible 1x1 blank. Reject any
+// match from a known tracking-pixel host rather than trying to keep up
+// with every vendor -- these are a small, stable set.
+const TRACKING_PIXEL_HOSTS = /imrworldwide\.com|doubleclick\.net|google-analytics\.com|scorecardresearch\.com|adnxs\.com|facebook\.com\/tr/i;
+
+function isTrackingPixel(url) {
+  return TRACKING_PIXEL_HOSTS.test(url);
+}
+
 // rss-parser leaves any element it doesn't recognize as a first-class field
 // (media:content, media:thumbnail) as a raw xml2js node under its
 // namespaced tag name -- {$: {url: ...}} for a single element, an array of
@@ -30,16 +44,19 @@ const parser = new Parser({
 // thumbnails), but computed here for every source so a transfers source
 // gets it too for free if a future card design wants one.
 function extractImage(item) {
-  if (item.enclosure?.url) return item.enclosure.url;
+  if (item.enclosure?.url && !isTrackingPixel(item.enclosure.url)) return item.enclosure.url;
   for (const key of ['media:content', 'media:thumbnail']) {
     const node = item[key];
     if (!node) continue;
     const first = Array.isArray(node) ? node[0] : node;
     const url = first?.$?.url || first?.url;
-    if (url) return url;
+    if (url && !isTrackingPixel(url)) return url;
   }
-  const match = /<img[^>]+src=["']([^"']+)["']/i.exec(item['content:encoded'] || item.content || '');
-  return match?.[1] ?? null;
+  const html = item['content:encoded'] || item.content || '';
+  for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+    if (!isTrackingPixel(match[1])) return match[1];
+  }
+  return null;
 }
 
 // Confirmed live (gazzetta.js, diagnoseGeneralNewsFeeds.js's real-world run):

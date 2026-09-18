@@ -3,6 +3,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { findMentionedClubs } from './clubMatch.js';
 import { findDuplicateArticle } from './dedupeNews.js';
 import { llmSummarizeNews } from './llmSummarizeNews.js';
+import { fetchOgImage } from './ogImage.js';
 import { isWomensFootball } from './relevance.js';
 
 import bundesligaCom from './generalSources/bundesligaCom.js';
@@ -82,6 +83,20 @@ async function scrapeSource(supabase, source, allClubs) {
     }
     const leagueIds = [...new Set(mentionedClubs.map((c) => c.league_id))];
 
+    // Fallback thumbnail: several sources' own RSS entries never carry a
+    // usable image at all (confirmed live via diagnoseNewsImageLoading.js:
+    // Bundesliga.com/kicker/BBC/Guardian's <item> always come back null
+    // from rssSource.js's extractImage()) -- but the article page itself
+    // reliably sets an og:image. Resolved right here, once per genuinely
+    // new+relevant article (not for every item in the feed -- the
+    // markSeen/relevance gates above already filtered those out), so this
+    // costs one extra request only for articles that are actually going to
+    // be stored, in the same pass that discovers them.
+    let image = item.image;
+    if (!image) {
+      image = await fetchOgImage(item.link);
+    }
+
     // Summarize once per article (not once per matching league) -- the
     // summary text itself doesn't depend on which league we're filing it
     // under. LLM call happens before markSeen so a crash mid-call doesn't
@@ -120,7 +135,7 @@ async function scrapeSource(supabase, source, allClubs) {
           source: source.sourceKey,
           title: item.title,
           teaser: item.summary || null,
-          image_url: item.image || null,
+          image_url: image || null,
           source_url: item.link,
           published_at: item.publishedAt,
           external_id: externalId,
