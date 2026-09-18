@@ -172,6 +172,29 @@ export async function syncPlayerProfiles() {
     .not('external_team_id', 'is', null);
   if (clubsErr) throw clubsErr;
 
+  // Shuffled, not left in the query's own ascending-id order -- confirmed
+  // live (2026-09-18, Inter's own still-photoless Thuram-Ulien/Diouf/
+  // Spence/Stones/Akanji/Sucic/Stankovic): MAX_GAP_FILLS_PER_RUN=30 is one
+  // shared budget for the ENTIRE run across all ~96 clubs, and with a
+  // fixed iteration order (ids 1-7 -- AC Milan/Fiorentina/Roma/Atalanta/
+  // Bologna/Cagliari/Genoa -- always processed before Inter's id 8) the
+  // same early clubs' own unresolved players consume the whole day's
+  // budget before later clubs ever get a single gap-fill attempt, every
+  // single day. One run that day had gapFilled: 19/gapUnresolved: 861 --
+  // nowhere near enough budget to reach a club 8th in a list of ~96 most
+  // days. Confirmed via a live search that at least one of Inter's own
+  // stuck players (Thuram-Ulien) resolves correctly on the very first
+  // attempt (GOAL API's own "Marcus Thuram" / Internazionale) whenever
+  // gap-fill actually reaches him -- this was never a resolution failure,
+  // just a fairness failure in which players ever got tried. A random
+  // order each run means every club's backlog gets a turn near the front
+  // on roughly one run in ~96, rather than the same handful monopolizing
+  // the budget indefinitely.
+  for (let i = clubs.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [clubs[i], clubs[j]] = [clubs[j], clubs[i]];
+  }
+
   // Loaded once up front rather than per player -- a player can already
   // have a row from playerProfileResolver.js's transfer-story resolution
   // (keyed by whatever name spelling that headline used, e.g. "Rowe" vs.
