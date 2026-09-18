@@ -60,6 +60,19 @@ const BADGE_PADDING = 6;
 // a 56px tile, not a heavier squircle) so that combined with
 // BADGE_PADDING, the rounded corners only ever cut into the padding, never
 // into actual logo content.
+// The badge background above is fixed white regardless of theme (see that
+// comment), so the active ring needs to contrast against WHITE specifically,
+// not just against the page background. theme.accent does that for every
+// palette except mono in dark mode, where accent itself IS pure white
+// (#FFFFFF) -- confirmed live: the ring became invisible, blending straight
+// into the tile it's drawn around, while every other accent (a saturated
+// hue) still stood out fine against the same white tile. Falls back to
+// black only in that one case; every other accent's own value already
+// works and is left untouched.
+function activeBorderColor(theme) {
+  return theme.accent.toUpperCase() === '#FFFFFF' ? '#000000' : theme.accent;
+}
+
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
   return (
     <div
@@ -93,7 +106,7 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 height: `${BADGE_SIZE}px`,
                 borderRadius: '10px',
                 background: '#FFFFFF',
-                border: `2px solid ${active ? theme.accent : theme.border}`,
+                border: `2px solid ${active ? activeBorderColor(theme) : theme.border}`,
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 padding: `${BADGE_PADDING}px`,
