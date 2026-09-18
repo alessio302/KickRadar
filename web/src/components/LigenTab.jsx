@@ -7,11 +7,13 @@ import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import ClubDetailOverlay from './ClubDetailOverlay.jsx';
 import { StandingsTable } from './StandingsTab.jsx';
 import { TopScorersTable } from './TopScorersTable.jsx';
+import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
 import { useClubs } from '../hooks/useClubs.js';
 import { useFixtures } from '../hooks/useFixtures.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { useFavoriteFixtures } from '../hooks/useFavoriteFixtures.js';
 import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
+import { fetchPlayerProfile } from '../lib/playerProfile.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 
 // Merges the former standalone "Spiele" (FixturesTab.jsx) and "Tabelle"
@@ -243,6 +245,25 @@ export default function LigenTab({
   const [todayOnly, setTodayOnly] = useState(false);
   const [tableSubTab, setTableSubTab] = useState('table');
   const [selectedClub, setSelectedClub] = useState(null);
+  // Lifted out of TopScorersTable (same reasoning as selectedClub/
+  // ClubDetailOverlay above): that table renders inside LeagueCarousel's
+  // own transformed+overflow:hidden panel (see LeagueCarousel.jsx), which
+  // becomes the containing block for any position:fixed descendant --
+  // confirmed live this clipped/mispositioned PlayerProfileOverlay's sheet
+  // (cut off at the top) in every league, since the fixed backdrop's inset:0
+  // resolved against that panel's own shorter box instead of the viewport.
+  // Rendering the overlay here, outside the carousel entirely, is the same
+  // fix ClubDetailOverlay/FixtureDetailOverlay already rely on below.
+  const [profilePlayer, setProfilePlayer] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const handleSelectPlayer = async (row) => {
+    if (!row.player_id) return;
+    setProfilePlayer({ name: row.player_name, photo_url: row.photo_url });
+    setProfileLoading(true);
+    const live = await fetchPlayerProfile(row.goal_api_id);
+    if (live) setProfilePlayer(live);
+    setProfileLoading(false);
+  };
   // Single object rather than separate fixture/view/league/club states --
   // mirrors FixturesTab.jsx's own reasoning (kept even though LiveCarousel
   // is gone: a favorited-fixture push notification can still deep-link
@@ -516,10 +537,10 @@ export default function LigenTab({
                   key={`${slug}-scorers`}
                   theme={theme}
                   t={t}
-                  language={language}
                   league={slug}
                   scrollRef={slug === league ? pullScrollRef : undefined}
                   refetchRef={slug === league ? refetchRef : undefined}
+                  onSelectPlayer={slug === league ? handleSelectPlayer : undefined}
                 />
               )
             }
@@ -549,6 +570,17 @@ export default function LigenTab({
           league={league}
           club={selectedClub}
           onClose={() => setSelectedClub(null)}
+        />
+      )}
+
+      {profilePlayer && (
+        <PlayerProfileOverlay
+          theme={theme}
+          t={t}
+          player={profilePlayer}
+          locale={locale}
+          loading={profileLoading}
+          onClose={() => setProfilePlayer(null)}
         />
       )}
     </div>

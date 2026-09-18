@@ -1,8 +1,4 @@
-import { useState } from 'react';
 import { useTopScorers } from '../hooks/useTopScorers.js';
-import PlayerProfileOverlay from './PlayerProfileOverlay.jsx';
-import { fetchPlayerProfile } from '../lib/playerProfile.js';
-import { DATE_LOCALES } from '../i18n/languages.js';
 
 // Same fixed width and single text style for header and data cells alike
 // as StandingsTable.jsx's own NumCell -- that table abbreviates every
@@ -30,34 +26,22 @@ function NumCell({ children, theme }) {
   );
 }
 
-export function TopScorersTable({ theme, t, language, league, scrollRef, refetchRef }) {
+// onSelectPlayer(row) is owned by the caller (LigenTab.jsx), not this
+// component -- this table renders inside LeagueCarousel's own transformed+
+// overflow:hidden panel (see LeagueCarousel.jsx), which becomes the
+// containing block for any position:fixed descendant. A PlayerProfileOverlay
+// mounted in here directly used to clip/mis-position against that panel's
+// own shorter box instead of the viewport (confirmed live: cut off at the
+// top, in every league). The overlay now lives at LigenTab's top level
+// instead, same as ClubDetailOverlay/selectedClub already does for the
+// Tabelle sub-tab's own row taps.
+export function TopScorersTable({ theme, t, league, scrollRef, refetchRef, onSelectPlayer }) {
   const { scorers, loading, refetch } = useTopScorers(league);
   // Plain assignment during render, same idiom as usePullToRefresh.js's own
   // onRefreshRef -- StandingsTab.jsx's own tab-level pull-to-refresh hook
   // reads this later, from an event handler, well after this render has
   // committed.
   if (refetchRef) refetchRef.current = refetch;
-  const locale = DATE_LOCALES[language];
-
-  const [profilePlayer, setProfilePlayer] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-
-  // Same live get-player-profile call every player-profile entry point in
-  // the app goes through (see lib/playerProfile.js) -- an immediate
-  // minimal profile from the row's own already-resolved fields keeps the
-  // overlay responsive while that call is in flight, then the live result
-  // wins once it lands. Only rows syncTopScorers.js managed to resolve to
-  // a real players row (see that file's own resolvePlayerLinks()) carry a
-  // goal_api_id at all -- an unresolved row has nothing to open, so it's
-  // simply not tappable rather than opening a mostly-empty overlay.
-  const handleSelectPlayer = async (row) => {
-    if (!row.player_id) return;
-    setProfilePlayer({ name: row.player_name, photo_url: row.photo_url });
-    setProfileLoading(true);
-    const live = await fetchPlayerProfile(row.goal_api_id);
-    if (live) setProfilePlayer(live);
-    setProfileLoading(false);
-  };
 
   return (
     <div ref={scrollRef} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
@@ -90,7 +74,7 @@ export function TopScorersTable({ theme, t, language, league, scrollRef, refetch
             {scorers.map((row) => (
               <div
                 key={`${row.rank}-${row.player_name}`}
-                onClick={row.player_id ? () => handleSelectPlayer(row) : undefined}
+                onClick={row.player_id ? () => onSelectPlayer?.(row) : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -147,10 +131,6 @@ export function TopScorersTable({ theme, t, language, league, scrollRef, refetch
             ))}
           </div>
         </div>
-      )}
-
-      {profilePlayer && (
-        <PlayerProfileOverlay theme={theme} t={t} player={profilePlayer} locale={locale} loading={profileLoading} onClose={() => setProfilePlayer(null)} />
       )}
     </div>
   );
