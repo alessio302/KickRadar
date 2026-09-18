@@ -40,6 +40,19 @@ name: Schedule watchdog
 # while live; checked aggressively since it's nearly free when nothing's
 # live).
 #
+# fixture-reminders.yml was never added here either, despite being on the
+# tightest native cron of anything in this repo (every 5 min) -- confirmed
+# live 2026-09-18 via run history: actual gaps between successful runs hit
+# 2h43m, 3h48m and 4h46m that same day, the same GitHub scheduler
+# unreliability this whole file exists for, just never wired up for this
+# workflow. This is the one job with zero tolerance for a multi-hour gap:
+# it's solely responsible for the 30/15-minute-before-kickoff push (see its
+# own WINDOW_SLACK_MS -- a +-5min window around each target), so a gap even
+# a bit wider than that silently drops a reminder with no other path ever
+# recovering it (unlike goals/lineups, which live-events.yml/lineups-
+# sync.yml would still eventually pick up). Threshold of 10 (double the
+# 5-min cadence) tolerates one missed native tick before re-triggering.
+#
 # This watchdog's own schedule is subject to the identical GitHub
 # reliability issue -- it isn't a way around the root cause, since nothing
 # we control is. That's why it's also wired up to be triggered externally:
@@ -145,6 +158,7 @@ jobs:
           # both already guard against overlap with concurrency groups.
           check_and_trigger news-scraper.yml 50     # cadence 30 min
           check_and_trigger lineups-sync.yml 25     # cadence 15 min
+          check_and_trigger fixture-reminders.yml 10  # cadence 5 min -- sole path for 30/15-min-before-kickoff pushes, see this file's own top comment
           check_and_trigger live-events.yml 14      # self-loops ~14 min while live -- see this file's own top comment
           check_and_trigger live-scores.yml 13      # self-loops ~13 min while live; see comment above
           check_and_trigger live-scores-european.yml 13  # same self-loop shape as live-scores.yml
