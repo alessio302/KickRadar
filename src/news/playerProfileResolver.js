@@ -33,6 +33,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Same helper as syncPlayerProfiles.js's own lastToken() -- kept as a
+// separate copy rather than a shared import since the two files' dedup
+// logic differs enough (this one is a single same-club-last-name check,
+// not a full collision-safe map) that sharing just this one line isn't
+// worth a cross-file dependency for.
+function lastToken(name) {
+  const parts = normalize(name).trim().split(/\s+/);
+  return parts[parts.length - 1];
+}
+
 async function throttleGoalApi(fn) {
   const wait = lastGoalApiCallAt + MIN_GOAL_API_INTERVAL_MS - Date.now();
   if (wait > 0) await sleep(wait);
@@ -359,6 +369,47 @@ export async function resolvePlayerProfile(supabase, playerName, candidateClubNa
       .single();
     if (updateErr) throw updateErr;
     return updated;
+  }
+
+  // Last-name-within-the-same-club check before creating a new row --
+  // confirmed live (Inter's Francesco Pio Esposito, 2026-09-16): squads-sync.js's
+  // own source (football-data.org) calls him "Francesco Esposito" while GOAL
+  // API's squad walk (syncPlayerProfiles.js) already had him as "Pio Esposito"
+  // under a goal_api_id -- exact-normalized-name lookup above missed him,
+  // and GOAL API's own name search for "Francesco Esposito" found no
+  // confident match either (goalApiProfile stayed null), so this fell
+  // straight through to a blind insert, creating a photo-less/stats-less
+  // orphan row that permanently split his season stats away from his real
+  // profile (syncPlayerSeasonStats.js's own first-initial disambiguation
+  // then kept crediting goals to whichever of the two rows' first name
+  // matched the match_events scorer string). syncPlayerProfiles.js already
+  // had this exact safety net (its own canonicalTokenKey/lastToken
+  // matching) for its own squad walk; this path never did. Scoped to
+  // candidateClubNames (never global) for the same reason that file's own
+  // collision handling is club-scoped -- two different players can share a
+  // surname across different clubs. Ambiguous (0 or 2+ same-club, same-
+  // last-name candidates) is left alone rather than guessed at, same
+  // principle as syncPlayerProfiles.js's own collision drop.
+  if (candidateClubNames.length > 0) {
+    const targetLastToken = lastToken(playerName);
+    const { data: clubCandidates, error: clubCandidatesErr } = await supabase
+      .from('players')
+      .select('id, name, transfermarkt_url, goal_api_id, photo_url')
+      .in('current_club_name', candidateClubNames);
+    if (clubCandidatesErr) throw clubCandidatesErr;
+    const sameLastName = (clubCandidates ?? []).filter((p) => lastToken(p.name) === targetLastToken);
+    if (sameLastName.length === 1) {
+      const match = sameLastName[0];
+      if (!goalApiProfile) return match;
+      const { data: updated, error: updateErr } = await supabase
+        .from('players')
+        .update(goalApiProfile)
+        .eq('id', match.id)
+        .select('id, transfermarkt_url, goal_api_id, photo_url')
+        .single();
+      if (updateErr) throw updateErr;
+      return updated;
+    }
   }
 
   const transfermarktUrl = goalApiProfile ? null : (await lookupTransfermarktUrl(playerName)).url;
