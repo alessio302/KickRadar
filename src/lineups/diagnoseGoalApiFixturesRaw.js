@@ -1,16 +1,11 @@
-// Second follow-up (after diagnoseGoalApiIdResolution.js showed GOAL API's
-// /leagues/{id}/fixtures?date=... response for Bundesliga/Ligue 1 today
-// did NOT include the actual match kicking off today at all). Confirmed by
-// this script's first version: the response carries pagination
-// {total:1909, limit:50, offset:0, hasMore:true} for Bundesliga -- WAY more
-// than one season's fixtures for an 18-team league -- and is IDENTICAL
-// whether `date` is passed or not, sorted by matchRound descending
-// (round 34, the season's LAST round, on page 1; round 29 around
-// offset=50). The `date` query param this codebase sends does nothing;
-// GOAL API's own field for a fixture's calendar date is called `matchDate`
-// (confirmed in the raw fixture shape: "matchDate": "2027-05-22"), not
-// `date`. This second version tests whether `matchDate` is the query
-// param GOAL API actually expects.
+// Third round: confirmed `?matchDate=YYYY-MM-DD&status=LIVE` together
+// correctly filters GOAL API's /leagues/{id}/fixtures response down to
+// exactly the one live Bundesliga match today (matchDate alone, without
+// status, still returned the same unfiltered 1909-total page as `date`
+// did). resolveGoalApiIds() needs both already-live AND soon-to-kick-off
+// scheduled candidates (see its own findCandidateFixtures() query), so
+// this checks whether matchDate+status=SCHEDULED filters correctly too,
+// before writing the actual fix to getLeagueFixtures().
 const BASE_URL = process.env.GOAL_API_BASE_URL || 'https://api.goal-api.com/v1';
 
 async function rawCall(path, params) {
@@ -27,41 +22,36 @@ async function rawCall(path, params) {
   return JSON.parse(body);
 }
 
-function summarize(data, today) {
+function summarize(data) {
   const items = data.data ?? [];
   console.log(`  data.length=${items.length}, pagination=${JSON.stringify(data.pagination ?? 'NONE')}`);
-  const matchDates = [...new Set(items.map((m) => m.matchDate))].sort();
-  console.log(`  distinct matchDate values in this page: ${JSON.stringify(matchDates.slice(0, 10))}${matchDates.length > 10 ? ` (+${matchDates.length - 10} more)` : ''}`);
-  const todays = items.filter((m) => m.matchDate === today);
-  console.log(`  fixtures with matchDate === ${today}: ${todays.length}`);
-  for (const m of todays) {
-    console.log(`    "${m.homeTeamName}" vs "${m.awayTeamName}" status=${m.matchStatus} round=${m.matchRound}`);
+  for (const m of items) {
+    console.log(`    "${m.homeTeamName}" vs "${m.awayTeamName}" matchDate=${m.matchDate} status=${m.matchStatus} round=${m.matchRound}`);
   }
-  return todays;
 }
 
 async function main() {
   const bundesligaLeagueId = 'cmr77dvgm0002rx06rt2uqxii';
   const today = new Date().toISOString().slice(0, 10);
 
-  console.log(`\n=== Attempt 1: ?matchDate=${today} ===`);
-  const byMatchDate = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today });
-  summarize(byMatchDate, today);
+  console.log(`\n=== matchDate=${today}&status=SCHEDULED ===`);
+  summarize(await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today, status: 'SCHEDULED' }));
 
-  console.log(`\n=== Attempt 2: ?date=${today} (current code's param name, for comparison) ===`);
-  const byDate = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { date: today });
-  summarize(byDate, today);
+  console.log(`\n=== matchDate=${today}&status=FINISHED ===`);
+  summarize(await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today, status: 'FINISHED' }));
 
-  console.log(`\n=== Attempt 3: ?matchDate=${today}&status=LIVE (in case a status filter also exists) ===`);
-  const byMatchDateLive = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today, status: 'LIVE' });
-  summarize(byMatchDateLive, today);
+  console.log(`\n=== matchDate=${today} with NO status at all (re-confirm it alone is not enough) ===`);
+  summarize(await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today }));
 
-  console.log(`\n=== Attempt 4: ?dateFrom=${today}&dateTo=${today} ===`);
-  const byRange = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { dateFrom: today, dateTo: today });
-  summarize(byRange, today);
+  // Tomorrow, LIVE status shouldn't exist but SCHEDULED should show
+  // upcoming fixtures -- sanity-checks that matchDate genuinely varies the
+  // result (not just an artifact of today happening to have a LIVE match).
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  console.log(`\n=== matchDate=${tomorrow}&status=SCHEDULED (tomorrow, sanity check) ===`);
+  summarize(await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: tomorrow, status: 'SCHEDULED' }));
 }
 
 main().catch((err) => {
-  console.error('Diagnose raw GOAL API fixtures (v2) failed:', err);
+  console.error('Diagnose raw GOAL API fixtures (v3) failed:', err);
   process.exitCode = 1;
 });
