@@ -13,6 +13,27 @@ const SOURCES = [
   { name: 'Prime Video Sport Deutschland', channelId: 'UCK2izXoHvraUFaPMU5B7vMQ' },
 ];
 
+// RTL Sport -- confirmed via web search to post "X vs. Y | Highlights | UEFA
+// Europa League | RTL Sport"-shaped titles, real broadcaster of UEL/UECL in
+// Germany 2026/27 (RTL/NITRO free-to-air, RTL+ full coverage). No known
+// channel_id yet, only a sample video URL -- resolved below via the watch
+// page's own embedded channelId before the RSS feed is fetched, same
+// "confirm live before guessing" discipline as the rest of this file.
+const RTL_SAMPLE_VIDEO_ID = 'jCY4Awy3yKE'; // "OFI Kreta vs. TSG Hoffenheim | Highlights | UEFA Europa League | RTL Sport"
+
+async function resolveChannelIdFromVideo(videoId) {
+  const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    },
+  });
+  if (!res.ok) throw new Error(`watch page request failed: ${res.status} ${res.statusText}`);
+  const html = await res.text();
+  const m = html.match(/"channelId":"(UC[\w-]+)"/);
+  return m ? m[1] : null;
+}
+
 async function fetchFeedEntries(channelId) {
   const res = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
     headers: {
@@ -28,6 +49,15 @@ async function fetchFeedEntries(channelId) {
     title: entry.match(/<title>(.*?)<\/title>/)?.[1] ?? null,
     published: entry.match(/<published>(.*?)<\/published>/)?.[1] ?? null,
   }));
+}
+
+console.log(`\n=== Resolving RTL Sport channel id from sample video ${RTL_SAMPLE_VIDEO_ID} ===`);
+try {
+  const rtlChannelId = await resolveChannelIdFromVideo(RTL_SAMPLE_VIDEO_ID);
+  console.log(`  resolved channelId: ${rtlChannelId}`);
+  if (rtlChannelId) SOURCES.push({ name: 'RTL Sport', channelId: rtlChannelId });
+} catch (err) {
+  console.error(`  resolve failed: ${err.message}`);
 }
 
 for (const source of SOURCES) {
