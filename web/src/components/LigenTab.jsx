@@ -35,6 +35,13 @@ function formatTime(iso, locale) {
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
+// Device-local calendar day, consistent with formatDate's own use of the
+// browser's local timezone for date grouping above -- no fixed/server
+// timezone precedent exists elsewhere in the app to match instead.
+function isToday(iso) {
+  return new Date(iso).toDateString() === new Date().toDateString();
+}
+
 // The "current" matchday is the round containing the next upcoming/live
 // game -- not just "the lowest matchday number in the data" (that gets
 // stuck on an already-finished round once no future game of it remains)
@@ -85,6 +92,7 @@ function FixturesList({
   league,
   currentMatchdayOnly,
   liveOnly,
+  todayOnly,
   favoriteIds,
   onToggleFavorite,
   onSelectFixture,
@@ -109,11 +117,18 @@ function FixturesList({
   const currentMatchday = useMemo(() => pickCurrentMatchday(matchdays), [matchdays]);
   const matchdayFiltered = currentMatchdayOnly ? (currentMatchday ? [currentMatchday] : []) : matchdays;
   // Additive to the matchday filter above, not a replacement -- the "Live"
-  // button narrows whatever matchdayFiltered already decided down to just
-  // the games currently in progress, same additive relationship as two
-  // independent filters anywhere else in the app.
-  const visible = liveOnly
-    ? matchdayFiltered.map((g) => ({ ...g, games: g.games.filter((f) => f.status === 'live') })).filter((g) => g.games.length > 0)
+  // and "Heute" buttons each narrow whatever matchdayFiltered already
+  // decided down further, same additive relationship as two independent
+  // filters anywhere else in the app. Both can be active at once (e.g. only
+  // today's live games) since they filter on different fields (status vs.
+  // kickoff date).
+  const visible = liveOnly || todayOnly
+    ? matchdayFiltered
+        .map((g) => ({
+          ...g,
+          games: g.games.filter((f) => (!liveOnly || f.status === 'live') && (!todayOnly || isToday(f.kickoff_at))),
+        }))
+        .filter((g) => g.games.length > 0)
     : matchdayFiltered;
 
   // Opens the fixture a lineup or highlights push notification pointed at,
@@ -225,6 +240,7 @@ export default function LigenTab({
   const [activeSubTab, setActiveSubTab] = useState('spiele');
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [liveOnly, setLiveOnly] = useState(false);
+  const [todayOnly, setTodayOnly] = useState(false);
   const [tableSubTab, setTableSubTab] = useState('table');
   const [selectedClub, setSelectedClub] = useState(null);
   // Single object rather than separate fixture/view/league/club states --
@@ -362,7 +378,7 @@ export default function LigenTab({
                 </button>
               </div>
 
-              <div style={{ padding: '10px 2px 4px' }}>
+              <div style={{ display: 'flex', gap: '8px', padding: '10px 2px 4px' }}>
                 <button
                   onClick={() => setLiveOnly((v) => !v)}
                   aria-label={t.fixtures.liveOnlyToggle}
@@ -384,6 +400,26 @@ export default function LigenTab({
                 >
                   <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
                   {t.fixtures.live}
+                </button>
+                <button
+                  onClick={() => setTodayOnly((v) => !v)}
+                  aria-label={t.fixtures.todayOnlyToggle}
+                  aria-pressed={todayOnly}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 12px',
+                    borderRadius: '999px',
+                    border: `1.5px solid ${todayOnly ? theme.accent : theme.border}`,
+                    background: todayOnly ? `${theme.accent}1a` : 'transparent',
+                    color: todayOnly ? theme.accent : theme.textMuted,
+                    font: 'inherit',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t.fixtures.today}
                 </button>
               </div>
             </>
@@ -440,6 +476,7 @@ export default function LigenTab({
                 league={slug}
                 currentMatchdayOnly={currentMatchdayOnly}
                 liveOnly={liveOnly}
+                todayOnly={todayOnly}
                 favoriteIds={slug === league ? favoriteIds : undefined}
                 onToggleFavorite={slug === league ? handleToggleFavorite : undefined}
                 onSelectFixture={slug === league ? openFromList : undefined}

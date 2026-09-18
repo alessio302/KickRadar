@@ -163,6 +163,13 @@ function formatTime(iso, locale) {
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
+// Device-local calendar day, consistent with formatDate's own use of the
+// browser's local timezone for date grouping above -- same helper as
+// LigenTab.jsx's own isToday.
+function isToday(iso) {
+  return new Date(iso).toDateString() === new Date().toDateString();
+}
+
 function CompetitionSelector({ selected, theme, onSelect }) {
   return (
     <div
@@ -408,7 +415,7 @@ function pickActiveMatchday(fixtures) {
 // instance (see LeagueCarousel.jsx's own comment on why the preview one
 // stays non-interactive) -- EuropaFixtureRow's onClick already guards
 // against it being undefined.
-function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, refetch, onSelectFixture, scrollRef, refetchRef }) {
+function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, todayOnly, refetch, onSelectFixture, scrollRef, refetchRef }) {
   // Plain assignment during render, same idiom as usePullToRefresh.js's own
   // onRefreshRef -- EuropaTab's own tab-level pull-to-refresh hook reads
   // this later, from an event handler, well after this render has
@@ -424,13 +431,16 @@ function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchd
     if (liveOnly) {
       list = list.filter((f) => f.status === 'live');
     }
+    if (todayOnly) {
+      list = list.filter((f) => isToday(f.kickoff_at));
+    }
     const byDate = {};
     for (const f of list) {
       const key = formatDate(f.kickoff_at, locale);
       (byDate[key] = byDate[key] || []).push(f);
     }
     return byDate;
-  }, [fixtures, currentMatchdayOnly, liveOnly, activeMatchday, locale]);
+  }, [fixtures, currentMatchdayOnly, liveOnly, todayOnly, activeMatchday, locale]);
 
   const dateEntries = Object.entries(grouped);
 
@@ -490,6 +500,7 @@ export default function EuropaTab({ theme, t, language }) {
   const [activeSubTab, setActiveSubTab] = useState('spiele');
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
   const [liveOnly, setLiveOnly] = useState(false);
+  const [todayOnly, setTodayOnly] = useState(false);
   // Holds whatever `data` had for the clicked row at click time -- kept
   // only as a fallback for the split second before the live lookup below
   // resolves, and for a fixture that fell outside the loaded window.
@@ -618,7 +629,7 @@ export default function EuropaTab({ theme, t, language }) {
               </button>
             </div>
 
-            <div style={{ padding: '10px 2px 4px' }}>
+            <div style={{ display: 'flex', gap: '8px', padding: '10px 2px 4px' }}>
               <button
                 onClick={() => setLiveOnly((v) => !v)}
                 aria-label={t.fixtures.liveOnlyToggle}
@@ -641,6 +652,26 @@ export default function EuropaTab({ theme, t, language }) {
                 <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.danger, flexShrink: 0 }} />
                 {t.fixtures.live}
               </button>
+              <button
+                onClick={() => setTodayOnly((v) => !v)}
+                aria-label={t.fixtures.todayOnlyToggle}
+                aria-pressed={todayOnly}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  border: `1.5px solid ${todayOnly ? theme.accent : theme.border}`,
+                  background: todayOnly ? `${theme.accent}1a` : 'transparent',
+                  color: todayOnly ? theme.accent : theme.textMuted,
+                  font: 'inherit',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {t.fixtures.today}
+              </button>
             </div>
           </>
         )}
@@ -661,6 +692,7 @@ export default function EuropaTab({ theme, t, language }) {
               loading={loading}
               currentMatchdayOnly={currentMatchdayOnly}
               liveOnly={liveOnly}
+              todayOnly={todayOnly}
               refetch={refetch}
               onSelectFixture={slug === selectedComp ? setSelectedFixture : undefined}
               scrollRef={slug === selectedComp ? pullScrollRef : undefined}
