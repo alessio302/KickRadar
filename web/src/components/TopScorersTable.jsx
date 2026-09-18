@@ -1,1 +1,140 @@
-aW1wb3J0IHsgdXNlVG9wU2NvcmVycyB9IGZyb20gJy4uL2hvb2tzL3VzZVRvcFNjb3JlcnMuanMnOwoKLy8gU2FtZSBmaXhlZCB3aWR0aCBhbmQgc2luZ2xlIHRleHQgc3R5bGUgZm9yIGhlYWRlciBhbmQgZGF0YSBjZWxscyBhbGlrZQovLyBhcyBTdGFuZGluZ3NUYWJsZS5qc3gncyBvd24gTnVtQ2VsbCAtLSB0aGF0IHRhYmxlIGFiYnJldmlhdGVzIGV2ZXJ5Ci8vIGhlYWRlciBkb3duIHRvIHNvbWV0aGluZyBzaG9ydCBlbm91Z2ggdG8gc2hhcmUgYSBjb2x1bW4gd2l0aCBpdHMgZGF0YQovLyAoIlNwIiwgIlREIiwgIlBrdCIpLCBzbyB0aGlzIG9uZSBkb2VzIHRvbyAoZ29hbHMvYXNzaXN0cyBoZWFkZXJzIGJlbG93Ci8vIGFyZSBub3cgYWJicmV2aWF0ZWQgdGhlIHNhbWUgd2F5KSByYXRoZXIgdGhhbiBnaXZpbmcgaGVhZGVycyB0aGVpciBvd24KLy8gd2lkZXIgY29sdW1uIG9yIHNtYWxsZXIgZm9udC4KY29uc3QgTlVNX0NPTF9XSURUSCA9ICcyNnB4JzsKCmZ1bmN0aW9uIE51bUNlbGwoeyBjaGlsZHJlbiwgdGhlbWUgfSkgewogIHJldHVybiAoCiAgICA8ZGl2CiAgICAgIHN0eWxlPXt7CiAgICAgICAgd2lkdGg6IE5VTV9DT0xfV0lEVEgsCiAgICAgICAgZmxleFNocmluazogMCwKICAgICAgICB0ZXh0QWxpZ246ICdjZW50ZXInLAogICAgICAgIGZvbnRTaXplOiAnMTIuNXB4JywKICAgICAgICBmb250V2VpZ2h0OiA1MDAsCiAgICAgICAgZm9udFZhcmlhbnROdW1lcmljOiAndGFidWxhci1udW1zJywKICAgICAgICBjb2xvcjogdGhlbWUudGV4dE11dGVkLAogICAgICB9fQogICAgPgogICAgICB7Y2hpbGRyZW59CiAgICA8L2Rpdj4KICApOwp9CgovLyBvblNlbGVjdFBsYXllcihyb3cpIGlzIG93bmVkIGJ5IHRoZSBjYWxsZXIgKExpZ2VuVGFiLmpzeCksIG5vdCB0aGlzCi8vIGNvbXBvbmVudCAtLSB0aGlzIHRhYmxlIHJlbmRlcnMgaW5zaWRlIExlYWd1ZUNhcm91c2VsJ3Mgb3duIHRyYW5zZm9ybWVkKwovLyBvdmVyZmxvdzpoaWRkZW4gcGFuZWwgKHNlZSBMZWFndWVDYXJvdXNlbC5qc3gpLCB3aGljaCBiZWNvbWVzIHRoZQovLyBjb250YWluaW5nIGJsb2NrIGZvciBhbnkgcG9zaXRpb246Zml4ZWQgZGVzY2VuZGFudC4gQSBQbGF5ZXJQcm9maWxlT3ZlcmxheQovLyBtb3VudGVkIGluIGhlcmUgZGlyZWN0bHkgdXNlZCB0byBjbGlwL21pcy1wb3NpdGlvbiBhZ2FpbnN0IHRoYXQgcGFuZWwncwovLyBvd24gc2hvcnRlciBib3ggaW5zdGVhZCBvZiB0aGUgdmlld3BvcnQgKGNvbmZpcm1lZCBsaXZlOiBjdXQgb2ZmIGF0IHRoZQovLyB0b3AsIGluIGV2ZXJ5IGxlYWd1ZSkuIFRoZSBvdmVybGF5IG5vdyBsaXZlcyBhdCBMaWdlblRhYidzIHRvcCBsZXZlbAovLyBpbnN0ZWFkLCBzYW1lIGFzIENsdWJEZXRhaWxPdmVybGF5L3NlbGVjdGVkQ2x1YiBhbHJlYWR5IGRvZXMgZm9yIHRoZQovLyBUYWJlbGxlIHN1Yi10YWIncyBvd24gcm93IHRhcHMuCmV4cG9ydCBmdW5jdGlvbiBUb3BTY29yZXJzVGFibGUoeyB0aGVtZSwgdCwgbGVhZ3VlLCBzY3JvbGxSZWYsIHJlZmV0Y2hSZWYsIG9uU2VsZWN0UGxheWVyIH0pIHsKICBjb25zdCB7IHNjb3JlcnMsIGxvYWRpbmcsIHJlZmV0Y2ggfSA9IHVzZVRvcFNjb3JlcnMobGVhZ3VlKTsKICAvLyBQbGFpbiBhc3NpZ25tZW50IGR1cmluZyByZW5kZXIsIHNhbWUgaWRpb20gYXMgdXNlUHVsbFRvUmVmcmVzaC5qcydzIG93bgogIC8vIG9uUmVmcmVzaFJlZiAtLSBTdGFuZGluZ3NUYWIuanN4J3Mgb3duIHRhYi1sZXZlbCBwdWxsLXRvLXJlZnJlc2ggaG9vawogIC8vIHJlYWRzIHRoaXMgbGF0ZXIsIGZyb20gYW4gZXZlbnQgaGFuZGxlciwgd2VsbCBhZnRlciB0aGlzIHJlbmRlciBoYXMKICAvLyBjb21taXR0ZWQuCiAgaWYgKHJlZmV0Y2hSZWYpIHJlZmV0Y2hSZWYuY3VycmVudCA9IHJlZmV0Y2g7CgogIHJldHVybiAoCiAgICA8ZGl2IHJlZj17c2Nyb2xsUmVmfSBzdHlsZT17eyBoZWlnaHQ6ICcxMDAlJywgb3ZlcmZsb3dZOiAnYXV0bycsIFdlYmtpdE92ZXJmbG93U2Nyb2xsaW5nOiAndG91Y2gnLCBwYWRkaW5nOiAnNHB4IDE2cHggMTRweCcgfX0+CiAgICAgIHtsb2FkaW5nICYmICgKICAgICAgICA8cCBzdHlsZT17eyBmb250U2l6ZTogJzEzcHgnLCBjb2xvcjogdGhlbWUudGV4dE11dGVkLCB0ZXh0QWxpZ246ICdjZW50ZXInLCBwYWRkaW5nOiAnMjRweCAwJyB9fT4KICAgICAgICAgIHt0LmNvbW1vbi5sb2FkaW5nfQogICAgICAgIDwvcD4KICAgICAgKX0KCiAgICAgIHshbG9hZGluZyAmJiBzY29yZXJzLmxlbmd0aCA9PT0gMCAmJiAoCiAgICAgICAgPHAgc3R5bGU9e3sgZm9udFNpemU6ICcxM3B4JywgY29sb3I6IHRoZW1lLnRleHRNdXRlZCwgdGV4dEFsaWduOiAnY2VudGVyJywgcGFkZGluZzogJzI0cHggMCcgfX0+CiAgICAgICAgICB7dC50b3BzY29yZXJzPy5lbXB0eSA/PyAnS2VpbmUgRGF0ZW4gdmVyZsO8Z2JhcicgfQogICAgICAgIDwvcD4KICAgICAgKX0KCiAgICAgIHtzY29yZXJzLmxlbmd0aCA+IDAgJiYgKAogICAgICAgIDxkaXYgc3R5bGU9e3sgb3ZlcmZsb3dYOiAnYXV0bycgfX0+CiAgICAgICAgICA8ZGl2IHN0eWxlPXt7IG1pbldpZHRoOiAnMzAwcHgnIH19PgogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICdmbGV4JywgYWxpZ25JdGVtczogJ2NlbnRlcicsIHBhZGRpbmc6ICcwIDAgOHB4JywgYm9yZGVyQm90dG9tOiBgMXB4IHNvbGlkICR7dGhlbWUuYm9yZGVyfWAgfX0+CiAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyB3aWR0aDogJzIwcHgnLCBmbGV4U2hyaW5rOiAwIH19IC8+CiAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmbGV4OiAxLCBtaW5XaWR0aDogMCB9fSAvPgogICAgICAgICAgICAgIDxOdW1DZWxsIHRoZW1lPXt0aGVtZX0+e3QudG9wc2NvcmVycz8uZ29hbHMgPz8gJ1RvcmUnfTwvTnVtQ2VsbD4KICAgICAgICAgICAgICA8TnVtQ2VsbCB0aGVtZT17dGhlbWV9Pnt0LnRvcHNjb3JlcnM/LmFzc2lzdHMgPz8gJ1ZvcmwnfTwvTnVtQ2VsbD4KICAgICAgICAgICAgICB7LyogUmV1c2VzIHN0YW5kaW5ncycgb3duICJtYXRjaGVzIHBsYXllZCIgYWJicmV2aWF0aW9uCiAgICAgICAgICAgICAgICAgIChlLmcuIEdlcm1hbiAiU3AiKSByYXRoZXIgdGhhbiBhIHNlY29uZCB0cmFuc2xhdGlvbiBrZXkgLS0KICAgICAgICAgICAgICAgICAgc2FtZSBzdGF0LCBzYW1lIGxhYmVsLCBvbmUgc291cmNlIG9mIHRydXRoLiAqL30KICAgICAgICAgICAgICA8TnVtQ2VsbCB0aGVtZT17dGhlbWV9Pnt0LnN0YW5kaW5ncy5wbGF5ZWR9PC9OdW1DZWxsPgogICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgIHtzY29yZXJzLm1hcCgocm93KSA9PiB7CiAgICAgICAgICAgICAgY29uc3QgdGFwcGFibGUgPSBCb29sZWFuKHJvdy5wbGF5ZXJfaWQgJiYgb25TZWxlY3RQbGF5ZXIpOwogICAgICAgICAgICAgIHJldHVybiAoCiAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAga2V5PXtgJHtyb3cucmFua30tJHtyb3cucGxheWVyX25hbWV9YH0KICAgICAgICAgICAgICAgIG9uQ2xpY2s9e3RhcHBhYmxlID8gKCkgPT4gb25TZWxlY3RQbGF5ZXIocm93KSA6IHVuZGVmaW5lZH0KICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgIGRpc3BsYXk6ICdmbGV4JywKICAgICAgICAgICAgICAgICAgYWxpZ25JdGVtczogJ2NlbnRlcicsCiAgICAgICAgICAgICAgICAgIHdpZHRoOiAnMTAwJScsCiAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICc5cHggMCcsCiAgICAgICAgICAgICAgICAgIGJvcmRlckJvdHRvbTogYDFweCBzb2xpZCAke3RoZW1lLmJvcmRlcn1gLAogICAgICAgICAgICAgICAgICBjdXJzb3I6IHRhcHBhYmxlID8gJ3BvaW50ZXInIDogJ2RlZmF1bHQnLAogICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICcyMHB4JywKICAgICAgICAgICAgICAgICAgICBmbGV4U2hyaW5rOiAwLAogICAgICAgICAgICAgICAgICAgIGZvbnRTaXplOiAnMTJweCcsCiAgICAgICAgICAgICAgICAgICAgY29sb3I6IHRoZW1lLnRleHRNdXRlZCwKICAgICAgICAgICAgICAgICAgICBmb250VmFyaWFudE51bWVyaWM6ICd0YWJ1bGFyLW51bXMnLAogICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICB7cm93LnJhbmt9CiAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICBmbGV4OiAxLAogICAgICAgICAgICAgICAgICAgIG1pbldpZHRoOiAwLAogICAgICAgICAgICAgICAgICAgIGRpc3BsYXk6ICdmbGV4JywKICAgICAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAnY2VudGVyJywKICAgICAgICAgICAgICAgICAgICBnYXA6ICcxMHB4JywKICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAge3Jvdy5waG90b191cmwgPyAoCiAgICAgICAgICAgICAgICAgICAgPGltZwogICAgICAgICAgICAgICAgICAgICAgc3JjPXtyb3cucGhvdG9fdXJsfQogICAgICAgICAgICAgICAgICAgICAgYWx0PSIiCiAgICAgICAgICAgICAgICAgICAgICB3aWR0aD17MzR9CiAgICAgICAgICAgICAgICAgICAgICBoZWlnaHQ9ezM0fQogICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sgd2lkdGg6ICczNHB4JywgaGVpZ2h0OiAnMzRweCcsIGJvcmRlclJhZGl1czogJzUwJScsIG9iamVjdEZpdDogJ2NvdmVyJywgZmxleFNocmluazogMCwgYmFja2dyb3VuZDogdGhlbWUuc3VyZmFjZVJhaXNlZCB9fQogICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICkgOiAoCiAgICAgICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyB3aWR0aDogJzM0cHgnLCBoZWlnaHQ6ICczNHB4JywgYm9yZGVyUmFkaXVzOiAnNTAlJywgYmFja2dyb3VuZDogdGhlbWUuc3VyZmFjZVJhaXNlZCwgZmxleFNocmluazogMCB9fSAvPgogICAgICAgICAgICAgICAgICApfQogICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IG92ZXJmbG93OiAnaGlkZGVuJyB9fT4KICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAnMTNweCcsIGZvbnRXZWlnaHQ6IDYwMCwgd2hpdGVTcGFjZTogJ25vd3JhcCcsIG92ZXJmbG93OiAnaGlkZGVuJywgdGV4dE92ZXJmbG93OiAnZWxsaXBzaXMnIH19PgogICAgICAgICAgICAgICAgICAgICAge3Jvdy5wbGF5ZXJfbmFtZX0KICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAnMTFweCcsIGNvbG9yOiB0aGVtZS50ZXh0TXV0ZWQsIHdoaXRlU3BhY2U6ICdub3dyYXAnLCBvdmVyZmxvdzogJ2hpZGRlbicsIHRleHRPdmVyZmxvdzogJ2VsbGlwc2lzJyB9fT4KICAgICAgICAgICAgICAgICAgICAgIHtyb3cuY2x1Yl9uYW1lfQogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgPE51bUNlbGwgdGhlbWU9e3RoZW1lfT57cm93LmdvYWxzfTwvTnVtQ2VsbD4KICAgICAgICAgICAgICAgIDxOdW1DZWxsIHRoZW1lPXt0aGVtZX0+e3Jvdy5hc3Npc3RzfTwvTnVtQ2VsbD4KICAgICAgICAgICAgICAgIDxOdW1DZWxsIHRoZW1lPXt0aGVtZX0+e3Jvdy5tYXRjaGVzX3BsYXllZH08L051bUNlbGw+CiAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgKTsKICAgICAgICAgICAgfSl9CiAgICAgICAgICA8L2Rpdj4KICAgICAgICA8L2Rpdj4KICAgICAgKX0KICAgIDwvZGl2PgogICk7Cn0K
+import { useTopScorers } from '../hooks/useTopScorers.js';
+
+// Same fixed width and single text style for header and data cells alike
+// as StandingsTable.jsx's own NumCell -- that table abbreviates every
+// header down to something short enough to share a column with its data
+// ("Sp", "TD", "Pkt"), so this one does too (goals/assists headers below
+// are now abbreviated the same way) rather than giving headers their own
+// wider column or smaller font.
+const NUM_COL_WIDTH = '26px';
+
+function NumCell({ children, theme }) {
+  return (
+    <div
+      style={{
+        width: NUM_COL_WIDTH,
+        flexShrink: 0,
+        textAlign: 'center',
+        fontSize: '12.5px',
+        fontWeight: 500,
+        fontVariantNumeric: 'tabular-nums',
+        color: theme.textMuted,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// onSelectPlayer(row) is owned by the caller (LigenTab.jsx), not this
+// component -- this table renders inside LeagueCarousel's own transformed+
+// overflow:hidden panel (see LeagueCarousel.jsx), which becomes the
+// containing block for any position:fixed descendant. A PlayerProfileOverlay
+// mounted in here directly used to clip/mis-position against that panel's
+// own shorter box instead of the viewport (confirmed live: cut off at the
+// top, in every league). The overlay now lives at LigenTab's top level
+// instead, same as ClubDetailOverlay/selectedClub already does for the
+// Tabelle sub-tab's own row taps.
+export function TopScorersTable({ theme, t, league, scrollRef, refetchRef, onSelectPlayer }) {
+  const { scorers, loading, refetch } = useTopScorers(league);
+  // Plain assignment during render, same idiom as usePullToRefresh.js's own
+  // onRefreshRef -- StandingsTab.jsx's own tab-level pull-to-refresh hook
+  // reads this later, from an event handler, well after this render has
+  // committed.
+  if (refetchRef) refetchRef.current = refetch;
+
+  return (
+    <div ref={scrollRef} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 14px' }}>
+      {loading && (
+        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
+          {t.common.loading}
+        </p>
+      )}
+
+      {!loading && scorers.length === 0 && (
+        <p style={{ fontSize: '13px', color: theme.textMuted, textAlign: 'center', padding: '24px 0' }}>
+          {t.topscorers?.empty ?? 'Keine Daten verfügbar' }
+        </p>
+      )}
+
+      {scorers.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: '300px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 8px', borderBottom: `1px solid ${theme.border}` }}>
+              <div style={{ width: '20px', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }} />
+              <NumCell theme={theme}>{t.topscorers?.goals ?? 'Tore'}</NumCell>
+              <NumCell theme={theme}>{t.topscorers?.assists ?? 'Vorl'}</NumCell>
+              {/* Reuses standings' own "matches played" abbreviation
+                  (e.g. German "Sp") rather than a second translation key --
+                  same stat, same label, one source of truth. */}
+              <NumCell theme={theme}>{t.standings.played}</NumCell>
+            </div>
+
+            {scorers.map((row) => {
+              const tappable = Boolean(row.player_id && onSelectPlayer);
+              return (
+              <div
+                key={`${row.rank}-${row.player_name}`}
+                onClick={tappable ? () => onSelectPlayer(row) : undefined}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  padding: '9px 0',
+                  borderBottom: `1px solid ${theme.border}`,
+                  cursor: tappable ? 'pointer' : 'default',
+                }}
+              >
+                <div
+                  style={{
+                    width: '20px',
+                    flexShrink: 0,
+                    fontSize: '12px',
+                    color: theme.textMuted,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {row.rank}
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  {row.photo_url ? (
+                    <img
+                      src={row.photo_url}
+                      alt=""
+                      width={34}
+                      height={34}
+                      style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: theme.surfaceRaised }}
+                    />
+                  ) : (
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: theme.surfaceRaised, flexShrink: 0 }} />
+                  )}
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {row.player_name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: theme.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {row.club_name}
+                    </div>
+                  </div>
+                </div>
+                <NumCell theme={theme}>{row.goals}</NumCell>
+                <NumCell theme={theme}>{row.assists}</NumCell>
+                <NumCell theme={theme}>{row.matches_played}</NumCell>
+              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
