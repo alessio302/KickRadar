@@ -95,12 +95,25 @@
 //     <matchday>. Spieltag <season> | ZDFsportstudio" -- an EN DASH (–),
 //     not a hyphen, confirmed live from the raw feed XML.
 //
-// europa-league/conference-league: still UNMAPPED -- neither source's own
-// coverage of those two was checked (their 2026/27 league phase hasn't
-// started yet, 2026-09-16/17, so there's nothing real to verify against
-// regardless -- findCandidates() below naturally yields zero candidates
-// for either until then). Worth checking both channels first once there's
-// real data, before searching elsewhere.
+//  5. RTL Sport (channel_id UC8WYi3XQXsf-6FNvqoEvxag) -- added 2026-09-18
+//     for europa-league/conference-league once their 2026/27 league phase
+//     had started: RTL/NITRO/RTL+ hold German UEL/UECL rights this season
+//     (Sky shares UEL rights but has no public highlights channel found;
+//     DAZN already ruled out channel-wide for embedding, see entry 2).
+//     Confirmed live via a resolved-then-fetched channel feed, 2026-09-18:
+//     6 Europa League fixtures present in the most recent 15 items alone
+//     (e.g. Real Sociedad vs. AFC Bournemouth, Celtic Glasgow vs.
+//     Ferencvaros Budapest), all embeddable-shaped (not yet oEmbed-checked
+//     individually, but RTL is a free-to-air/RTL+ broadcaster with no
+//     DAZN-style paid-platform incentive to disable embedding). No
+//     Conference League title seen yet in this same window -- not
+//     surprising this early in the matchday, not evidence RTL skips UECL
+//     (they hold both competitions' rights) -- parseRtlSportTeams below
+//     doesn't anchor on the competition name, so a UECL upload will match
+//     the moment one appears, same feed/channel, no separate source entry
+//     needed. Title shape: "<home> vs. <away> | Highlights | UEFA Europa
+//     League | RTL Sport" -- a literal period after "vs", no matchday/
+//     season suffix (unlike ZDFsportstudio's own CL titles).
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 
@@ -258,11 +271,34 @@ function parseZdfSportstudioTeams(title) {
   return { home, away };
 }
 
+// Title pattern confirmed live against RTL Sport's own channel feed,
+// 2026-09-18: "<home> vs. <away> | Highlights | UEFA Europa League | RTL
+// Sport" -- deliberately not anchored on the competition name (unlike
+// parsePrimeVideoTeams/parseZdfSportstudioTeams above, both scoped to a
+// single competition's own source list), so the same parser covers a
+// future UEFA Conference League upload from this channel without a
+// separate entry -- see the top comment's source-history entry 5 for why
+// none has been seen yet. Same effect as the other two parsers: RTL's own
+// non-football clips (NFL, MMA, ...) simply don't match "vs." followed by
+// "| Highlights |" and are skipped for free.
+function parseRtlSportTeams(title) {
+  const m = title.match(/^(.+?)\s+vs\.\s+(.+?)\s*\|\s*Highlights\s*\|/);
+  if (!m) return null;
+  const home = m[1].trim();
+  const away = m[2].trim();
+  if (!home || !away) return null;
+  return { home, away };
+}
+
 // One competition can list more than one source -- tried in order, first
 // match wins (see the main loop below). Kept as a list rather than a single
 // {feedUrl, parseTeams} pair specifically because ZDF and Prime Video's own
 // coverage don't subsume each other (see the top comment's source-history
 // entry 4) -- checking both maximizes how many fixtures get a clip.
+const RTL_SPORT_SOURCE = {
+  feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC8WYi3XQXsf-6FNvqoEvxag',
+  parseTeams: parseRtlSportTeams,
+};
 const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
   'champions-league': [
     {
@@ -274,7 +310,8 @@ const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
       parseTeams: parsePrimeVideoTeams,
     },
   ],
-  // europa-league / conference-league: intentionally absent -- see top comment.
+  'europa-league': [RTL_SPORT_SOURCE],
+  'conference-league': [RTL_SPORT_SOURCE],
 };
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
