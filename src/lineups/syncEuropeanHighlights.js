@@ -164,6 +164,11 @@ const GERMAN_CITY_EXONYMS = {
   florenz: 'firenze',
   lissabon: 'lisbon',
   brugge: 'brugge',
+  // Confirmed live 2026-09-18: RTL Sport's own title "Crystal Palace vs.
+  // Lech Posen | Highlights | UEFA Europa League | RTL Sport" left fixture
+  // 68452 (our stored "Lech Poznań") unmatched -- same exonym shape as
+  // Neapel/Mailand above, just not yet in this table.
+  posen: 'poznan',
 };
 // Known colloquial/abbreviated forms a broadcaster's titles use in place
 // of a club's own name -- confirmed live in a real feed dump (see the top
