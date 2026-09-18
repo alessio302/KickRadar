@@ -61,16 +61,42 @@ const BADGE_PADDING = 6;
 // BADGE_PADDING, the rounded corners only ever cut into the padding, never
 // into actual logo content.
 // The badge background above is fixed white regardless of theme (see that
-// comment), so the active ring needs to contrast against WHITE specifically,
-// not just against the page background. theme.accent does that for every
-// palette except mono in dark mode, where accent itself IS pure white
-// (#FFFFFF) -- confirmed live: the ring became invisible, blending straight
-// into the tile it's drawn around, while every other accent (a saturated
-// hue) still stood out fine against the same white tile. Falls back to
-// black only in that one case; every other accent's own value already
-// works and is left untouched.
-function activeBorderColor(theme) {
-  return theme.accent.toUpperCase() === '#FFFFFF' ? '#000000' : theme.accent;
+// comment), so the active ring sits between two different backgrounds at
+// once: the tile's own fixed-white fill on the inside, and theme.bg (which
+// itself flips between white and black across light/dark mode) on the
+// outside. A saturated accent colour (terracotta/violet/green) is distinct
+// enough from both white and black to read as a clear ring against either,
+// so a single border in theme.accent already works there.
+//
+// Mono has no hue to fall back on -- its accent IS white in dark mode and
+// black in light mode, i.e. always one of the two colours already in play.
+// A plain border in that colour merges into whichever side happens to
+// match: confirmed live twice -- white blended into the tile's own white
+// fill (the tile just looked like it had grown a little, no visible ring),
+// and switching to black instead merely moved the same problem to dark
+// mode's black page background (the ring vanished there instead, this time
+// reading as no active indicator at all, worse than before since inactive
+// tiles' grey border was still faintly visible next to it).
+//
+// Fixed with a genuine two-colour ring: a black inner border (always
+// visible against the tile's own constant white fill, in both themes) plus
+// a white outer ring via box-shadow, added ONLY in dark mode where theme.bg
+// is black and would otherwise swallow that black border. In light mode
+// theme.bg is white, so the black border already contrasts against the
+// page directly and the extra ring is skipped (adding a white-on-white
+// outer ring there would do nothing anyway).
+function isMonoAccent(theme) {
+  const c = theme.accent.toUpperCase();
+  return c === '#FFFFFF' || c === '#000000';
+}
+function activeBadgeStyle(theme) {
+  if (!isMonoAccent(theme)) {
+    return { border: `2px solid ${theme.accent}`, boxShadow: 'none' };
+  }
+  return {
+    border: '2px solid #000000',
+    boxShadow: theme.isDark ? '0 0 0 2px #FFFFFF' : 'none',
+  };
 }
 
 export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
@@ -106,7 +132,6 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 height: `${BADGE_SIZE}px`,
                 borderRadius: '10px',
                 background: '#FFFFFF',
-                border: `2px solid ${active ? activeBorderColor(theme) : theme.border}`,
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 padding: `${BADGE_PADDING}px`,
@@ -114,6 +139,7 @@ export default function LeagueSwitcher({ league, onSelectLeague, theme }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                ...(active ? activeBadgeStyle(theme) : { border: `2px solid ${theme.border}`, boxShadow: 'none' }),
               }}
             >
               <img src={l.logo} alt={l.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
