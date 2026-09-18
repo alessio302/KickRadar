@@ -1,0 +1,18 @@
+-- Confirmed live 2026-09-18: syncPlayerProfiles.js's new departed-player
+-- reconciliation (clearing current_club_name off anyone a club's fdSquad
+-- no longer lists) trusts a single run's football-data.org response as
+-- ground truth. That single-run trust turned out too aggressive -- a
+-- player whose own row's name spelling just doesn't canonically/normalized
+-- match this run's fdSquad entry (the same class of bug already hit twice
+-- for Francesco/Pio Esposito) gets treated identically to a genuine
+-- departure and loses their club association on the very first miss, with
+-- no chance for a transient fdSquad hiccup or a lingering name-matching
+-- gap to self-correct first.
+--
+-- This column lets the reconciliation require the SAME player to go
+-- unmatched on two separate daily runs before actually clearing
+-- current_club_name -- cheap insurance against a one-off false positive,
+-- while still catching a real departure (like Francesco Acerbi's, already
+-- confirmed independently via squad_memberships) within a couple of days
+-- instead of instantly.
+alter table players add column roster_unmatched_since timestamptz;
