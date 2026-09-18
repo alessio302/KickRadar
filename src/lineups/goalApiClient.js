@@ -140,8 +140,37 @@ async function call(path, params = {}) {
 // plays on that date. Matched against our own club rows by team name via
 // clubMatch.js's resolveClub(), same as the rest of this project does for
 // every external provider's own naming.
+//
+// Confirmed live (2026-09-18, diagnoseGoalApiFixturesRaw.js): this
+// endpoint's `date` query param is silently ignored -- a call with
+// date=2026-09-18 and one with no date at all return byte-identical
+// responses (same page, sorted by matchRound descending, i.e. the
+// season's LAST round first). The fixture object's own date field is
+// called `matchDate`, but passing that as the query param instead makes
+// no difference either -- still ignored. Kept as-is for now (every
+// existing caller below still passes `date` and gets back the same
+// broken, unfiltered response it always has) since this file's own
+// resolveGoalApiIds() switched to getLiveLeagueFixtures() below instead
+// of trying to fix date-filtering here; the other callers of this
+// function (syncEuropeanFixtures.js, syncLineups.js,
+// syncEuropeanLineups.js, syncEuropeanLiveScores.js,
+// backfillEuropeanLineup.js) haven't been individually re-verified yet
+// and are out of scope for that specific fix.
 export async function getLeagueFixtures(leagueId, date) {
   const data = await call(`/leagues/${leagueId}/fixtures`, { date });
+  return data.data ?? [];
+}
+
+// `status` IS a real, working filter on this same endpoint (confirmed live
+// alongside the `date` finding above: status=LIVE correctly narrowed a
+// 1909-total response down to exactly the one fixture actually live at
+// request time) -- unlike `date`, which never filters anything. No date
+// param needed here at all: there are only ever a handful of
+// simultaneously-live matches league-wide, so status=LIVE alone is
+// enough to find the fixture syncLiveEvents.js's resolveGoalApiIds()
+// is looking for once it actually has gone live in GOAL API's own system.
+export async function getLiveLeagueFixtures(leagueId) {
+  const data = await call(`/leagues/${leagueId}/fixtures`, { status: 'LIVE' });
   return data.data ?? [];
 }
 

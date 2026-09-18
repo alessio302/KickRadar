@@ -57,7 +57,7 @@
 // writes status/score for it.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { LEAGUES, UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getLeagueFixtures, getWsToken, GOAL_API_WS_URL, hasGoalApiBudgetRemaining } from './goalApiClient.js';
+import { getLiveLeagueFixtures, getWsToken, GOAL_API_WS_URL, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
 import { insertNewMatchEvents } from './matchEventsReconciler.js';
@@ -167,10 +167,6 @@ const RECONNECT_DELAY_MS = 5_000;
 // let the next scheduled run (or the watchdog) try fresh.
 const MAX_RECONNECTS = 30;
 
-function toDateString(date) {
-  return date.toISOString().slice(0, 10);
-}
-
 async function findCandidateFixtures(supabase) {
   const now = new Date();
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
@@ -240,26 +236,38 @@ export async function resolveGoalApiIds(supabase, candidates) {
     (isEuropean ? unresolvedEuropean : unresolvedDomestic).push({ ...f, leagueSlug });
   }
 
-  // Domestic resolution -- unchanged from before this file tracked Europe
-  // too, just reading from unresolvedDomestic instead of a single shared
-  // unresolved array.
+  // Domestic resolution -- grouped by LEAGUE only, not (league, date):
+  // confirmed live (2026-09-18, diagnoseGoalApiFixturesRaw.js) that GOAL
+  // API's /leagues/{id}/fixtures date/matchDate params are both silently
+  // ignored, so the previous (league, date) grouping + getLeagueFixtures()
+  // call never actually found a candidate that wasn't coincidentally on
+  // whatever fixed page the endpoint returns regardless of date --
+  // reproduced live for today's actual Bundesliga match, which never
+  // resolved a goal_api_id at all despite being 'live' in our own DB for
+  // 28+ minutes. getLiveLeagueFixtures() uses `status=LIVE` instead, which
+  // IS a real, working filter -- no date needed, since a fixture that's
+  // actually live in our own DB either shows up in GOAL API's own live
+  // list too (resolves this run) or hasn't gone live in GOAL API's system
+  // yet (falls through to the next rescan/run, same self-healing shape
+  // every other gap in this file already has -- see its own top comment).
+  // A still-'scheduled' candidate (the near-kickoff window) can never
+  // match here, on purpose: it isn't live yet by definition, so it simply
+  // stays unresolved until it is.
   if (unresolvedDomestic.length > 0) {
     const groups = new Map();
     for (const f of unresolvedDomestic) {
       const league = LEAGUES.find((l) => l.slug === f.leagueSlug);
       if (!league) continue;
-      const dateStr = toDateString(new Date(f.kickoff_at));
-      const key = `${league.slug}|${dateStr}`;
-      if (!groups.has(key)) groups.set(key, { league, dateStr, fixtures: [] });
-      groups.get(key).fixtures.push(f);
+      if (!groups.has(league.slug)) groups.set(league.slug, { league, fixtures: [] });
+      groups.get(league.slug).fixtures.push(f);
     }
 
-    for (const { league, dateStr, fixtures } of groups.values()) {
+    for (const { league, fixtures } of groups.values()) {
       let apiFixtures;
       try {
-        apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
+        apiFixtures = await getLiveLeagueFixtures(league.goalApiLeagueId);
       } catch (err) {
-        console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
+        console.error(`GOAL API live fixtures failed for ${league.slug}:`, err.message);
         continue;
       }
       const leagueClubs = allClubs.filter((c) => c.league_id === fixtures[0]?.league_id);
@@ -292,24 +300,26 @@ export async function resolveGoalApiIds(supabase, candidates) {
   // unresolvedEuropean at all. UCL comes from football-data.org instead,
   // so it needs the same team-name resolution syncEuropeanLineups.js
   // already does against GOAL API's own UCL fixture list.
+  //
+  // Same getLiveLeagueFixtures() / grouped-by-competition-only switch as
+  // the domestic branch above, for the same confirmed-live reason (date/
+  // matchDate params both silently ignored by this endpoint).
   if (unresolvedEuropean.length > 0) {
     const compBySlug = new Map(UEFA_COMPETITIONS.map((c) => [c.slug, c]));
     const groups = new Map();
     for (const f of unresolvedEuropean) {
       const comp = compBySlug.get(f.leagueSlug);
       if (!comp) continue;
-      const dateStr = toDateString(new Date(f.kickoff_at));
-      const key = `${comp.slug}|${dateStr}`;
-      if (!groups.has(key)) groups.set(key, { comp, dateStr, fixtures: [] });
-      groups.get(key).fixtures.push(f);
+      if (!groups.has(comp.slug)) groups.set(comp.slug, { comp, fixtures: [] });
+      groups.get(comp.slug).fixtures.push(f);
     }
 
-    for (const { comp, dateStr, fixtures } of groups.values()) {
+    for (const { comp, fixtures } of groups.values()) {
       let apiFixtures;
       try {
-        apiFixtures = await getLeagueFixtures(comp.goalApiLeagueId, dateStr);
+        apiFixtures = await getLiveLeagueFixtures(comp.goalApiLeagueId);
       } catch (err) {
-        console.error(`GOAL API fixtures failed for ${comp.slug} ${dateStr}:`, err.message);
+        console.error(`GOAL API live fixtures failed for ${comp.slug}:`, err.message);
         continue;
       }
 
