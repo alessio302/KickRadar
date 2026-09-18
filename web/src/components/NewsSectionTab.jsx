@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import LeagueSwitcher from './LeagueSwitcher.jsx';
 import NewsTab from './NewsTab.jsx';
 import TransfersTab from './TransfersTab.jsx';
 
@@ -13,10 +14,20 @@ import TransfersTab from './TransfersTab.jsx';
 // the rename; a user who wants Transfers is one tap away, same as before.
 export default function NewsSectionTab(props) {
   const [subTab, setSubTab] = useState('news');
-  const { theme, t } = props;
+  const { theme, t, league, onSelectLeague } = props;
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* League switcher above the News/Transfers sub-tabs -- matches
+          LigenTab's and EuropaTab's own League/CompetitionSelector-above-
+          sub-nav layout. Lives here once, shared by both sub-tabs, rather
+          than duplicated inside NewsTab.jsx and TransfersTab.jsx below the
+          sub-nav (confirmed live: that was the only place in the app with
+          this order flipped). */}
+      <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
+        <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
+      </div>
+
       <div style={{ flexShrink: 0, display: 'flex', borderBottom: `1px solid ${theme.border}` }}>
         {[
           ['news', t.newsSection.tabNews],
@@ -49,7 +60,7 @@ export default function NewsSectionTab(props) {
 
       <div style={{ flex: 1, minHeight: 0 }}>
         {subTab === 'news' ? (
-          <NewsTab theme={props.theme} t={props.t} language={props.language} league={props.league} onSelectLeague={props.onSelectLeague} onSwipeLeague={props.onSwipeLeague} />
+          <NewsTab theme={props.theme} t={props.t} language={props.language} league={props.league} onSwipeLeague={props.onSwipeLeague} />
         ) : (
           <TransfersTab {...props} />
         )}

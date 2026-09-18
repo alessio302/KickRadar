@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import LeagueSwitcher from './LeagueSwitcher.jsx';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import NewsCard from './NewsCard.jsx';
 import NewsSummaryOverlay from './NewsSummaryOverlay.jsx';
@@ -40,11 +39,13 @@ function NewsList({ theme, t, language, league, onOpenSummary, scrollRef, refetc
 }
 
 // League-scoped news feed, same overall shape as TransfersTab.jsx (per
-// explicit request: identical layout, League switcher up top selects which
-// league's news is shown -- no separate source/quick filters). Rendered as
-// the "News" half of the News/Transfers sub-tab split, see App.jsx's
-// TransfersTab usage and this file's sibling TransfersTab.jsx.
-export default function NewsTab({ theme, t, language, league, onSelectLeague, onSwipeLeague }) {
+// explicit request: identical layout -- the League switcher that selects
+// which league's news is shown lives in the shared NewsSectionTab.jsx
+// parent now, above the News/Transfers sub-tabs, not duplicated in here --
+// no separate source/quick filters). Rendered as the "News" half of the
+// News/Transfers sub-tab split, see App.jsx's TransfersTab usage and this
+// file's sibling TransfersTab.jsx.
+export default function NewsTab({ theme, t, language, league, onSwipeLeague }) {
   const [summaryArticle, setSummaryArticle] = useState(null);
   const pullContainerRef = useRef(null);
   const refetchRef = useRef(() => {});
@@ -56,10 +57,6 @@ export default function NewsTab({ theme, t, language, league, onSelectLeague, on
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PullToRefreshIndicator theme={theme} containerRef={pullContainerRef} pullDistance={pullDistance} pulling={pulling} refreshing={pullRefreshing}>
-        <div style={{ flexShrink: 0, padding: '14px 16px 0' }}>
-          <LeagueSwitcher league={league} onSelectLeague={onSelectLeague} theme={theme} />
-        </div>
-
         <LeagueCarousel
           league={league}
           onSwitchLeague={onSwipeLeague}
