@@ -59,7 +59,22 @@ async function getFootballDataSquad(externalTeamId) {
 // at least once wins over exhaustively filling gaps in whichever club
 // happens to come first -- the remaining gaps close gradually across
 // several daily runs instead of one run trying to close them all at once.
-const MAX_GAP_FILLS_PER_RUN = 30;
+//
+// Bumped 30 -> 60 (2026-09-18), deliberately NOT back to 200 or higher --
+// user asked for "one big call that gets everyone" after Inter's own
+// still-photoless players sat unresolved for weeks, but a literal
+// everyone-at-once run (861 unresolved that day x 2 calls = 1722) would
+// alone blow past the ENTIRE day's shared 1000-request GOAL API budget
+// that syncLiveEvents.js/syncLineups.js/news-scraper.js also depend on for
+// goals/lineups/live pushes -- not worth trading working live features for
+// a faster backlog catch-up. The actual fix for "the same players never
+// get their turn" is the club-order shuffle added the same day (see
+// `clubs`' own comment above): a random order each run means the whole
+// backlog gets touched roughly evenly across runs instead of the same
+// early clubs always winning, so a moderate 2x bump here compounds with
+// that fairness fix rather than needing to be large on its own. Revisit
+// if goal_api_usage stays comfortably under budget with this in place.
+const MAX_GAP_FILLS_PER_RUN = 60;
 
 // Confirmed live: a first version of this reused playerProfileResolver.js's
 // resolveGoalApiProfile(), which paces every GOAL API call 6.5s apart via
@@ -242,6 +257,7 @@ export async function syncPlayerProfiles() {
   let failed = 0;
   let gapFilled = 0;
   let gapUnresolved = 0;
+  let departed = 0;
   let gapFillBudgetLeft = MAX_GAP_FILLS_PER_RUN;
   // A run of *real errors* this long means GOAL API's rate-limit window is
   // genuinely contended right now (see MAX_GAP_FILLS_PER_RUN's own
@@ -276,6 +292,21 @@ export async function syncPlayerProfiles() {
       await sleep(6500);
       continue;
     }
+
+    // Every player row this run actually matches against this club's own
+    // fdSquad -- used below to clear current_club_name off anyone this
+    // club's row set still claims but fdSquad (the authoritative "who's
+    // really on this squad" source, per this file's own top comment) no
+    // longer lists. Confirmed live (Inter's Francesco Acerbi, still shown
+    // in the Kader tab weeks after leaving): nothing anywhere ever
+    // unset a departed player's current_club_name -- this loop only ever
+    // upserts players IT finds in the current squad, so a player who
+    // dropped off never got touched again, and get-team-squad's own Kader
+    // query (`current_club_name = club.name`) kept surfacing the stale row
+    // forever. Scoped to exactly the rows already known to belong to this
+    // club before this run (fetched once, below) rather than a broader
+    // players-table scan.
+    const touchedIds = new Set();
 
     let goalSquad;
     try {
@@ -386,6 +417,7 @@ export async function syncPlayerProfiles() {
           const { error } = await supabase.from('players').update(row).eq('id', targetId);
           if (error) throw error;
           updated += 1;
+          touchedIds.add(targetId);
         } else {
           const { data: insertedRow, error } = await supabase
             .from('players')
@@ -414,6 +446,7 @@ export async function syncPlayerProfiles() {
               if (goalApiId) byGoalApiId.set(goalApiId, existing.id);
               byNormalizedName.set(normalizedName, existing.id);
               byClubCanonical.set(canonicalKey, existing.id);
+              touchedIds.add(existing.id);
             } else {
               throw error;
             }
@@ -422,11 +455,43 @@ export async function syncPlayerProfiles() {
             if (goalApiId) byGoalApiId.set(goalApiId, insertedRow.id);
             byNormalizedName.set(normalizedName, insertedRow.id);
             byClubCanonical.set(canonicalKey, insertedRow.id);
+            touchedIds.add(insertedRow.id);
           }
         }
       } catch (err) {
         console.error(`Player sync failed for ${fp.name} (${club.name}):`, err.message);
         failed += 1;
+      }
+    }
+
+    // Clears current_club_name off any player this club's own existing
+    // rows still claim but this run's fdSquad (fetched successfully above,
+    // so a real answer, not a fetch failure) no longer lists -- see
+    // touchedIds' own comment above for why this is needed at all. Set to
+    // null rather than deleted: the row (goal_api_id, photo, stats
+    // history) stays intact for whichever club's squad walk picks them up
+    // next, or for transfers.js's own history if they're referenced there;
+    // they just stop showing on a Kader tab they're no longer actually on.
+    //
+    // Queried fresh here, not filtered from existingRows (that map is a
+    // snapshot from before this run started) -- a player who transferred
+    // from this club to one processed EARLIER in this same (now shuffled,
+    // see clubs' own comment above) run already has their current_club_name
+    // correctly pointing at the new club in the DB by the time we get here,
+    // but would still show under the OLD club in that stale snapshot. Fresh
+    // read avoids clobbering that already-correct reassignment back to null.
+    const { data: clubExisting, error: clubExistingErr } = await supabase
+      .from('players')
+      .select('id, name')
+      .eq('current_club_name', club.name);
+    if (clubExistingErr) {
+      console.error(`Failed to read existing roster for ${club.name}:`, clubExistingErr.message);
+    } else {
+      for (const r of clubExisting) {
+        if (touchedIds.has(r.id)) continue;
+        const { error } = await supabase.from('players').update({ current_club_name: null, current_club_badge: null }).eq('id', r.id);
+        if (error) console.error(`Failed to clear departed player ${r.name} off ${club.name}:`, error.message);
+        else departed += 1;
       }
     }
 
@@ -438,7 +503,7 @@ export async function syncPlayerProfiles() {
     await sleep(6500);
   }
 
-  return { checked, updated, inserted, failed, gapFilled, gapUnresolved };
+  return { checked, updated, inserted, failed, gapFilled, gapUnresolved, departed };
 }
 
 const isMain = process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href;
