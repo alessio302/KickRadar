@@ -174,6 +174,55 @@ export async function getLiveLeagueFixtures(leagueId) {
   return data.data ?? [];
 }
 
+// Confirmed live (2026-09-18): the ~50min-late lineup-confirmed push bug
+// had the same root cause as the live_minute bug above -- syncLineups.js/
+// syncEuropeanLineups.js still called the broken getLeagueFixtures(id,
+// date) to resolve a SCHEDULED (pre-kickoff) fixture's goal_api_id, which
+// (per that function's own comment) never actually filters by date, so a
+// fixture in its near-kickoff window almost never showed up in whatever
+// fixed page came back. goal_api_id only ended up resolved once
+// syncLiveEvents.js's own (already-fixed) getLiveLeagueFixtures() caught
+// the match after kickoff and cached it -- explaining the observed delay
+// (a lineup push landing near half-time instead of near kickoff).
+//
+// status IS a real filter (see getLiveLeagueFixtures() above), so this
+// finds a fixture by its real matchDate the only way that's actually
+// possible: fetch each relevant status bucket and filter client-side.
+// SCHEDULED is paginated (bounded at MAX_SCHEDULED_PAGES*100 -- confirmed
+// live a full domestic league's remaining-season SCHEDULED count is in
+// the low hundreds, so this comfortably covers it) because the near-
+// kickoff round is the LOWEST remaining round number, and the endpoint
+// sorts SCHEDULED descending by round (highest/most-future first) --
+// exactly the one status where the target fixture is likely deep in the
+// list, not on page 1. LIVE and FINISHED aren't paginated: LIVE is always
+// tiny (a handful of matches league-wide at once), and FINISHED already
+// returns its most-recently-completed matches first (confirmed live), so
+// anything within this file's own near-kickoff lookback window is already
+// on page 1.
+const MAX_SCHEDULED_PAGES = 6;
+const FIXTURES_PAGE_SIZE = 100;
+
+export async function findLeagueFixturesByDate(leagueId, matchDate) {
+  const found = [];
+
+  const live = await call(`/leagues/${leagueId}/fixtures`, { status: 'LIVE' });
+  found.push(...(live.data ?? []).filter((m) => m.matchDate === matchDate));
+
+  const finished = await call(`/leagues/${leagueId}/fixtures`, { status: 'FINISHED' });
+  found.push(...(finished.data ?? []).filter((m) => m.matchDate === matchDate));
+
+  let offset = 0;
+  for (let page = 0; page < MAX_SCHEDULED_PAGES; page++) {
+    const scheduled = await call(`/leagues/${leagueId}/fixtures`, { status: 'SCHEDULED', limit: FIXTURES_PAGE_SIZE, offset });
+    const items = scheduled.data ?? [];
+    found.push(...items.filter((m) => m.matchDate === matchDate));
+    if (!scheduled.pagination?.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
+
+  return found;
+}
+
 // Every team GOAL API has ever tracked for this league (confirmed live:
 // Serie A returns 40 for a 20-club top flight -- includes past
 // seasons'/inactive clubs, not just this season's 20; callers filter by
