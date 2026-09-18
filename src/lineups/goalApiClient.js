@@ -223,6 +223,49 @@ export async function findLeagueFixturesByDate(leagueId, matchDate) {
   return found;
 }
 
+// For a caller that needs fixtures across a whole DATE RANGE (not just one
+// date) -- syncEuropeanFixtures.js's own per-date loop used to call
+// getLeagueFixtures(id, date) once per date in its ±N-day window (up to 67
+// calls for a full sync), which (per that function's own comment) never
+// actually filtered by date at all, so almost every one of those calls
+// just re-fetched the same broken unfiltered page. Fetches each relevant
+// status bucket ONCE for the whole competition instead -- LIVE (always
+// tiny), FINISHED (paginated a couple pages; already sorted most-recent-
+// first, confirmed live), SCHEDULED (paginated, same rationale as
+// findLeagueFixturesByDate() above) -- and returns the merged raw list for
+// the caller to group by its own `matchDate` field locally. Bounded pages
+// are a caller-provided ceiling, not a guess: a UEFA league-phase
+// competition's whole remaining season comfortably fits well under the
+// defaults below (confirmed live: a single domestic league's remaining
+// season SCHEDULED count sits in the low hundreds; UEFA's 36-team league
+// phase is smaller still).
+export async function getAllLeagueFixtures(leagueId, { maxFinishedPages = 2, maxScheduledPages = MAX_SCHEDULED_PAGES } = {}) {
+  const all = [];
+
+  const live = await call(`/leagues/${leagueId}/fixtures`, { status: 'LIVE' });
+  all.push(...(live.data ?? []));
+
+  let offset = 0;
+  for (let page = 0; page < maxFinishedPages; page++) {
+    const finished = await call(`/leagues/${leagueId}/fixtures`, { status: 'FINISHED', limit: FIXTURES_PAGE_SIZE, offset });
+    const items = finished.data ?? [];
+    all.push(...items);
+    if (!finished.pagination?.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
+
+  offset = 0;
+  for (let page = 0; page < maxScheduledPages; page++) {
+    const scheduled = await call(`/leagues/${leagueId}/fixtures`, { status: 'SCHEDULED', limit: FIXTURES_PAGE_SIZE, offset });
+    const items = scheduled.data ?? [];
+    all.push(...items);
+    if (!scheduled.pagination?.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
+
+  return all;
+}
+
 // Every team GOAL API has ever tracked for this league (confirmed live:
 // Serie A returns 40 for a 20-club top flight -- includes past
 // seasons'/inactive clubs, not just this season's 20; callers filter by

@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getLeagueFixtures } from '../lineups/goalApiClient.js';
+import { getAllLeagueFixtures } from '../lineups/goalApiClient.js';
 import { sleep } from './client.js';
 import { extractStatus, extractScore } from './syncEuropeanFixtures.js';
 
@@ -39,10 +39,6 @@ const JOB_BUDGET_MS = 13 * 60 * 1000;
 const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
 const RECENT_KICKOFF_WINDOW_MS = 15 * 60 * 1000;
 
-function toDateString(date) {
-  return date.toISOString().slice(0, 10);
-}
-
 // Decides both whether this run should poll AT ALL (called once up front,
 // before pollOnce() ever spends any GOAL API budget) and whether its own
 // internal loop keeps sleeping and re-polling once it's started -- NOT
@@ -75,16 +71,24 @@ async function hasFixtureNeedingAttention(supabase, uefaLeagueIds) {
 }
 
 async function pollOnce(supabase) {
-  const dateStr = toDateString(new Date());
   let updated = 0;
   let stillLive = false;
 
   for (const comp of UEFA_COMPETITIONS) {
     let apiFixtures;
     try {
-      apiFixtures = await getLeagueFixtures(comp.goalApiLeagueId, dateStr);
+      // Confirmed live (2026-09-18): getLeagueFixtures(id, date)'s own
+      // `date` param is silently ignored by this endpoint, so the old
+      // dateStr-scoped call here almost never actually returned today's
+      // live/finished fixtures. This poller only ever looks at 'live' or
+      // 'finished' rows anyway (see the loop below), so it doesn't need
+      // date-scoping at all -- status=LIVE (always tiny) plus status=
+      // FINISHED's own first page (already most-recent-first, confirmed
+      // live) covers everything this file cares about with no SCHEDULED
+      // pages fetched at all.
+      apiFixtures = await getAllLeagueFixtures(comp.goalApiLeagueId, { maxFinishedPages: 1, maxScheduledPages: 0 });
     } catch (err) {
-      console.error(`Failed to fetch GOAL API fixtures for ${comp.slug} ${dateStr}:`, err.message);
+      console.error(`Failed to fetch GOAL API fixtures for ${comp.slug}:`, err.message);
       await sleep(500);
       continue;
     }

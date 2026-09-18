@@ -67,7 +67,7 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 import { getMatches, sleep, STATUS_MAP } from './client.js';
-import { getLeagueFixtures } from '../lineups/goalApiClient.js';
+import { getAllLeagueFixtures } from '../lineups/goalApiClient.js';
 import { SHORT_NAME_OVERRIDES } from './syncClubs.js';
 
 // Same guard as syncFixtures.js -- never move a fixture backwards through
@@ -227,16 +227,37 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
     dates.push(dt.toISOString().slice(0, 10));
   }
 
+  // One set of GOAL API calls for the WHOLE date window, not one call per
+  // date -- confirmed live (2026-09-18): getLeagueFixtures(id, date)'s own
+  // `date` param is silently ignored by this endpoint, so the old per-date
+  // loop's up to 67 calls (full-sync mode) almost all just re-fetched the
+  // exact same broken, unfiltered page. getAllLeagueFixtures() fetches
+  // each real status bucket once and this groups the merged result by its
+  // own `matchDate` field locally, the only way date-scoping this endpoint
+  // actually works. Bounded pages sized to this window: FULL_SYNC's wider
+  // ±7d/+60d range gets more headroom on both ends than the narrow daily
+  // window needs.
+  let byDate;
+  try {
+    const allFixtures = await getAllLeagueFixtures(comp.goalApiLeagueId, {
+      maxFinishedPages: FULL_SYNC ? 3 : 1,
+      maxScheduledPages: FULL_SYNC ? 8 : 4,
+    });
+    byDate = new Map();
+    for (const f of allFixtures) {
+      if (!f.matchDate) continue;
+      if (!byDate.has(f.matchDate)) byDate.set(f.matchDate, []);
+      byDate.get(f.matchDate).push(f);
+    }
+  } catch (err) {
+    console.error(`  GOAL API fixtures failed for ${comp.slug}:`, err.message);
+    return 0;
+  }
+
   let inserted = 0;
 
   for (const dateStr of dates) {
-    let apiFixtures;
-    try {
-      apiFixtures = await getLeagueFixtures(comp.goalApiLeagueId, dateStr);
-    } catch (err) {
-      console.error(`  GOAL API failed for ${comp.slug} ${dateStr}:`, err.message);
-      continue;
-    }
+    const apiFixtures = byDate.get(dateStr);
     if (!apiFixtures || apiFixtures.length === 0) continue;
 
     // Fetch existing rows for this (league, date) window to apply the
@@ -293,8 +314,6 @@ async function syncGoalApiCompetition(supabase, comp, leagueId) {
     } else {
       inserted += rows.length;
     }
-
-    await sleep(500); // stay well inside GOAL API's 15-min sliding budget
   }
 
   return inserted;
