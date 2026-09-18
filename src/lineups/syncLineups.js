@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
 import { LEAGUES } from '../config/leagues.js';
-import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
+import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { normalize } from '../util/normalize.js';
@@ -38,7 +38,7 @@ const LOOKBACK_MIN = 90;
 // GOAL API simply never populates (a genuine data gap, not a timing issue)
 // stayed "pending" for the full 15-day window, costing a fresh
 // getFixtureLineups() call -- and keeping its whole league/date group's
-// getLeagueFixtures() call alive too -- on every single 15-minute run,
+// findLeagueFixturesByDate() call alive too -- on every single 15-minute run,
 // forever. 6 hours is well past any plausible late-submission delay (real
 // lineups confirm within minutes of kickoff, per this file's own top
 // comment); a fixture past this without a confirmed lineup on both sides
@@ -51,7 +51,7 @@ const LINEUP_GIVE_UP_MIN = 360;
 // Confirmed live: the near-kickoff window above is a one-shot pass -- a
 // fixture whose lineup didn't confirm in that ~65-minute window (a delayed
 // run, a late-submitting club) was never looked at again. Match resolution
-// (getLeagueFixtures, grouped by league+date) is shared between the
+// (findLeagueFixturesByDate, grouped by league+date) is shared between the
 // lineup and events work below, so this doesn't double the request cost
 // of covering both.
 const PAST_WINDOW_DAYS = 15;
@@ -210,7 +210,7 @@ export async function syncLineups() {
     // Cached in fixtures.goal_api_id (048_fixtures_goal_api_id.sql), same
     // column syncLiveEvents.js's resolveGoalApiIds() writes -- a fixture's
     // GOAL API id never changes once resolved, so this file's own
-    // getLeagueFixtures() call (previously made unconditionally, every
+    // findLeagueFixturesByDate() call (previously made unconditionally, every
     // 15-min run, for every group with anything still pending) only
     // actually runs when the group has at least one fixture this file (or
     // syncLiveEvents.js, while the match was live) hasn't already resolved.
@@ -218,7 +218,7 @@ export async function syncLineups() {
     let apiFixtures = null;
     if (needsResolution) {
       try {
-        apiFixtures = await getLeagueFixtures(league.goalApiLeagueId, dateStr);
+        apiFixtures = await findLeagueFixturesByDate(league.goalApiLeagueId, dateStr);
       } catch (err) {
         console.error(`GOAL API fixtures failed for ${league.slug} ${dateStr}:`, err.message);
       }

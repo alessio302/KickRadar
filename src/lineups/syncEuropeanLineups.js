@@ -25,12 +25,12 @@
 // from football-data.org instead, so its fixtures only have
 // external_fixture_id -- goal_api_id is resolved here the same way
 // syncLineups.js resolves it for the 5 domestic leagues (one
-// getLeagueFixtures() call per pending date, matched and cached), just by
+// findLeagueFixturesByDate() call per pending date, matched and cached), just by
 // team name instead of resolveClub() against a clubs table row, since UCL
 // clubs like Real Madrid aren't in that table either.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getLeagueFixtures, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
+import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { normalize } from '../util/normalize.js';
 import { buildEventRowsFromRest } from './eventRows.js';
@@ -160,7 +160,7 @@ export async function syncEuropeanLineups() {
   // out.
   if (pending.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
-  // Group by (competition, date) -- one getLeagueFixtures() call covers
+  // Group by (competition, date) -- one findLeagueFixturesByDate() call covers
   // every pending fixture for that competition on that date, same
   // grouping rationale as syncLineups.js.
   const groups = new Map();
@@ -182,7 +182,7 @@ export async function syncEuropeanLineups() {
     let apiFixtures = null;
     if (needsResolution) {
       try {
-        apiFixtures = await getLeagueFixtures(comp.goalApiLeagueId, dateStr);
+        apiFixtures = await findLeagueFixturesByDate(comp.goalApiLeagueId, dateStr);
       } catch (err) {
         console.error(`GOAL API fixtures failed for ${comp.slug} ${dateStr}:`, err.message);
       }
