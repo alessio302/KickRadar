@@ -12,7 +12,7 @@
 // (or FIXTURE_ID env var, for the workflow_dispatch input)
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getLeagueFixtures, getFixtureLineups } from './goalApiClient.js';
+import { findLeagueFixturesByDate, getFixtureLineups } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
 
@@ -39,7 +39,7 @@ async function backfillEuropeanLineup(fixtureId) {
   let goalApiId = fixture.goal_api_id;
   if (!goalApiId) {
     const dateStr = toDateString(new Date(fixture.kickoff_at));
-    const apiFixtures = await getLeagueFixtures(comp.goalApiLeagueId, dateStr);
+    const apiFixtures = await findLeagueFixturesByDate(comp.goalApiLeagueId, dateStr);
     const match = apiFixtures.find(
       (m) =>
         namesLooselyMatch(m.homeTeam?.name, fixture.home_team_name) && namesLooselyMatch(m.awayTeam?.name, fixture.away_team_name)
