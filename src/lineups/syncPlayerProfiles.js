@@ -229,7 +229,11 @@ export async function syncPlayerProfiles() {
   // already-existing good row for most players simply wasn't in
   // `existingRows` at all, on any of the three lookup maps, not just the
   // new one.
-  const existingRows = await fetchAllRows(supabase, 'players', 'id, goal_api_id, normalized_name, name, current_club_name');
+  const existingRows = await fetchAllRows(
+    supabase,
+    'players',
+    'id, goal_api_id, normalized_name, name, current_club_name, roster_unmatched_since'
+  );
   const byGoalApiId = new Map(existingRows.filter((r) => r.goal_api_id).map((r) => [r.goal_api_id, r.id]));
   const byNormalizedName = new Map(existingRows.map((r) => [r.normalized_name, r.id]));
 
@@ -249,6 +253,35 @@ export async function syncPlayerProfiles() {
       continue;
     }
     byClubCanonical.set(key, r.id);
+  }
+
+  // Last-token fallback, below byClubCanonical -- confirmed live twice now
+  // (Francesco/Pio Esposito): football-data.org and GOAL API can each keep
+  // only 2 of a player's 3 real name parts, and pick DIFFERENT 2 ("Francesco
+  // Esposito" vs. "Pio Esposito") -- no shared full-name or bag-of-words
+  // overlap exists between the two spellings at all, so byNormalizedName/
+  // byClubCanonical both miss every time, and this row previously fell
+  // through to an insert (a second, photo-less duplicate) then to the
+  // departed-player reconciliation below clearing the REAL row's club
+  // (neither spelling ever matches the other, so the miss recurs forever,
+  // not just once). The one thing both spellings do share is his actual
+  // surname ("Esposito") -- same collision-drop safety as byClubCanonical
+  // and goalByLastToken below: only used when exactly one same-club
+  // existing player shares that last name, so a genuine surname collision
+  // (two different real players) still falls through to gap-fill/insert
+  // rather than guessing.
+  const byClubLastToken = new Map();
+  const clubLastTokenCollided = new Set();
+  for (const r of existingRows) {
+    if (!r.current_club_name) continue;
+    const key = `${r.current_club_name}|${lastToken(r.name)}`;
+    if (clubLastTokenCollided.has(key)) continue;
+    if (byClubLastToken.has(key)) {
+      byClubLastToken.delete(key);
+      clubLastTokenCollided.add(key);
+      continue;
+    }
+    byClubLastToken.set(key, r.id);
   }
 
   let checked = 0;
@@ -397,8 +430,13 @@ export async function syncPlayerProfiles() {
 
         const normalizedName = normalize(fp.name);
         const canonicalKey = `${club.name}|${canonicalTokenKey(fp.name)}`;
+        const clubLastTokenKey = `${club.name}|${lastToken(fp.name)}`;
         const targetId =
-          (goalApiId && byGoalApiId.get(goalApiId)) ?? byNormalizedName.get(normalizedName) ?? byClubCanonical.get(canonicalKey) ?? null;
+          (goalApiId && byGoalApiId.get(goalApiId)) ??
+          byNormalizedName.get(normalizedName) ??
+          byClubCanonical.get(canonicalKey) ??
+          byClubLastToken.get(clubLastTokenKey) ??
+          null;
         // goal_api_id is only ever set here when this run actually resolved
         // one -- confirmed live this was previously unconditional
         // (`goal_api_id: goalApiId`), which meant a single failed
@@ -410,7 +448,7 @@ export async function syncPlayerProfiles() {
         // silently breaking get-player-profile's own by-goal_api_id lookup
         // for that player from then on. Omitting the key when unresolved
         // leaves whatever the row already had alone instead.
-        const row = { stats_refreshed_at: new Date().toISOString(), ...fields };
+        const row = { stats_refreshed_at: new Date().toISOString(), roster_unmatched_since: null, ...fields };
         if (goalApiId) row.goal_api_id = goalApiId;
 
         if (targetId) {
@@ -480,16 +518,41 @@ export async function syncPlayerProfiles() {
     // correctly pointing at the new club in the DB by the time we get here,
     // but would still show under the OLD club in that stale snapshot. Fresh
     // read avoids clobbering that already-correct reassignment back to null.
+    //
+    // Two-run confirmation (roster_unmatched_since), not an immediate clear
+    // on the first miss -- confirmed live (2026-09-18, this reconciliation's
+    // very first run): trusting a single day's fdSquad response outright is
+    // too aggressive. A first miss only timestamps roster_unmatched_since;
+    // the club only actually gets cleared once a player is STILL unmatched
+    // roughly a day later (a second real run, not just a same-day retry),
+    // giving a transient football-data.org hiccup or a name-matching gap
+    // (byClubLastToken above closes the specific Esposito-shaped one, but
+    // there could be others not yet found) one full cycle to self-correct
+    // before this treats it as a real departure. A genuine departure (like
+    // Francesco Acerbi's, confirmed independently via squad_memberships
+    // already having zero rows for him anywhere) still resolves within a
+    // couple of days instead of instantly, which is an acceptable trade for
+    // not risking a false "left the club" on real, still-rostered players.
     const { data: clubExisting, error: clubExistingErr } = await supabase
       .from('players')
-      .select('id, name')
+      .select('id, name, roster_unmatched_since')
       .eq('current_club_name', club.name);
     if (clubExistingErr) {
       console.error(`Failed to read existing roster for ${club.name}:`, clubExistingErr.message);
     } else {
       for (const r of clubExisting) {
         if (touchedIds.has(r.id)) continue;
-        const { error } = await supabase.from('players').update({ current_club_name: null, current_club_badge: null }).eq('id', r.id);
+        if (!r.roster_unmatched_since) {
+          const { error } = await supabase.from('players').update({ roster_unmatched_since: new Date().toISOString() }).eq('id', r.id);
+          if (error) console.error(`Failed to flag possibly-departed player ${r.name} off ${club.name}:`, error.message);
+          continue;
+        }
+        const hoursSinceFirstMiss = (Date.now() - new Date(r.roster_unmatched_since).getTime()) / (60 * 60 * 1000);
+        if (hoursSinceFirstMiss < 20) continue; // still within the same "day" as the first miss -- not a second confirmation yet
+        const { error } = await supabase
+          .from('players')
+          .update({ current_club_name: null, current_club_badge: null, roster_unmatched_since: null })
+          .eq('id', r.id);
         if (error) console.error(`Failed to clear departed player ${r.name} off ${club.name}:`, error.message);
         else departed += 1;
       }
