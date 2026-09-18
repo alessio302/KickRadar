@@ -1,16 +1,16 @@
 // Second follow-up (after diagnoseGoalApiIdResolution.js showed GOAL API's
 // /leagues/{id}/fixtures?date=... response for Bundesliga/Ligue 1 today
-// did NOT include the actual match kicking off today at all -- Bayern vs
-// Union Berlin and Monaco vs Lens were both simply absent from the 50
-// fixtures returned, which looked like several whole rounds' worth of
-// fixtures rather than anything date-filtered). This dumps the RAW,
-// unprocessed JSON for one call (bypassing getLeagueFixtures()'s own
-// `data.data ?? []` unwrapping) to see: (1) whether the response carries a
-// pagination object at all (getLeagueTeams() needed one for the exact same
-// undocumented 50-result cap, confirmed live elsewhere in this file), and
-// (2) the full raw shape of one fixture entry, since diagnoseGoalApiIdResolution.js's
-// `m.date ?? m.utcDate` both came back undefined -- the real field name
-// (if there is one) is still unknown.
+// did NOT include the actual match kicking off today at all). Confirmed by
+// this script's first version: the response carries pagination
+// {total:1909, limit:50, offset:0, hasMore:true} for Bundesliga -- WAY more
+// than one season's fixtures for an 18-team league -- and is IDENTICAL
+// whether `date` is passed or not, sorted by matchRound descending
+// (round 34, the season's LAST round, on page 1; round 29 around
+// offset=50). The `date` query param this codebase sends does nothing;
+// GOAL API's own field for a fixture's calendar date is called `matchDate`
+// (confirmed in the raw fixture shape: "matchDate": "2027-05-22"), not
+// `date`. This second version tests whether `matchDate` is the query
+// param GOAL API actually expects.
 const BASE_URL = process.env.GOAL_API_BASE_URL || 'https://api.goal-api.com/v1';
 
 async function rawCall(path, params) {
@@ -20,53 +20,48 @@ async function rawCall(path, params) {
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   }
+  console.log(`  -> ${url.toString()}`);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
   const body = await res.text();
   if (!res.ok) throw new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
   return JSON.parse(body);
 }
 
+function summarize(data, today) {
+  const items = data.data ?? [];
+  console.log(`  data.length=${items.length}, pagination=${JSON.stringify(data.pagination ?? 'NONE')}`);
+  const matchDates = [...new Set(items.map((m) => m.matchDate))].sort();
+  console.log(`  distinct matchDate values in this page: ${JSON.stringify(matchDates.slice(0, 10))}${matchDates.length > 10 ? ` (+${matchDates.length - 10} more)` : ''}`);
+  const todays = items.filter((m) => m.matchDate === today);
+  console.log(`  fixtures with matchDate === ${today}: ${todays.length}`);
+  for (const m of todays) {
+    console.log(`    "${m.homeTeamName}" vs "${m.awayTeamName}" status=${m.matchStatus} round=${m.matchRound}`);
+  }
+  return todays;
+}
+
 async function main() {
   const bundesligaLeagueId = 'cmr77dvgm0002rx06rt2uqxii';
   const today = new Date().toISOString().slice(0, 10);
 
-  console.log(`Raw call: /leagues/${bundesligaLeagueId}/fixtures?date=${today}`);
-  const data = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { date: today });
+  console.log(`\n=== Attempt 1: ?matchDate=${today} ===`);
+  const byMatchDate = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today });
+  summarize(byMatchDate, today);
 
-  console.log('\nTop-level response keys:', Object.keys(data));
-  console.log('pagination field:', JSON.stringify(data.pagination ?? 'NONE'));
-  console.log('data.data length:', (data.data ?? []).length);
+  console.log(`\n=== Attempt 2: ?date=${today} (current code's param name, for comparison) ===`);
+  const byDate = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { date: today });
+  summarize(byDate, today);
 
-  const first = data.data?.[0];
-  console.log('\nFull raw shape of first fixture entry:');
-  console.log(JSON.stringify(first, null, 2));
+  console.log(`\n=== Attempt 3: ?matchDate=${today}&status=LIVE (in case a status filter also exists) ===`);
+  const byMatchDateLive = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { matchDate: today, status: 'LIVE' });
+  summarize(byMatchDateLive, today);
 
-  const bayernMatch = (data.data ?? []).find(
-    (m) => /bayern/i.test(m.homeTeam?.name ?? '') || /bayern/i.test(m.awayTeam?.name ?? '')
-  );
-  console.log('\nAny Bayern München fixture found in this response:', bayernMatch ? JSON.stringify(bayernMatch, null, 2) : 'NONE FOUND');
-
-  // Try without the date param at all, to see if the endpoint behaves any
-  // differently (e.g. still capped at 50, but a DIFFERENT 50, which would
-  // point at date filtering being silently ignored either way).
-  console.log('\n--- Same call WITHOUT the date param ---');
-  const noDate = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, {});
-  console.log('data.data length (no date):', (noDate.data ?? []).length);
-  console.log('pagination field (no date):', JSON.stringify(noDate.pagination ?? 'NONE'));
-
-  // Try common pagination params in case the endpoint silently supports
-  // them the same way /leagues/{id}/teams does (limit/offset, confirmed
-  // live for that endpoint per getLeagueTeams()'s own comment).
-  console.log('\n--- Same call with limit=100&offset=50, no date ---');
-  const page2 = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { limit: 100, offset: 50 });
-  console.log('data.data length (offset=50):', (page2.data ?? []).length);
-  const bayernPage2 = (page2.data ?? []).find(
-    (m) => /bayern/i.test(m.homeTeam?.name ?? '') || /bayern/i.test(m.awayTeam?.name ?? '')
-  );
-  console.log('Bayern München fixture in offset=50 page:', bayernPage2 ? JSON.stringify(bayernPage2, null, 2) : 'NONE FOUND');
+  console.log(`\n=== Attempt 4: ?dateFrom=${today}&dateTo=${today} ===`);
+  const byRange = await rawCall(`/leagues/${bundesligaLeagueId}/fixtures`, { dateFrom: today, dateTo: today });
+  summarize(byRange, today);
 }
 
 main().catch((err) => {
-  console.error('Diagnose raw GOAL API fixtures failed:', err);
+  console.error('Diagnose raw GOAL API fixtures (v2) failed:', err);
   process.exitCode = 1;
 });
