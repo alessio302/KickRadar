@@ -1,14 +1,17 @@
-// Shared REST-shaped (camelCase, GOAL API's own stable per-event ids)
-// match_events row builder -- used by both syncLineups.js (club_id-keyed
-// domestic fixtures) and syncEuropeanLineups.js (team_name-keyed UEFA
-// fixtures, no clubs table row -- see syncEuropeanFixtures.js's own
-// comment), via `sideRef` returning exactly one of {club_id}/{team_name}
-// per sql/054's own "exactly one set" contract. event_key uses GOAL API's
-// own row id (goal:${id}/card:${id}/sub:${id}), stable and unique --
-// repeated calls for the same real event upsert into the same row rather
-// than duplicating, unlike a synthetic content-based key built from
-// field values (see src/lineups/syncLiveEvents.js's own buildLiveEventRows
-// for that, and matchEventsReconciler.js for how the two coexist).
+// Shared REST-shaped (camelCase) match_events row builder -- used by both
+// syncLineups.js (club_id-keyed domestic fixtures) and
+// syncEuropeanLineups.js (team_name-keyed UEFA fixtures, no clubs table
+// row -- see syncEuropeanFixtures.js's own comment), via `sideRef`
+// returning exactly one of {club_id}/{team_name} per sql/054's own
+// "exactly one set" contract. event_key uses GOAL API's own row id
+// (goal:${id}/card:${id}/sub:${id}) -- unique WITHIN one call's response,
+// but NOT stable across two separate calls for the same real event
+// (confirmed live 2026-09-19, matchEventsReconciler.js's own top comment
+// -- this file's comment used to claim otherwise). Only ever compared
+// against the DB by matchEventsReconciler.js's own CONTENT matching
+// (type+minute+player), never by this key alone, for exactly that reason
+// -- see that file for how it and syncLiveEvents.js's own synthetic
+// content-based key (buildLiveEventRows) coexist.
 export function buildEventRowsFromRest(fixtureId, sideRef, { goals, cards, substitutions }) {
   const rows = [];
 
