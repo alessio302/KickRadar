@@ -157,7 +157,20 @@ jobs:
           # same budget, and even if it did, live-scores.yml/live-events.yml
           # both already guard against overlap with concurrency groups.
           check_and_trigger news-scraper.yml 50     # cadence 30 min
-          check_and_trigger lineups-sync.yml 25     # cadence 15 min
+          # Tightened 25->20 -- confirmed live 2026-09-19 (Roma vs Inter):
+          # a genuine ~29min gap between successful runs (16:45:29 ->
+          # manual 17:14:42) sat entirely inside the old 25-min threshold
+          # until very late, during which a live goal (Inter, 46') went
+          # unnotified for ~28 minutes -- lineups-sync.yml is this app's
+          # own REST backstop for match events too, not just lineups (see
+          # that file's own eventsNeeded()), so a stale gap here isn't
+          # just a delayed lineup, it's a delayed goal/card/sub push with
+          # no other safety net while syncLiveEvents.js's WS path is also
+          # having a quiet spell. 20 is cadence (15) + one tick of slack,
+          # same shape as fixture-reminders.yml's own 10 = 2x its 5-min
+          # cadence below -- still tolerates one missed native tick before
+          # re-triggering, just doesn't wait for two.
+          check_and_trigger lineups-sync.yml 20     # cadence 15 min
           check_and_trigger fixture-reminders.yml 10  # cadence 5 min -- sole path for 30/15-min-before-kickoff pushes, see this file's own top comment
           check_and_trigger live-events.yml 14      # self-loops ~14 min while live -- see this file's own top comment
           check_and_trigger live-scores.yml 13      # self-loops ~13 min while live; see comment above
