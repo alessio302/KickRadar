@@ -26,15 +26,23 @@ export async function fetchOgImage(articleUrl, { timeoutMs = 6000 } = {}) {
       signal: controller.signal,
     });
     if (!res.ok) return null;
-    // og:image is always in <head>, well within the first chunk of most
-    // real article pages -- capping how much HTML we read (rather than
-    // buffering a whole page, some of which run 200KB+) keeps this cheap
-    // per-article even though it now runs inline in the scrape loop.
+    // og:image sits in <head> HTML-order-wise, but that's no guarantee it's
+    // early in the raw response -- confirmed live (2026-09-19, user-reported
+    // unreliable Bundesliga News images): bundesliga.com's own pages now
+    // front-load ~180KB of inline scripts/hydration data before their own
+    // og:image meta tag, well past the original 60000-char cap here, so
+    // this returned null on literally every bundesliga-com article despite
+    // the tag being present and this file's own regexes matching it fine in
+    // isolation (confirmed via diagnoseBundesligaImages.js). Raised with
+    // real headroom above that observed ~183000-char offset -- still well
+    // under a full page (850KB+ for these specific pages) to keep this
+    // bounded, since it runs inline in the scrape loop once per genuinely
+    // new+relevant article, not per feed item.
     const reader = res.body?.getReader();
     if (!reader) return null;
     let html = '';
     const decoder = new TextDecoder();
-    while (html.length < 60000) {
+    while (html.length < 400000) {
       const { done, value } = await reader.read();
       if (done) break;
       html += decoder.decode(value, { stream: true });
