@@ -37,7 +37,16 @@ function buildPayloads(fixtureId, leagueSlug, row) {
     const label = pushStringsFor(lang).matchEvent[labelKey];
     const minute = row.minute ? ` (${row.minute}')` : '';
     const body = row.type === 'Substitution' ? `${row.substituted ?? '?'} → ${row.player}` : `${row.player}${minute}`;
-    byLanguage[lang] = { title: `${label.icon} ${label.title}`, body, url: `/?league=${leagueSlug}&fixture=${fixtureId}` };
+    // label.icon is deliberately unset for yellow/red cards -- see
+    // pushI18n.js's own comment: 🟨/🟥 render as a plain square in a push
+    // notification's plain OS text, not the timeline's actual narrow-
+    // rectangle card shape (FixtureDetailOverlay.jsx's CardIcon), and
+    // there's no way to draw that shape inline in notification text at
+    // all. Dropping the mismatched icon (title alone still reads clearly
+    // as "Gelbe Karte"/"Yellow Card") rather than keeping a shape that
+    // visibly contradicts the in-app one.
+    const title = label.icon ? `${label.icon} ${label.title}` : label.title;
+    byLanguage[lang] = { title, body, url: `/?league=${leagueSlug}&fixture=${fixtureId}` };
   }
   return byLanguage;
 }
