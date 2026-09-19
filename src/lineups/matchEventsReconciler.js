@@ -8,11 +8,12 @@
 //
 // Confirmed live (2026-09-12): the WS keys its own rows by content (GOAL
 // API's live match_update payload has no stable per-event id), while REST
-// keys by GOAL API's own real, stable id. Making both schemes match
-// exactly turned out to work for goals (REST exposes the same time/scorer-
-// id/score fields the WS's own key formula uses) but isn't guaranteed for
-// cards/substitutions, and is exactly the kind of fragile cross-provider
-// coupling not worth relying on. Matching on CONTENT instead --
+// keys by GOAL API's own id for that event. Originally assumed that REST
+// id was stable across separate calls -- confirmed WRONG live (2026-09-19,
+// Roma vs Inter): two separate /fixtures/:id/events calls for the exact
+// same already-finished match returned entirely different `id`s for every
+// one of the same real goals/cards. So REST's own key is no more trustworthy
+// across calls than the WS's isn't -- matching on CONTENT instead --
 // type+minute+player(+substituted for a sub) -- sidesteps the whole
 // problem: both writers already produce rows in that same normalized
 // shape regardless of their own key, so two rows describing the same real
@@ -73,9 +74,38 @@ function typeFamily(type) {
   return GOAL_TYPES.has(type) ? 'goal' : type;
 }
 
+// Normalized (case/diacritic/whitespace-insensitive), not a raw `!==` --
+// confirmed live (2026-09-19, Roma vs Inter, right after this same match's
+// full-time push finally landed): a routine lineups-sync run re-fetched
+// this ALREADY-FINISHED fixture's events (events_synced_at gets set only
+// once, at the moment a fixture is first seen 'finished' -- this was that
+// moment) and reconcileMatchEvents() below deleted-then-reinserted ALL 4
+// already-pushed REST-origin events (plus correctly added several
+// genuinely new ones), re-triggering notifyFavoritedFixtureEvents() for
+// every one of them -- 19 pushes landing in one burst is what that looks
+// like from the subscriber's side. isSameEvent()'s player comparison was
+// exact-string `!==`; GOAL API's own diacritic/whitespace normalization on
+// player names isn't guaranteed identical between two separate REST calls
+// for the same real event (confirmed this same app already had to solve
+// the identical cross-call formatting-drift problem for player identity
+// elsewhere -- see src/util/normalize.js, reused here rather than
+// reinventing it), so a byte-level difference invisible in a raw JSON diff
+// was enough to make every one of these look "retracted" and "new" at
+// once. Reused GOAL API event ids being non-stable across calls (confirmed
+// live: the exact same Kone/Barella/Martinez events got entirely different
+// `id`s on this re-fetch than the ones stored from the 17:14 fetch) is WHY
+// this matters so much here specifically -- event_key alone could never
+// have caught this, content matching was always the only real defense,
+// and it had a gap.
+import { normalize } from '../util/normalize.js';
+
+function normalizedPlayer(name) {
+  return normalize(name ?? '');
+}
+
 function isSameEvent(a, b) {
   if (typeFamily(a.type) !== typeFamily(b.type)) return false;
-  if (a.player !== b.player) return false;
+  if (normalizedPlayer(a.player) !== normalizedPlayer(b.player)) return false;
   if ((a.substituted ?? '') !== (b.substituted ?? '')) return false;
   const minuteA = parseMinuteValue(a.minute);
   const minuteB = parseMinuteValue(b.minute);
@@ -138,14 +168,70 @@ export async function insertNewMatchEvents(supabase, fixtureId, leagueSlug, fres
   return { inserted };
 }
 
+// Greedy 1:1 pairing between existing DB rows and this call's freshRows --
+// same shape as insert_new_match_events()'s own claim loop (sql/065), kept
+// as a separate, mirrored implementation here rather than shared code
+// since one runs in Postgres and the other in Node. Existing rows are
+// matched to the closest (smallest minute delta) still-unclaimed fresh row
+// so two real, close-together events (see sql/065's own comment on why
+// "any match" isn't enough) don't collide here either.
+function pairExistingWithFresh(existing, freshRows) {
+  const claimedFreshIdx = new Set();
+  const pairs = []; // { existingRow, freshRow }
+  const unmatchedExisting = [];
+
+  for (const ex of existing) {
+    let bestIdx = null;
+    let bestDelta = null;
+    freshRows.forEach((fresh, idx) => {
+      if (claimedFreshIdx.has(idx)) return;
+      if (!isSameEvent(fresh, ex)) return;
+      const delta = Math.abs((parseMinuteValue(fresh.minute) ?? 0) - (parseMinuteValue(ex.minute) ?? 0));
+      if (bestDelta === null || delta < bestDelta) {
+        bestIdx = idx;
+        bestDelta = delta;
+      }
+    });
+    if (bestIdx === null) {
+      unmatchedExisting.push(ex);
+    } else {
+      claimedFreshIdx.add(bestIdx);
+      pairs.push({ existingRow: ex, freshRow: freshRows[bestIdx] });
+    }
+  }
+
+  const unmatchedFresh = freshRows.filter((_, idx) => !claimedFreshIdx.has(idx));
+  return { pairs, unmatchedExisting, unmatchedFresh };
+}
+
 // Authoritative REST reconciler's own call (syncLineups.js/
-// syncEuropeanLineups.js, on their own ~15min cadence): insert whatever's
-// newly missing AND delete whatever's no longer in GOAL API's own current
-// REST response -- safe to trust as a complete snapshot, unlike the WS's
-// own per-tick one, so a real retraction (a VAR-disallowed goal, a
-// rescinded card) gets cleaned up here within this job's own cadence
-// instead of needing the WS's own score.changed-driven detection this
-// replaced.
+// syncEuropeanLineups.js, on their own ~15min cadence): reconciles whatever
+// GOAL API's current REST response says against what's already stored --
+// safe to trust as a complete snapshot, unlike the WS's own per-tick one,
+// so a real retraction (a VAR-disallowed goal, a rescinded card) gets
+// cleaned up here within this job's own cadence instead of needing the
+// WS's own score.changed-driven detection this replaced.
+//
+// A row that's still represented (isSameEvent, via pairExistingWithFresh)
+// gets UPDATED in place -- type/minute corrected if REST's now-current
+// values differ -- rather than deleted and reinserted under a fresh id.
+// This isn't just tidier: confirmed live (2026-09-19, Roma vs Inter) that
+// GOAL API's own REST /events endpoint does NOT return a stable id for the
+// same real event across two separate calls (this file's own top comment
+// used to claim otherwise -- confirmed wrong), so the delete-then-reinsert
+// this used to do assigned every still-current event a brand-new
+// event_key on every single re-fetch. insertGenuinelyNew() always
+// re-notifies for whatever it inserts, with no way to tell "actually new"
+// apart from "same event, reinserted under a new key" -- so a routine
+// re-fetch of an already-fully-pushed match (routine for a `finished`
+// fixture whose events_synced_at hadn't been set yet) deleted and
+// reinserted EVERY still-current event, re-pushing every single one of
+// them at once. Keeping the original row/id/event_key for anything still
+// matched by content means notified_match_events' claim (keyed to that
+// same event_key) stays valid indefinitely, regardless of how many times
+// GOAL API reassigns its own ids underneath -- so this can never happen
+// again, independent of whatever made isSameEvent() itself disagree this
+// time (see that function's own comment on the immediate cause).
 export async function reconcileMatchEvents(supabase, fixtureId, leagueSlug, freshRows) {
   const { data: existing, error } = await supabase
     .from('match_events')
@@ -153,36 +239,36 @@ export async function reconcileMatchEvents(supabase, fixtureId, leagueSlug, fres
     .eq('fixture_id', fixtureId);
   if (error) {
     console.error(`Failed to read existing match_events for fixture ${fixtureId}:`, error.message);
-    return { inserted: 0, deleted: 0 };
+    return { inserted: 0, deleted: 0, updated: 0 };
   }
 
-  const toDelete = existing.filter((r) => !freshRows.some((f) => isSameEvent(f, r)));
+  const { pairs, unmatchedExisting, unmatchedFresh } = pairExistingWithFresh(existing, freshRows);
 
-  if (toDelete.length > 0) {
+  if (unmatchedExisting.length > 0) {
     const { error: deleteErr } = await supabase
       .from('match_events')
       .delete()
-      .in('id', toDelete.map((r) => r.id));
+      .in('id', unmatchedExisting.map((r) => r.id));
     if (deleteErr) console.error(`Failed to delete retracted events for fixture ${fixtureId}:`, deleteErr.message);
   }
 
-  // Upgrades an already-stored generic "Goal" row to the more specific
-  // "Penalty"/"Own Goal" REST now reports for that same real event --
-  // isSameEvent() above treats all three as the same goal-family event
-  // (so this never duplicates), but a same-family match alone never
-  // corrects the stored type, only skips re-inserting it. Without this, a
-  // penalty the fast WS path first wrote as a plain "Goal" (its own
-  // payload not confirmed to always carry GOAL API's penalty flag) would
-  // stay mislabeled for the rest of the match even once REST's
-  // authoritative snapshot knows better.
-  for (const fresh of freshRows) {
-    if (fresh.type === 'Goal') continue; // nothing more specific to upgrade TO
-    const stale = existing.find((e) => isSameEvent(e, fresh) && e.type !== fresh.type);
-    if (!stale) continue;
-    const { error: upgradeErr } = await supabase.from('match_events').update({ type: fresh.type }).eq('id', stale.id);
-    if (upgradeErr) console.error(`Failed to upgrade event type for fixture ${fixtureId}:`, upgradeErr.message);
+  // Corrects type (e.g. a plain "Goal" the WS wrote upgraded to REST's more
+  // specific "Penalty"/"Own Goal" for the same real event) and minute (a
+  // provider clock/stoppage-time estimate settling, see isSameEvent's own
+  // MINUTE_TOLERANCE comment) on the SAME row -- never its id or
+  // event_key, which is the whole point (see this function's own top
+  // comment).
+  let updated = 0;
+  for (const { existingRow, freshRow } of pairs) {
+    if (existingRow.type === freshRow.type && existingRow.minute === freshRow.minute) continue;
+    const { error: updateErr } = await supabase
+      .from('match_events')
+      .update({ type: freshRow.type, minute: freshRow.minute })
+      .eq('id', existingRow.id);
+    if (updateErr) console.error(`Failed to update event for fixture ${fixtureId}:`, updateErr.message);
+    else updated += 1;
   }
 
-  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, freshRows);
-  return { inserted, deleted: toDelete.length };
+  const inserted = await insertGenuinelyNew(supabase, fixtureId, leagueSlug, unmatchedFresh);
+  return { inserted, deleted: unmatchedExisting.length, updated };
 }
