@@ -40,3 +40,17 @@ jobs:
           FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Confirmed live 2026-09-19 (Roma vs Inter, favorited, kickoff
+          # 16:00 UTC): missing here meant every kickoff/full-time push this
+          # file's own status-write loop triggers (MILESTONE_BY_STATUS ->
+          # sendPushToFixtureFavoriters) threw "Missing VAPID_PUBLIC_KEY/
+          # VAPID_PRIVATE_KEY env vars" on its push attempt -- caught and
+          # logged, not fatal to the run, but the notification itself never
+          # went out. The 30/15-minute-before reminders still worked
+          # (fixture-reminders.yml has its own copy of these secrets), so
+          # this went unnoticed until a kickoff push was checked directly.
+          # Exact same class of gap already found and fixed for
+          # live-events.yml (#148, 2026-09-17) -- this file was just missed
+          # at the time.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
