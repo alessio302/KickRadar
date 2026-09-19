@@ -98,7 +98,54 @@ async function hasFixtureNeedingAttention(supabase) {
     .select('id', { count: 'exact', head: true })
     .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
-  return (count ?? 0) > 0;
+  if ((count ?? 0) > 0) return true;
+  // Confirmed live 2026-09-19 (Roma vs Inter): the goal-api-webhook Edge
+  // Function's own handleMatchFinished() flips fixtures.status to
+  // 'finished' directly and fast (see notifyFixtureStatusChange's own
+  // comment on why that leaves the full-time push stranded), which means
+  // by the time this gate runs again for a match with nothing else live,
+  // the fixture is already 'finished' in our own DB -- the plain
+  // status.eq.live check above no longer sees it as needing anything, so
+  // this whole job would never even start, let alone reach the fallback
+  // notify added to pollOnce() below. hasUnpushedFinish() is the second,
+  // independent reason this gate can be true: a finished fixture nobody's
+  // claimed the 'finished' milestone for yet.
+  return hasUnpushedFinish(supabase);
+}
+
+// Precise (checked against the actual claim table, not a time-window
+// guess) so this never keeps the job spinning after the push has already
+// gone out, and never gives up on a genuinely still-pending one. Bounded
+// to the last 24h by kickoff_at purely to keep the query cheap as the
+// season's `finished` row count grows -- a fixture whose push is somehow
+// still unclaimed after a full day is an edge case not worth re-checking
+// on every single invocation forever.
+async function hasUnpushedFinish(supabase) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: finished, error } = await supabase
+    .from('fixtures')
+    .select('id, favorite_fixtures!inner(id)')
+    .eq('status', 'finished')
+    .gte('kickoff_at', since)
+    .limit(50);
+  if (error) {
+    console.error('Failed to check for unpushed finishes:', error.message);
+    return false;
+  }
+  if (finished.length === 0) return false;
+
+  const ids = [...new Set(finished.map((f) => f.id))];
+  const { data: claimed, error: claimErr } = await supabase
+    .from('fixture_reminders_sent')
+    .select('fixture_id')
+    .eq('milestone', 'finished')
+    .in('fixture_id', ids);
+  if (claimErr) {
+    console.error('Failed to check finished-push claims:', claimErr.message);
+    return false;
+  }
+  const claimedIds = new Set(claimed.map((c) => c.fixture_id));
+  return ids.some((id) => !claimedIds.has(id));
 }
 
 // Kickoff/full-time push for whoever favorited this fixture -- piggybacked
@@ -267,7 +314,7 @@ async function pollOnce(supabase, clubById) {
 
     const { data: current, error: currentErr } = await supabase
       .from('fixtures')
-      .select('status, home_score, away_score')
+      .select('id, status, home_score, away_score, home_club_id, away_club_id')
       .eq('external_fixture_id', m.id)
       .maybeSingle();
     if (currentErr) {
@@ -278,14 +325,28 @@ async function pollOnce(supabase, clubById) {
       newStatus !== 'postponed' &&
       newStatus !== 'cancelled'
     ) {
-      // "Never walk it backwards" only makes sense between the normal
-      // scheduled->live->finished progression, where a lower rank really
-      // does mean "a slower source hasn't caught up yet" -- postponed/
-      // cancelled are a different kind of transition entirely (the match
-      // isn't following that progression at all anymore) and are always
-      // real, authoritative corrections from football-data.org whenever
-      // they show up, not a stale race to guard against.
-      continue; // already further along by a faster source (the webhook) -- never walk it backwards
+      // Confirmed live 2026-09-19 (Roma vs Inter): a lower rank here
+      // doesn't ALWAYS mean "a slower source hasn't caught up yet" the way
+      // the rest of this comment describes -- it's also exactly what
+      // happens when the goal-api-webhook Edge Function's own
+      // handleMatchFinished()/handleMatchStarted() got there first. That
+      // handler writes fixtures.status directly (fast, event-driven) but
+      // never sends the kickoff/full-time push itself -- this file's own
+      // notifyFixtureStatusChange() is the ONLY code that does, and it
+      // only used to run from the block below, which this branch skips
+      // entirely. Once the webhook wins the race (routine, since it reacts
+      // to GOAL API's own real-time event instead of polling football-
+      // data.org every 120s), that push was permanently stranded: this
+      // continue happened on every subsequent tick, and once no OTHER
+      // fixture was still 'live', hasFixtureNeedingAttention() stopped
+      // scheduling any further runs for this fixture at all. Still attempt
+      // the notify here, against the DB's own already-authoritative
+      // current status/score -- notifyFixtureStatusChange()'s own
+      // fixture_reminders_sent claim already makes this a no-op on every
+      // tick after the first successful one, from whichever of the two
+      // sources gets there first.
+      await notifyFixtureStatusChange(supabase, clubById, current, m._leagueSlug, current.status, current.home_score, current.away_score);
+      continue; // already further along by a faster source (the webhook) -- never walk the status/score itself backwards
     }
 
     // Same "never walk it backwards" guard as status above, applied to the
