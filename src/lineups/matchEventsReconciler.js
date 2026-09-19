@@ -32,7 +32,22 @@
 // minutes apart, never a single minute apart the way a same-event
 // correction typically is, so this tolerance doesn't risk merging two
 // real events into one.
-const MINUTE_TOLERANCE = 1;
+// Widened from 1 to 3 -- confirmed live (2026-09-19, Roma vs Inter): the
+// WS path pushed M. Kone's goal as minute 39 (live-goal:39:...), but
+// GOAL API's own later REST snapshot reported the SAME real goal as
+// minute 37 -- a 2-minute drift, one more than the old tolerance
+// allowed. reconcileMatchEvents() treated the REST row as NOT matching
+// the already-stored (and already-pushed) WS row, deleted the WS row as
+// "retracted", and re-inserted the REST row as "new" -- which
+// re-triggered notifyFavoritedFixtureEvents() and sent a second push for
+// a goal already pushed ~25 minutes earlier. Same class of bug as the
+// 34-vs-35 case above, just a wider clock-estimate drift than 1 minute
+// covers. insert_new_match_events() (sql/062, widened in migration 064)
+// has its own identical ±N check and needed the same bump -- otherwise a
+// row this file's own delete step lets survive would still look "new" to
+// that function's separate content check and get re-inserted (and
+// re-pushed) anyway.
+const MINUTE_TOLERANCE = 3;
 
 function parseMinuteValue(minute) {
   if (minute === null || minute === undefined || minute === '') return null;
