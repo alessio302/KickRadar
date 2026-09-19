@@ -1,4 +1,4 @@
-name: Backfill Bundesliga.com news images
+name: Backfill news article images
 
 on:
   workflow_dispatch: {}
@@ -6,7 +6,7 @@ on:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,7 +14,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node src/news/backfillBundesligaImages.js
+      - run: node src/news/backfillNewsImages.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
