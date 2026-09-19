@@ -39,6 +39,16 @@
 // same real-usage verification lineupTitle/rumor above needed -- these are
 // the plain vocabulary words themselves.
 //
+// yellowCard/redCard have no `icon` (unlike goal/substitution) -- confirmed
+// live (user-reported): 🟨/🟥 render as a plain square in a push
+// notification's own plain OS text, visibly inconsistent with the in-app
+// match timeline's actual narrow-rectangle card shape
+// (FixtureDetailOverlay.jsx's own CardIcon, 10x14px with a 2px radius --
+// that file's own comment already rejected 🟨/🟥 for the exact same
+// reason). A push notification can't draw that shape inline in its title
+// text at all, so this drops the mismatched square rather than keeping a
+// shape that contradicts the one shown in-app for the same event.
+//
 // fixtureReminder/matchStarted/matchFinished: same "plain broadcast
 // vocabulary, not an idiom to verify" case as matchEvent -- kickoff/full-
 // time terminology is about as standardized as football language gets in
@@ -53,8 +63,8 @@ export const PUSH_STRINGS = {
     lineupTitle: 'Offizielle Aufstellungen',
     matchEvent: {
       goal: { icon: '⚽', title: 'Tor!' },
-      yellowCard: { icon: '🟨', title: 'Gelbe Karte' },
-      redCard: { icon: '🟥', title: 'Rote Karte' },
+      yellowCard: { title: 'Gelbe Karte' },
+      redCard: { title: 'Rote Karte' },
       substitution: { icon: '🔄', title: 'Wechsel' },
     },
     highlights: { title: '🎥 Highlights verfügbar' },
@@ -69,8 +79,8 @@ export const PUSH_STRINGS = {
     lineupTitle: 'Official lineups',
     matchEvent: {
       goal: { icon: '⚽', title: 'Goal!' },
-      yellowCard: { icon: '🟨', title: 'Yellow Card' },
-      redCard: { icon: '🟥', title: 'Red Card' },
+      yellowCard: { title: 'Yellow Card' },
+      redCard: { title: 'Red Card' },
       substitution: { icon: '🔄', title: 'Substitution' },
     },
     highlights: { title: '🎥 Highlights available' },
@@ -85,8 +95,8 @@ export const PUSH_STRINGS = {
     lineupTitle: 'Formazioni ufficiali',
     matchEvent: {
       goal: { icon: '⚽', title: 'Gol!' },
-      yellowCard: { icon: '🟨', title: 'Cartellino giallo' },
-      redCard: { icon: '🟥', title: 'Cartellino rosso' },
+      yellowCard: { title: 'Cartellino giallo' },
+      redCard: { title: 'Cartellino rosso' },
       substitution: { icon: '🔄', title: 'Cambio' },
     },
     highlights: { title: '🎥 Highlights disponibili' },
@@ -101,8 +111,8 @@ export const PUSH_STRINGS = {
     lineupTitle: 'Compositions officielles',
     matchEvent: {
       goal: { icon: '⚽', title: 'But !' },
-      yellowCard: { icon: '🟨', title: 'Carton jaune' },
-      redCard: { icon: '🟥', title: 'Carton rouge' },
+      yellowCard: { title: 'Carton jaune' },
+      redCard: { title: 'Carton rouge' },
       substitution: { icon: '🔄', title: 'Changement' },
     },
     highlights: { title: '🎥 Highlights disponibles' },
@@ -117,8 +127,8 @@ export const PUSH_STRINGS = {
     lineupTitle: 'Alineaciones oficiales',
     matchEvent: {
       goal: { icon: '⚽', title: '¡Gol!' },
-      yellowCard: { icon: '🟨', title: 'Tarjeta amarilla' },
-      redCard: { icon: '🟥', title: 'Tarjeta roja' },
+      yellowCard: { title: 'Tarjeta amarilla' },
+      redCard: { title: 'Tarjeta roja' },
       substitution: { icon: '🔄', title: 'Cambio' },
     },
     highlights: { title: '🎥 Highlights disponibles' },
