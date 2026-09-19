@@ -1,49 +1,24 @@
 // Temporary diagnostic (per this project's usual pattern) -- follow-up to
-// the bundesliga-com og:image cap fix (#196/#197, now confirmed 0/27
-// null there). User reported the Bundesliga News tab still shows 17
-// articles without an image -- a DB check across every source tagged to
-// the Bundesliga league shows kicker-general is now the dominant offender
-// (51/51 null, 100%), with guardian-football also partially broken
-// (5/7). Checks kicker.de's real pages the same way the bundesliga.com
-// investigation did: raw og:image/twitter:image tag presence + byte
-// offset, plus what fetchOgImage() (already raised to a 400000-char cap)
-// actually resolves.
-import { getSupabaseClient } from '../db/supabaseClient.js';
-import { fetchOgImage } from './ogImage.js';
-
+// the previous run: kicker.de returns HTTP 202 with only 2403 bytes and
+// zero og:image tags for every checked article -- much smaller than a
+// real article page, so this isn't a read-cap issue like bundesliga.com's
+// was. Dumps the raw response body to see what we're actually getting
+// (a bot-check/consent page, a redirect stub, etc.), plus response headers
+// that might explain it (redirect location, set-cookie, server name).
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-async function main() {
-  const supabase = getSupabaseClient();
-  const { data: rows, error } = await supabase
-    .from('news_articles')
-    .select('title, source_url')
-    .eq('source', 'kicker-general')
-    .order('published_at', { ascending: false })
-    .limit(5);
-  if (error) throw error;
+const URL = 'https://www.kicker.de/wer-uebertraegt-vfb-stuttgart-gegen-borussia-dortmund-live-im-tv-und-stream-1253315/artikel#omrss';
 
-  for (const row of rows) {
-    console.log(`\n=== ${row.title} ===`);
-    console.log(row.source_url);
-    try {
-      const res = await fetch(row.source_url, {
-        headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml' },
-      });
-      const html = await res.text();
-      console.log('status:', res.status, 'content-length:', html.length);
-      const ogMatches = [...html.matchAll(/<meta[^>]*(?:property|name)=["'](og:image[^"']*|twitter:image)["'][^>]*>/gi)];
-      console.log('raw og/twitter image meta tags found:', ogMatches.length);
-      for (const m of ogMatches) {
-        console.log('  offset', m.index, ':', m[0]);
-      }
-      const resolved = await fetchOgImage(row.source_url);
-      console.log('fetchOgImage() result:', resolved);
-    } catch (err) {
-      console.error('fetch failed:', err.message);
-    }
-  }
+async function main() {
+  const res = await fetch(URL, {
+    headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml' },
+  });
+  console.log('status:', res.status, res.statusText);
+  console.log('headers:');
+  for (const [k, v] of res.headers.entries()) console.log(`  ${k}: ${v}`);
+  const body = await res.text();
+  console.log('\nbody:\n', body);
 }
 
 main().catch((err) => {
