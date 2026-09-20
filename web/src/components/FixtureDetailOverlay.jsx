@@ -508,26 +508,16 @@ function MatchEventTimelineRow({ theme, t, event, side }) {
   );
 }
 
-// One column of scorers for one team -- shown as "⚽ 23' Name", ball icon
-// leading on the home (left) side and trailing on the away (right) side so
-// both columns visually lean toward the shared centre gap between them,
-// same mirroring idea as MatchEventContent's icon placement in the
-// timeline this reuses EVENT_ICON/parseMinute from.
+// One column of scorers for one team -- shown as "⚽ Name 23'", ball icon
+// always leading the name on both the home and away side (per feedback --
+// an earlier version mirrored it to the away side's trailing edge, matching
+// MatchEventContent's icon placement in the timeline, but that read as
+// inconsistent between the two columns).
 function GoalscorersColumn({ theme, t, scorers, align }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, alignItems: align === 'right' ? 'flex-end' : 'flex-start' }}>
       {scorers.map((s, i) => (
-        <div
-          key={i}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            fontSize: '11.5px',
-            color: theme.textMuted,
-            flexDirection: align === 'right' ? 'row-reverse' : 'row',
-          }}
-        >
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: theme.textMuted }}>
           <span style={{ fontSize: '10px', lineHeight: 1, flexShrink: 0 }}>{EVENT_ICON.Goal}</span>
           <span style={{ whiteSpace: 'nowrap' }}>
             {s.player || '–'}
@@ -948,9 +938,11 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
               <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '14px', fontWeight: 700 }} />
               <ClubJersey club={awayClub} size={22} theme={theme} />
             </div>
-            <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>
-              {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
-            </p>
+            {fixture.status !== 'live' && fixture.status !== 'finished' && (
+              <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>
+                {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
+              </p>
+            )}
           </div>
 
           <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
