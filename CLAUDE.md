@@ -138,5 +138,20 @@ the Claude Supabase connector.
   `kick-radar-alessio21.vercel.app`
 - Preview deployments have SSO protection enabled — don't hand the user a
   preview URL and expect them to be able to open it.
+- **The production alias is also currently behind Vercel SSO protection
+  (2026-09-20), and that's intentional — not a bug, not something to
+  "fix".** Project settings show `ssoProtection.deploymentType:
+  "all_except_custom_domains"`, which catches `kick-radar-eosin.vercel.app`
+  too since a `*.vercel.app` alias isn't a real custom domain. User
+  confirmed: this is deliberate until Impressum/Datenschutzerklärung are in
+  place (German legal-notice/privacy-policy pages), not yet done. Don't
+  disable or narrow this protection without the user explicitly asking.
+  Practical fallout: a Playwright/curl diagnostic hitting the production
+  URL from anywhere without a Vercel-authenticated session lands on
+  Vercel's own gate page ("KickRadar – Zugang" / "Privater Test-Build" /
+  "Öffnen"), not the real app — confirmed live, this cost a wasted
+  diagnostic run mid-investigation (2026-09-20) that read like the app
+  itself was broken. If a live-app diagnostic needs to get past this,
+  ask the user rather than trying to bypass it.
 - Root directory for the Vite app is `web/` (repo root has no
   package.json).
