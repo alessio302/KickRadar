@@ -9,6 +9,7 @@ import {
   PitchIcon,
   HighlightsTab,
   MatchInfoTimeline,
+  MatchGoalscorers,
   SECTION_LABEL_STYLE,
   HINT_STYLE,
   FormRow,
@@ -428,6 +429,8 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
                 {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
               </p>
             </div>
+
+            <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
 
             {/* Same tab-switcher styling as FixtureDetailOverlay.jsx's own,
                 including icons-only-with-aria-label -- see that file's own
