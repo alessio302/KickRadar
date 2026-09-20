@@ -538,9 +538,20 @@ const GOAL_EVENT_TYPES = new Set(['Goal', 'Own Goal', 'Penalty']);
 // just filtered down to goal-scoring event types and sorted chronologically
 // (earliest first, matching how goalscorers read on a scoreboard) instead
 // of the full timeline's newest-first order.
-export function MatchGoalscorers({ theme, t, fixture, homeClub, awayClub }) {
-  const { events, loading } = useMatchEvents(fixture.id);
-
+//
+// events/loading are passed in from the overlay's own single useMatchEvents()
+// call (see FixtureDetailOverlay/EuropaFixtureDetailOverlay's own comment) --
+// this used to call the hook itself, which meant a second, independent
+// Supabase Realtime subscription to the exact same `match-events-<id>`
+// channel topic as MatchInfoTimeline's own call, running from the moment
+// the overlay opened (this renders unconditionally in the header) rather
+// than only once the Spielinfo tab was actually opened. Confirmed live:
+// that's what broke Spielinfo -- two channel.subscribe() calls racing on
+// the identical topic, with the second (whichever mounted last) landing
+// mid-render once its first payload arrived and throwing past the render
+// boundary. One shared subscription for the whole overlay removes the
+// race entirely instead of trying to time/dedupe two independent ones.
+export function MatchGoalscorers({ theme, t, fixture, homeClub, awayClub, events, loading }) {
   if (loading || (fixture.status !== 'finished' && fixture.status !== 'live')) return null;
 
   const goals = events.filter((e) => GOAL_EVENT_TYPES.has(e.type)).sort((a, b) => parseMinute(a.minute) - parseMinute(b.minute));
@@ -568,9 +579,10 @@ export function MatchGoalscorers({ theme, t, fixture, homeClub, awayClub }) {
   );
 }
 
-export function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
-  const { events, loading } = useMatchEvents(fixture.id);
-
+// events/loading are passed in from the overlay's own single useMatchEvents()
+// call -- see MatchGoalscorers's own comment above for why this no longer
+// calls the hook itself.
+export function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub, events, loading }) {
   // 'live' shown here too, not just 'finished' -- src/lineups/syncLiveEvents.js
   // now streams goals/cards/subs in over Realtime while a match is still
   // being played (see useMatchEvents.js), so there's real content to show.
@@ -831,6 +843,11 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
   const [view, setView] = useState(initialView || 'lineups'); // 'lineups' | 'info' | 'stats' | 'highlights'
   const [side, setSide] = useState('home');
   const { byClubId } = useLineups(fixture.id);
+  // Single shared subscription for both MatchGoalscorers (always shown, in
+  // the header) and MatchInfoTimeline (Spielinfo tab only) -- see
+  // MatchGoalscorers's own comment for why this used to be two independent
+  // calls, each opening its own Realtime channel on the same topic.
+  const matchEvents = useMatchEvents(fixture.id);
   const locale = DATE_LOCALES[language];
 
   const activeClub = side === 'home' ? homeClub : awayClub;
@@ -945,7 +962,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
             )}
           </div>
 
-          <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
+          <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} events={matchEvents.events} loading={matchEvents.loading} />
 
           {/* Which tab is open at all -- Aufstellungen/Spielinfo -- versus
               which side's lineup is shown within the Aufstellungen tab are
@@ -1033,7 +1050,7 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
             </>
           )}
           {view === 'info' && (
-            <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
+            <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} events={matchEvents.events} loading={matchEvents.loading} />
           )}
           {view === 'stats' && (
             <MatchStatsTab theme={theme} t={t} language={language} league={league} homeClub={homeClub} awayClub={awayClub} />

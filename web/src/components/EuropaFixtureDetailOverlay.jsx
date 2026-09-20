@@ -15,6 +15,7 @@ import {
   FormRow,
   StandingRow,
 } from './FixtureDetailOverlay.jsx';
+import { useMatchEvents } from '../hooks/useMatchEvents.js';
 import { useEuropaLineups } from '../hooks/useEuropaLineups.js';
 import { useEuropaTeamForm } from '../hooks/useEuropaTeamForm.js';
 import { useEuropaLeagueStandings } from '../hooks/useEuropaLeagueStandings.js';
@@ -323,6 +324,12 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
   const [view, setView] = useState('lineups');
   const [side, setSide] = useState('home');
   const { byTeamName } = useEuropaLineups(fixture.id);
+  // Single shared subscription for both MatchGoalscorers (always shown, in
+  // the header) and MatchInfoTimeline (Spielinfo tab only) -- see
+  // FixtureDetailOverlay.jsx's own MatchGoalscorers comment for why this
+  // must not be two independent useMatchEvents() calls each opening their
+  // own Realtime channel on the same topic.
+  const matchEvents = useMatchEvents(fixture.id);
   const locale = DATE_LOCALES[language];
 
   const activeRow = side === 'home' ? byTeamName.get(fixture.home_team_name) : byTeamName.get(fixture.away_team_name);
@@ -432,7 +439,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
               )}
             </div>
 
-            <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
+            <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} events={matchEvents.events} loading={matchEvents.loading} />
 
             {/* Same tab-switcher styling as FixtureDetailOverlay.jsx's own,
                 including icons-only-with-aria-label -- see that file's own
@@ -518,7 +525,7 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
                 <MatchInfoFooter theme={theme} fixture={fixture} />
               </>
             )}
-            {view === 'info' && <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
+            {view === 'info' && <MatchInfoTimeline theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} events={matchEvents.events} loading={matchEvents.loading} />}
             {view === 'stats' && <MatchStatisticsTab theme={theme} t={t} locale={locale} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />}
             {view === 'highlights' && <HighlightsTab theme={theme} t={t} fixture={fixture} />}
           </div>
