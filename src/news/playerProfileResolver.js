@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { normalize } from '../util/normalize.js';
 import { searchPlayers, getPlayer } from '../lineups/goalApiClient.js';
+import { getSupabaseClient } from '../db/supabaseClient.js';
 
 const TRANSFERMARKT_BASE = 'https://www.transfermarkt.de';
 
@@ -139,9 +140,64 @@ export function extractStats(profile) {
 // country a real club happens to be based in -- detected here by
 // name === country, since a genuine club's own country almost never
 // equals its own name.
-function extractClubAndNationality(profile) {
+// Loaded once per process and cached -- confirmed live (Marcus Thuram at
+// Inter, 2026-09-20): GOAL API's own `team.name` for a tracked club
+// ("Internazionale") routinely spells it differently from our own
+// football-data.org-derived clubs.name ("FC Internazionale Milano").
+// syncPlayerProfiles.js's football-data.org squad walk always writes
+// current_club_name from clubs.name (canonical); this file's own GOAL-API
+// resolution paths (resolveGoalApiProfile/refreshGoalApiProfileById, and
+// syncPlayerProfiles.js's own gapFillProfile()) used to write GOAL API's
+// raw spelling instead -- two different current_club_name strings for the
+// exact same real club, so the same real player ends up on two entirely
+// separate `players` rows (one with a real photo/goal_api_id, one without)
+// with get-team-squad's own `current_club_name = clubs.name` query only
+// ever surfacing the photo-less one on the Kader tab. Resolving GOAL API's
+// name down to our own canonical clubs.name here, before it's ever
+// written, stops that split at the source rather than needing a periodic
+// cleanup pass.
+let trackedClubsPromise = null;
+async function loadTrackedClubs() {
+  if (!trackedClubsPromise) {
+    trackedClubsPromise = getSupabaseClient()
+      .from('clubs')
+      .select('name, crest_url')
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return (data || []).map((c) => ({ name: c.name, crest_url: c.crest_url, normalized: normalize(c.name) }));
+      });
+  }
+  return trackedClubsPromise;
+}
+
+// Same substring-containment heuristic pickBestMatch() already uses for
+// GOAL API's own differently-abbreviated club names -- only trusted when
+// it picks out exactly one tracked club, same "ambiguous stays
+// unresolved rather than guessed at" principle as everywhere else in this
+// file.
+function findTrackedClub(rawName, trackedClubs) {
+  if (!rawName) return null;
+  const target = normalize(rawName);
+  const matches = trackedClubs.filter((c) => c.normalized.includes(target) || target.includes(c.normalized));
+  return matches.length === 1 ? matches[0] : null;
+}
+
+async function extractClubAndNationality(profile) {
   const team = profile.team;
   const isNationalTeamFallback = !!team && team.name === team.country;
+
+  if (team && !isNationalTeamFallback) {
+    const trackedClubs = await loadTrackedClubs();
+    const tracked = findTrackedClub(team.name, trackedClubs);
+    if (tracked) {
+      return {
+        current_club_name: tracked.name,
+        current_club_badge: tracked.crest_url || team.badge || null,
+        nationality_name: profile.country || null,
+        nationality_badge: null,
+      };
+    }
+  }
 
   return {
     current_club_name: team && !isNationalTeamFallback ? team.name || null : null,
@@ -207,7 +263,7 @@ export function pickBestMatch(results, candidateClubNames, searchedName) {
 // which bumps to now() on every successful poll regardless of whether
 // anything changed. Storing this separately is what lets the UI show a
 // real freshness date instead of "when we last happened to ask".
-export function buildProfileFields(profile) {
+export async function buildProfileFields(profile) {
   return {
     goal_api_id: profile.id,
     photo_url: profile.image || null,
@@ -216,7 +272,7 @@ export function buildProfileFields(profile) {
     squad_number: profile.number || null,
     injured: profile.injured === 'Yes',
     goal_api_updated_at: profile.updatedAt || null,
-    ...extractClubAndNationality(profile),
+    ...(await extractClubAndNationality(profile)),
     stats: extractStats(profile),
   };
 }
