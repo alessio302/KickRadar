@@ -425,9 +425,11 @@ export default function EuropaFixtureDetailOverlay({ theme, t, language, fixture
                 <MatchScore fixture={fixture} t={t} theme={theme} style={{ fontSize: '14px', fontWeight: 700 }} />
                 <ClubJersey club={awayClub} size={22} theme={theme} />
               </div>
-              <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>
-                {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
-              </p>
+              {fixture.status !== 'live' && fixture.status !== 'finished' && (
+                <p style={{ fontSize: '12px', color: theme.textMuted, textAlign: 'center', margin: '0 0 12px' }}>
+                  {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
+                </p>
+              )}
             </div>
 
             <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
