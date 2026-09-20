@@ -508,6 +508,76 @@ function MatchEventTimelineRow({ theme, t, event, side }) {
   );
 }
 
+// One column of scorers for one team -- shown as "⚽ 23' Name", ball icon
+// leading on the home (left) side and trailing on the away (right) side so
+// both columns visually lean toward the shared centre gap between them,
+// same mirroring idea as MatchEventContent's icon placement in the
+// timeline this reuses EVENT_ICON/parseMinute from.
+function GoalscorersColumn({ theme, t, scorers, align }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, alignItems: align === 'right' ? 'flex-end' : 'flex-start' }}>
+      {scorers.map((s, i) => (
+        <div
+          key={i}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '11.5px',
+            color: theme.textMuted,
+            flexDirection: align === 'right' ? 'row-reverse' : 'row',
+          }}
+        >
+          <span style={{ fontSize: '10px', lineHeight: 1, flexShrink: 0 }}>{EVENT_ICON.Goal}</span>
+          <span style={{ whiteSpace: 'nowrap' }}>
+            {s.player || '–'}
+            {s.type === 'Own Goal' && ` (${t.matchInfo.ownGoal})`} {s.minute}'
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const GOAL_EVENT_TYPES = new Set(['Goal', 'Own Goal', 'Penalty']);
+
+// Shown right under the score as soon as the overlay opens -- no tab
+// switch needed -- same club_id/team_name side resolution as
+// MatchInfoTimeline below (and the same reason a European fixture's events
+// still resolve correctly via team_name, see that function's own comment),
+// just filtered down to goal-scoring event types and sorted chronologically
+// (earliest first, matching how goalscorers read on a scoreboard) instead
+// of the full timeline's newest-first order.
+export function MatchGoalscorers({ theme, t, fixture, homeClub, awayClub }) {
+  const { events, loading } = useMatchEvents(fixture.id);
+
+  if (loading || (fixture.status !== 'finished' && fixture.status !== 'live')) return null;
+
+  const goals = events.filter((e) => GOAL_EVENT_TYPES.has(e.type)).sort((a, b) => parseMinute(a.minute) - parseMinute(b.minute));
+  if (goals.length === 0) return null;
+
+  const homeGoals = [];
+  const awayGoals = [];
+  for (const g of goals) {
+    const side =
+      g.club_id === homeClub?.id || (g.team_name && g.team_name === homeClub?.name)
+        ? 'home'
+        : g.club_id === awayClub?.id || (g.team_name && g.team_name === awayClub?.name)
+          ? 'away'
+          : null;
+    if (side === 'home') homeGoals.push(g);
+    else if (side === 'away') awayGoals.push(g);
+  }
+  if (homeGoals.length === 0 && awayGoals.length === 0) return null;
+
+  return (
+    <div style={{ display: 'flex', gap: '10px', padding: '0 2px 12px', justifyContent: 'space-between' }}>
+      <GoalscorersColumn theme={theme} t={t} scorers={homeGoals} align="left" />
+      <GoalscorersColumn theme={theme} t={t} scorers={awayGoals} align="right" />
+    </div>
+  );
+}
+
 export function MatchInfoTimeline({ theme, t, fixture, homeClub, awayClub }) {
   const { events, loading } = useMatchEvents(fixture.id);
 
@@ -882,6 +952,8 @@ export default function FixtureDetailOverlay({ theme, t, language, league, fixtu
               {formatKickoff(fixture.kickoff_at, locale, fixture.kickoff_confirmed, t.fixtures.kickoffTbd)}
             </p>
           </div>
+
+          <MatchGoalscorers theme={theme} t={t} fixture={fixture} homeClub={homeClub} awayClub={awayClub} />
 
           {/* Which tab is open at all -- Aufstellungen/Spielinfo -- versus
               which side's lineup is shown within the Aufstellungen tab are
