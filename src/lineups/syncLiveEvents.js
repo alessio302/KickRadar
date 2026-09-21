@@ -134,7 +134,17 @@ const STALE_CHECK_INTERVAL_MS = 15 * 1000;
 // live (or are about to) since the run started, and subscribe to them over
 // the already-open connection -- a match that kicks off mid-run shouldn't
 // have to wait for the next scheduled job invocation.
-const RESCAN_INTERVAL_MS = 60 * 1000;
+//
+// Bumped from 60s (2026-09-21): each tick calls resolveGoalApiIds(), which
+// for any not-yet-cached candidate means a real getLiveLeagueFixtures()
+// call per league still unresolved -- on a busy day with several
+// simultaneous kickoffs across leagues, that repeated every 60s for up to
+// JOB_BUDGET_MS (~14min) per run, 4 runs/hour, was a measurable share of
+// this project's own goal_api_usage going over the FREE plan's 1,000/day
+// cap on real matchdays (2145 on 2026-09-20, 1531 on 2026-09-19). 3 minutes
+// still comfortably beats waiting for the next 15-min scheduled run for a
+// mid-run kickoff, at a fifth of the re-fetch cost.
+const RESCAN_INTERVAL_MS = 3 * 60 * 1000;
 
 // Same slack as syncLiveScores.js's UPCOMING_WINDOW_MS/RECENT_KICKOFF_WINDOW_MS:
 // a scheduled fixture flips to 'live' sometime around kickoff_at, not

@@ -1,5 +1,13 @@
+import path from 'node:path';
 import { normalize } from '../util/normalize.js';
 import { getSupabaseClient } from '../db/supabaseClient.js';
+
+// Identifies which script is making GOAL API calls for goal_api_usage_by_source
+// (sql/067) -- every caller of this file runs as its own `node src/.../foo.js`
+// process (one script per GitHub Actions job), so the entry script's own
+// filename is a reliable, zero-config label without threading a `source`
+// param through every exported function below.
+const CALLER_SOURCE = process.argv[1] ? path.basename(process.argv[1]) : 'unknown';
 
 // Thin adapter around GOAL API's REST + WebSocket surface. Replaces
 // Highlightly for lineup confirmation and match events (goals/cards/
@@ -67,7 +75,7 @@ function retryDelayMs(res, attempt) {
 // record must never be why a real GOAL API call fails, so this only logs.
 async function recordUsage() {
   try {
-    const { error } = await getSupabaseClient().rpc('increment_goal_api_usage');
+    const { error } = await getSupabaseClient().rpc('increment_goal_api_usage', { p_source: CALLER_SOURCE });
     if (error) console.error('Failed to record GOAL API usage:', error.message);
   } catch (err) {
     console.error('Failed to record GOAL API usage:', err.message);
