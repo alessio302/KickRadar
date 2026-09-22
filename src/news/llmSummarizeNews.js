@@ -56,6 +56,28 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Confirmed live (2026-09-22): a Gemini-side 503 "high demand" spell lasting
+// several minutes hit ~25 back-to-back calls across one entire scraper run,
+// every one of them permanently stranding that article without a
+// translation -- runGeneralNewsScraper.js only ever calls this once per
+// item, on first sight, and marks it seen regardless of outcome (see this
+// project's own backfillNewsSummaries.js, written for the exact same
+// failure shape after the previous model's quota exhaustion). A transient
+// server-side overload is retryable in a way a genuine bad-request/auth
+// error isn't -- same isRetryable split goalApiClient.js's call() already
+// uses for its own provider. Capped at 2 retries: this call already sits
+// behind a 6.5s throttle per item, so stacking too much backoff on top
+// risks a big backlog run eating into the workflow's own timeout.
+const RETRY_BACKOFFS_MS = [4000, 8000];
+
+function isRetryableError(err) {
+  // The SDK surfaces a raw provider error body as err.message here (see the
+  // 503 log lines this was written from: `{"error":{"code":503,...}}`), not
+  // a structured status field -- matched on the message text rather than a
+  // property that may not exist on every error shape this call can throw.
+  return /"code":\s*503|UNAVAILABLE|high demand/i.test(err?.message || '');
+}
+
 // Same throttle value/reasoning as llmExtract.js's MIN_CALL_INTERVAL_MS --
 // a separate module-level counter (not imported from there) since this
 // runs in a different process/scraper (runGeneralNewsScraper.js vs
@@ -83,19 +105,29 @@ export async function llmSummarizeNews(title, teaser) {
   // shows the same 500 RPD if this one ever gets deprecated.)
   const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
-  await throttle();
-  const response = await ai.models.generateContent({
-    model,
-    contents: `Headline: ${title}\nTeaser: ${teaser || title}`,
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      responseMimeType: 'application/json',
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  });
+  for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
+    await throttle();
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model,
+        contents: `Headline: ${title}\nTeaser: ${teaser || title}`,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      });
+    } catch (err) {
+      const isLastAttempt = attempt === RETRY_BACKOFFS_MS.length;
+      if (!isRetryableError(err) || isLastAttempt) throw err;
+      await sleep(RETRY_BACKOFFS_MS[attempt]);
+      continue;
+    }
 
-  if (!response.text) {
-    throw new Error('LLM summarization returned no text');
+    if (!response.text) {
+      throw new Error('LLM summarization returned no text');
+    }
+    return JSON.parse(response.text);
   }
-  return JSON.parse(response.text);
 }
