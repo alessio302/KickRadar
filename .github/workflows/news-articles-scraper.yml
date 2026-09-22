@@ -6,7 +6,20 @@ on:
     # (5-15 min polling for these sources) -- unlike the transfer scraper,
     # general match-report/news coverage isn't seasonal (no closed transfer
     # window), so this runs year-round at a steady interval.
-    - cron: '*/15 * * * *'
+    #
+    # Offset to :03/:18/:33/:48 (2026-09-22) -- this was the one 15-min
+    # workflow in the repo still using the literal `*/15 * * * *` pattern.
+    # Confirmed live via this workflow's own run history: actual runs landed
+    # 2-5+ hours apart instead of every 15 minutes (e.g. 06:54 -> 01:50 ->
+    # 23:34 -> 20:33 -> 16:39 on 2026-09-21/22), the exact GitHub Actions
+    # scheduler throttling every other 15-min-cadence workflow here already
+    # works around with its own offset minute (see lineups-sync.yml/
+    # live-events.yml/live-scores.yml/live-scores-european.yml/
+    # lineups-sync-european.yml's own comments) -- this file was just missed
+    # when that fix was applied everywhere else. User-reported: Bundesliga
+    # News cards were arriving up to 16h apart because of this, not because
+    # the sources themselves were quiet.
+    - cron: '3,18,33,48 * * * *'
   workflow_dispatch: {}
 
 jobs:
