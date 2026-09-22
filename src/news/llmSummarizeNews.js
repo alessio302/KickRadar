@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { recordGeminiUsage } from './geminiUsageTracker.js';
 
 // Same Gemini free-tier approach as llmExtract.js (transfers). Returns both
 // a translated headline and a summary in every app language, in ONE call
@@ -118,7 +119,9 @@ export async function llmSummarizeNews(title, teaser) {
           responseSchema: RESPONSE_SCHEMA,
         },
       });
+      await recordGeminiUsage(model);
     } catch (err) {
+      await recordGeminiUsage(model);
       const isLastAttempt = attempt === RETRY_BACKOFFS_MS.length;
       if (!isRetryableError(err) || isLastAttempt) throw err;
       await sleep(RETRY_BACKOFFS_MS[attempt]);
