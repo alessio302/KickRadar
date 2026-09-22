@@ -171,6 +171,17 @@ jobs:
           # cadence below -- still tolerates one missed native tick before
           # re-triggering, just doesn't wait for two.
           check_and_trigger lineups-sync.yml 20     # cadence 15 min
+          # Added 2026-09-22: news-articles-scraper.yml was never on this
+          # list despite the exact same 15-min cadence as lineups-sync.yml
+          # above -- confirmed live it went completely dark for 3+ hours
+          # with zero scheduled runs (06:54 -> nothing) even AFTER its own
+          # cron was fixed from a literal `*/15 * * * *` to an offset
+          # pattern (that fix addressed a DIFFERENT failure mode -- GitHub
+          # throttling several workflows sharing one literal cron pattern --
+          # not this repo's separate, broader "scheduled triggers just don't
+          # fire at all sometimes" issue this whole watchdog exists for).
+          # User-reported: Bundesliga News cards arriving up to 16h apart.
+          check_and_trigger news-articles-scraper.yml 20  # cadence 15 min
           check_and_trigger fixture-reminders.yml 10  # cadence 5 min -- sole path for 30/15-min-before-kickoff pushes, see this file's own top comment
           check_and_trigger live-events.yml 14      # self-loops ~14 min while live -- see this file's own top comment
           check_and_trigger live-scores.yml 13      # self-loops ~13 min while live; see comment above
