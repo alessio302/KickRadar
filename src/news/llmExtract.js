@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { recordGeminiUsage } from './geminiUsageTracker.js';
 
 // Regex-based extraction (extract.js) hit a hard ceiling: RMC Sport alone
 // needed five rounds of prefix/stopword patches (confirmed live each time)
@@ -117,15 +118,23 @@ export async function llmExtractTransferInfo(title, summary) {
   const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   await throttle();
-  const response = await ai.models.generateContent({
-    model,
-    contents: `Headline: ${title}\nSummary: ${summary}`,
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      responseMimeType: 'application/json',
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  });
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model,
+      contents: `Headline: ${title}\nSummary: ${summary}`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+      },
+    });
+  } finally {
+    // Recorded regardless of outcome -- a rejected/erroring call still
+    // counts against Gemini's own RPD, same principle as goalApiClient.js's
+    // recordUsage() (see gemini_usage/sql/068's own comment).
+    await recordGeminiUsage(model);
+  }
 
   if (!response.text) {
     throw new Error('LLM extraction returned no text');
