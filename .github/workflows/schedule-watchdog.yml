@@ -156,7 +156,24 @@ jobs:
           # reach JOB_BUDGET_MS while the job itself is still inside that
           # same budget, and even if it did, live-scores.yml/live-events.yml
           # both already guard against overlap with concurrency groups.
-          check_and_trigger news-scraper.yml 50     # cadence 30 min
+          # Threshold must track news-scraper.yml's OWN cron, not a fixed
+          # assumption -- confirmed live, 2026-09-30: that file's cron was
+          # deliberately dropped to once/week on 2026-09-06 (seasonal
+          # throttle, closed transfer window) but this line stayed at 50
+          # (its old 30-min-cadence value), so this watchdog itself
+          # overrode the throttle -- every run past 50 minutes looked
+          # "stale" and got re-dispatched, running the job 30-50x/day for
+          # three-plus weeks instead of the intended 1x/week, defeating the
+          # whole point of that change (saving GitHub Actions minutes
+          # during a near-zero-content window) while also burning through
+          # this pipeline's own Gemini budget on runs that shouldn't have
+          # existed. 10200 = 7 days (10080 min) + ~2h slack for the native
+          # scheduler landing a bit late, same "cadence + slack" shape as
+          # every other threshold here. MUST be changed back to 50 in the
+          # same commit that restores news-scraper.yml's own cron to
+          # '4,34 * * * *' (see that file's own comment) -- these two
+          # values only ever make sense together.
+          check_and_trigger news-scraper.yml 10200  # cadence 1x/week (seasonal throttle, see news-scraper.yml)
           # Tightened 25->20 -- confirmed live 2026-09-19 (Roma vs Inter):
           # a genuine ~29min gap between successful runs (16:45:29 ->
           # manual 17:14:42) sat entirely inside the old 25-min threshold

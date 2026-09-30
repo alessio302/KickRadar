@@ -16,6 +16,15 @@ on:
     #   - cron: '4,34 * * * *'
     # That comment's own reasoning (why 30 not 15 min, why :04/:34 not
     # :00/:30) still applies unchanged once restored.
+    #
+    # IMPORTANT: schedule-watchdog.yml's own check_and_trigger for this
+    # workflow MUST change back to 50 (its old 30-min-cadence value) in the
+    # SAME commit that restores the cron above -- confirmed live,
+    # 2026-09-30: leaving that threshold at its seasonal-throttle value
+    # (10200, ~1x/week) once this file goes back to running every 30
+    # minutes just means the watchdog re-triggers it almost immediately on
+    # top of its own native schedule, the opposite problem from the one
+    # that caused this note to be written.
     - cron: '0 3 * * 1'
   workflow_dispatch: {}
 
