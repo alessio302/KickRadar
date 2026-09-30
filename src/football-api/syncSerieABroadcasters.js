@@ -3,16 +3,16 @@ import { resolveClub } from '../news/clubMatch.js';
 import { llmExtractBroadcasts } from './llmExtractBroadcasts.js';
 import { hasGeminiBudgetRemaining } from '../news/geminiUsageTracker.js';
 
-// gemini-3.6-flash, not gemini-3.5-flash-lite -- matches
-// llmExtractBroadcasts.js's own model choice (see that file's own comment
-// for why: gemini_usage shows real headroom here most days, unlike
-// gemini-3.5-flash-lite's 500 RPD cap, which runGeneralNewsScraper.js alone
-// already blows past most days). ~1,500 RPD, per llmExtract.js's own
-// confirmed-live test. No safety margin needed here (unlike
+// gemini-3.5-flash-lite, matching llmExtractBroadcasts.js's own reverted
+// model choice -- see that file's own comment: gemini-3.6-flash's real cap
+// turned out to be 20 RPD (confirmed live, 2026-09-30), not the ~1,500
+// this project believed until that same day, making it effectively always
+// empty. 500 RPD here, shared with News, is still the better bet for a
+// single occasional call. No safety margin needed (unlike
 // goalApiClient.js's 50-request margin for a whole run's worth of calls) --
 // this only ever spends exactly one call, so "any room at all" is enough.
-const GEMINI_MODEL = 'gemini-3.6-flash';
-const GEMINI_DAILY_LIMIT = 1500;
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_DAILY_LIMIT = 500;
 
 // Serie A is the one league whose "which channel?" pill (web/src/lib/
 // broadcasters.js) can't be a static day/time rule -- confirmed live

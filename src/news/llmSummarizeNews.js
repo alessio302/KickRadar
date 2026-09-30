@@ -98,19 +98,16 @@ export async function llmSummarizeNews(title, teaser) {
   const ai = getClient();
   // This pipeline's very first real run on gemini-3.6-flash exhausted its
   // quota after only ~20 calls that day (every summary silently came back
-  // null) -- read at the time as "this model's free-tier cap is 20 RPD".
-  // Revisited 2026-09-30 with gemini_usage's own per-model numbers now in
-  // hand: llmExtract.js's own confirmed-live test puts gemini-3.6-flash's
-  // real cap at ~1,500 RPD, and runNewsScraper.js (Transfers) alone
-  // regularly spends 1,100-1,700+ of that most days. The quota is per
-  // MODEL, shared across every caller on this account -- News's first run
-  // that day almost certainly landed after Transfers had already spent
-  // most of the day's real 1,500 budget, leaving News only the ~20-request
-  // remainder, not a genuine 20 RPD ceiling. Kept on gemini-3.5-flash-lite
-  // regardless (500 RPD, its own separate per-model bucket) -- switching
-  // back to share gemini-3.6-flash with Transfers' own already-tight budget
-  // wouldn't help News's much higher volume (150-200+ summarizable
-  // items/day) either way.
+  // null). Re-confirmed live, independently, 2026-09-30: a fresh
+  // RESOURCE_EXHAUSTED response from that exact model states plainly
+  // "limit: 20, model: gemini-3.6-flash" -- so 20 RPD really is this
+  // model's actual free-tier cap, not a fluke of bad timing. (llmExtract.js
+  // briefly believed it had ~1,500 RPD instead and moved Transfers onto it
+  // on that basis -- also corrected the same day once this same live error
+  // surfaced again.) gemini-3.5-flash-lite's own separate 500 RPD bucket is
+  // comfortably the larger of the two, which is exactly why this pipeline
+  // stayed here rather than "switching back" to a model that can't support
+  // any real volume at all.
   const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
   for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {

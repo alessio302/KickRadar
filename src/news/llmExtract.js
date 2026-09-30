@@ -87,23 +87,22 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Confirmed live: the free tier caps gemini-3.6-flash at 10
-// requests/minute (gemini-3.5-flash-lite, used here until this switch, was
-// 15/min but only 500 requests/DAY -- confirmed live via a real
-// RESOURCE_EXHAUSTED response, and confirmed to be the actually-binding
-// constraint: sampled production runs averaged ~61 items/run falling back
-// to the regex heuristic, with the daily cap already exhausted within
-// seconds of most jobs starting. gemini-3.6-flash's 1,500/day headroom is
-// worth the lower per-minute rate). RMC Sport alone can have 60+
-// genuinely-new items on a first run (steady-state hourly runs will see
-// far fewer), and firing them all back-to-back blew through the
-// per-minute limit almost immediately -- every single call 429'd and
-// silently fell back to the regex heuristic, which looked like "the LLM
-// extraction isn't working" but was really "we never gave it a chance to
-// run". Spacing calls to stay under the cap (6.5s apart, a bit of margin
-// over the exact 6s/request ceiling) fixes that; the tradeoff is a big
-// backlog takes minutes to clear -- fine for a scheduled background job
-// with a 10-minute job timeout, not fine for anything latency-sensitive.
+// Moved BACK to gemini-3.5-flash-lite (2026-09-30) -- this file switched to
+// gemini-3.6-flash believing it had 1,500 RPD (see this repo's own prior
+// comment history), but a live RESOURCE_EXHAUSTED response from THIS exact
+// model, TODAY, states plainly: "limit: 20, model: gemini-3.6-flash". That
+// 1,500 figure was wrong (or the free tier was cut since) -- 20 RPD is
+// nowhere near enough for this pipeline's real volume (hundreds of
+// genuinely-new items/day across 6 sources), and gemini_usage's own
+// 1,100-1,700 "requests"/day for this model was never real usage: it was
+// this file retrying the same guaranteed-429 call for every single new
+// item, all day, for nothing (confirmed live, 2026-09-30: the very FIRST
+// call of one run already 429'd, and the transfers table shows only ~15%
+// of the last 14 days' rows got a real AI summary -- the other ~85% were
+// silently running on the regex fallback the whole time). Back on
+// gemini-3.5-flash-lite's real 500 RPD -- shared with News's own
+// llmSummarizeNews.js, so still not enough for combined demand, but at
+// least an actually usable budget instead of a 20-request mirage.
 const MIN_CALL_INTERVAL_MS = 6500;
 let lastCallAt = 0;
 
@@ -115,7 +114,7 @@ async function throttle() {
 
 export async function llmExtractTransferInfo(title, summary) {
   const ai = getClient();
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
   await throttle();
   let response;

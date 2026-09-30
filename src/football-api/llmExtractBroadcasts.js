@@ -56,17 +56,16 @@ function getClient() {
 
 export async function llmExtractBroadcasts(pageText) {
   const ai = getClient();
-  // gemini-3.6-flash, not gemini-3.5-flash-lite (switched 2026-09-30) --
-  // this call shares whichever model's quota it uses with one of the two
-  // existing News/Transfers pipelines regardless, but gemini_usage's own
-  // numbers show gemini-3.5-flash-lite's 500 RPD cap already blown past by
-  // runGeneralNewsScraper.js alone most days (700-1200+/day), while
-  // gemini-3.6-flash's ~1,500 RPD cap (see llmExtract.js's own confirmed-
-  // live test) still has real headroom on most days despite runNewsScraper.js's
-  // own 1,100-1,700+/day. This call only ever spends exactly one request,
-  // twice a week -- landing in whichever bucket is less likely to already
-  // be empty matters far more here than for either high-volume pipeline.
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  // Reverted back to gemini-3.5-flash-lite (2026-09-30, same day as the
+  // switch to gemini-3.6-flash) -- that switch assumed gemini-3.6-flash had
+  // ~1,500 RPD of headroom, based on llmExtract.js's own (apparently wrong,
+  // or since-cut) comment. A live RESOURCE_EXHAUSTED response from that
+  // exact model, same day, says otherwise: "limit: 20, model:
+  // gemini-3.6-flash". 20 RPD is effectively always gone (runNewsScraper.js
+  // alone exhausts it within the first call of most runs) -- far worse odds
+  // for this single occasional call than gemini-3.5-flash-lite's real
+  // 500 RPD, even shared with News's own high volume.
+  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
   let response;
   try {
