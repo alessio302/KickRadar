@@ -5,6 +5,7 @@ import { classifyOfficial } from './classify.js';
 import { isTransferRelevant, isWomensFootball } from './relevance.js';
 import { extractTransferInfo } from './extract.js';
 import { llmExtractTransferInfo } from './llmExtract.js';
+import { hasGeminiBudgetRemaining } from './geminiUsageTracker.js';
 import { fetchArticleText } from './articleBody.js';
 import { resolveClub } from './clubMatch.js';
 import { resolvePlayerProfile } from './playerProfileResolver.js';
@@ -101,7 +102,28 @@ function isNameVariant(a, b) {
 // heuristic only kicks in if the API call itself fails (rate limit, outage,
 // missing key), so a bad run degrades to the old behavior instead of losing
 // the item entirely.
+//
+// Cached per-process, not re-checked per item (2026-09-30): confirmed live
+// this pipeline's own gemini-3.5-flash-lite budget (shared with News, see
+// llmExtract.js's own comment) is typically gone well before a run's own
+// backlog is -- without this, every remaining item still paid the full
+// 6.5s throttle wait AND a real network round trip just to get the same
+// 429 back, one at a time, for the rest of the run. Once confirmed
+// exhausted, stays exhausted for the rest of this process (the real quota
+// is daily, so there's nothing to gain re-checking within one run) -- the
+// small risk of a stale "exhausted" read is irrelevant next to skipping
+// dozens of doomed calls.
+let geminiBudgetKnownExhausted = false;
+
 async function extractInfo(item, clubs, sourceKey) {
+  if (!geminiBudgetKnownExhausted && !(await hasGeminiBudgetRemaining('gemini-3.5-flash-lite', 500))) {
+    geminiBudgetKnownExhausted = true;
+  }
+  if (geminiBudgetKnownExhausted) {
+    const isOfficial = classifyOfficial(sourceKey, `${item.title} ${item.summary || ''}`);
+    const { playerName, fromClub, toClub } = extractTransferInfo(item.title, clubs, sourceKey);
+    return { playerName, fromClub, toClub, isOfficial, aiSummary: null, source: 'regex' };
+  }
   try {
     const result = await llmExtractTransferInfo(item.title, item.summary || item.title);
     return { ...result, source: 'llm' };
