@@ -96,14 +96,21 @@ async function throttle() {
 
 export async function llmSummarizeNews(title, teaser) {
   const ai = getClient();
-  // Confirmed live (this project's own AI Studio quota page, 2026-09-17):
-  // gemini-3.6-flash's free-tier daily cap is 20 RPD -- far too low for
-  // News's volume (150-200+ summarizable items/day), and it's what
-  // exhausted the quota on this pipeline's very first real run (every
-  // summary silently came back null). gemini-3.5-flash-lite's free-tier
-  // cap is 500 RPD on the same account/project -- 25x more headroom,
-  // comfortably covers current volume, still $0. (gemini-3.1-flash-lite
-  // shows the same 500 RPD if this one ever gets deprecated.)
+  // This pipeline's very first real run on gemini-3.6-flash exhausted its
+  // quota after only ~20 calls that day (every summary silently came back
+  // null) -- read at the time as "this model's free-tier cap is 20 RPD".
+  // Revisited 2026-09-30 with gemini_usage's own per-model numbers now in
+  // hand: llmExtract.js's own confirmed-live test puts gemini-3.6-flash's
+  // real cap at ~1,500 RPD, and runNewsScraper.js (Transfers) alone
+  // regularly spends 1,100-1,700+ of that most days. The quota is per
+  // MODEL, shared across every caller on this account -- News's first run
+  // that day almost certainly landed after Transfers had already spent
+  // most of the day's real 1,500 budget, leaving News only the ~20-request
+  // remainder, not a genuine 20 RPD ceiling. Kept on gemini-3.5-flash-lite
+  // regardless (500 RPD, its own separate per-model bucket) -- switching
+  // back to share gemini-3.6-flash with Transfers' own already-tight budget
+  // wouldn't help News's much higher volume (150-200+ summarizable
+  // items/day) either way.
   const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
   for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
