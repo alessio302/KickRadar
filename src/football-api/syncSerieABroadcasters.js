@@ -1,6 +1,16 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { llmExtractBroadcasts } from './llmExtractBroadcasts.js';
+import { hasGeminiBudgetRemaining } from '../news/geminiUsageTracker.js';
+
+// gemini-3.5-flash-lite's own confirmed free-tier cap (see
+// llmSummarizeNews.js's own comment) -- this sync shares that same
+// account-wide quota with runGeneralNewsScraper.js, which alone routinely
+// spends past it most days (confirmed live via gemini_usage, 2026-09-30).
+// No safety margin needed here (unlike goalApiClient.js's 50-request
+// margin for a whole run's worth of calls) -- this only ever spends
+// exactly one call, so "any room at all" is enough.
+const GEMINI_DAILY_LIMIT = 500;
 
 // Serie A is the one league whose "which channel?" pill (web/src/lib/
 // broadcasters.js) can't be a static day/time rule -- confirmed live
@@ -27,6 +37,14 @@ async function fetchPageText() {
 }
 
 export async function syncSerieABroadcasters() {
+  // Checked before the page fetch or any DB read below -- this run's whole
+  // point is the one llmExtractBroadcasts() call at the end, so there's
+  // nothing else worth doing if that's already doomed to fail today.
+  if (!(await hasGeminiBudgetRemaining('gemini-3.5-flash-lite', GEMINI_DAILY_LIMIT))) {
+    console.error('Serie A broadcaster sync: Gemini daily budget exhausted, skipping this run entirely.');
+    return { extracted: 0, matched: 0, unmatched: 0, skippedBudget: true };
+  }
+
   const supabase = getSupabaseClient();
 
   const { data: league, error: leagueErr } = await supabase.from('leagues').select('id').eq('slug', 'serie-a').single();

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { recordGeminiUsage } from '../news/geminiUsageTracker.js';
 
 // Same Gemini free-tier approach as news/llmExtract.js (and this project's
 // stated "stay free" constraint) -- extracts {homeTeam, awayTeam, providers}
@@ -57,15 +58,23 @@ export async function llmExtractBroadcasts(pageText) {
   const ai = getClient();
   const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: pageText,
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      responseMimeType: 'application/json',
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  });
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model,
+      contents: pageText,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+      },
+    });
+  } finally {
+    // Recorded regardless of outcome -- this call shares gemini-3.5-flash-lite's
+    // account-wide RPD with runGeneralNewsScraper.js's own llmSummarizeNews.js
+    // calls (see gemini_usage/geminiUsageTracker.js's own comment).
+    await recordGeminiUsage(model);
+  }
 
   if (!response.text) {
     throw new Error('LLM broadcast extraction returned no text');
