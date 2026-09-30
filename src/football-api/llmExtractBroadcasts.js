@@ -56,7 +56,17 @@ function getClient() {
 
 export async function llmExtractBroadcasts(pageText) {
   const ai = getClient();
-  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+  // gemini-3.6-flash, not gemini-3.5-flash-lite (switched 2026-09-30) --
+  // this call shares whichever model's quota it uses with one of the two
+  // existing News/Transfers pipelines regardless, but gemini_usage's own
+  // numbers show gemini-3.5-flash-lite's 500 RPD cap already blown past by
+  // runGeneralNewsScraper.js alone most days (700-1200+/day), while
+  // gemini-3.6-flash's ~1,500 RPD cap (see llmExtract.js's own confirmed-
+  // live test) still has real headroom on most days despite runNewsScraper.js's
+  // own 1,100-1,700+/day. This call only ever spends exactly one request,
+  // twice a week -- landing in whichever bucket is less likely to already
+  // be empty matters far more here than for either high-volume pipeline.
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   let response;
   try {
@@ -70,9 +80,9 @@ export async function llmExtractBroadcasts(pageText) {
       },
     });
   } finally {
-    // Recorded regardless of outcome -- this call shares gemini-3.5-flash-lite's
-    // account-wide RPD with runGeneralNewsScraper.js's own llmSummarizeNews.js
-    // calls (see gemini_usage/geminiUsageTracker.js's own comment).
+    // Recorded regardless of outcome -- shares this model's account-wide
+    // RPD with whichever other pipeline also uses it (see this function's
+    // own comment above, and gemini_usage/geminiUsageTracker.js's own).
     await recordGeminiUsage(model);
   }
 
