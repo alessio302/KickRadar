@@ -3,6 +3,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { findMentionedClubs } from './clubMatch.js';
 import { findDuplicateArticle } from './dedupeNews.js';
 import { llmSummarizeNews } from './llmSummarizeNews.js';
+import { hasGeminiBudgetRemaining } from './geminiUsageTracker.js';
 import { fetchOgImage } from './ogImage.js';
 import { isWomensFootball } from './relevance.js';
 
@@ -44,6 +45,32 @@ async function markSeen(supabase, sourceKey, externalId) {
     .from('seen_news_items')
     .upsert({ source: sourceKey, external_id: externalId }, { onConflict: 'source,external_id' });
   if (error) console.error(`[${sourceKey}] failed to record seen item:`, error.message);
+}
+
+// Same per-process cache as runNewsScraper.js's geminiBudgetKnownExhausted:
+// once gemini-3.5-flash-lite's daily 500 RPD is confirmed gone, every
+// remaining item in this run would only pay the 6.5s throttle plus a doomed
+// network call for the same 429 (confirmed live 2026-10-03: ~1,150 calls/day
+// against a 500 cap, summaries and translated titles missing from ~16:30 UTC
+// until the quota reset). The article is still stored without a summary,
+// exactly as before -- backfillNewsSummaries.js fills it in later.
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_DAILY_LIMIT = 500;
+let geminiBudgetKnownExhausted = false;
+
+async function summarizeIfBudgetAllows(sourceKey, item) {
+  if (!geminiBudgetKnownExhausted && !(await hasGeminiBudgetRemaining(GEMINI_MODEL, GEMINI_DAILY_LIMIT))) {
+    geminiBudgetKnownExhausted = true;
+    console.warn(`Gemini daily budget for ${GEMINI_MODEL} is exhausted; storing remaining articles without AI summary/translated title.`);
+  }
+  if (geminiBudgetKnownExhausted) return null;
+  try {
+    return await llmSummarizeNews(item.title, item.summary);
+  } catch (err) {
+    if (/RESOURCE_EXHAUSTED|"code":\s*429/.test(err?.message || '')) geminiBudgetKnownExhausted = true;
+    console.warn(`[${sourceKey}] LLM summarization failed, storing without AI summary/translated title:`, err.message);
+    return null;
+  }
 }
 
 async function scrapeSource(supabase, source, allClubs) {
@@ -103,12 +130,19 @@ async function scrapeSource(supabase, source, allClubs) {
     // silently lose the article (matches runNewsScraper.js's own ordering
     // intent), but AFTER the relevance gate above, so an irrelevant item
     // never costs an API call.
-    let llmResult = null;
-    try {
-      llmResult = await llmSummarizeNews(item.title, item.summary);
-    } catch (err) {
-      console.warn(`[${source.sourceKey}] LLM summarization failed, storing without AI summary/translated title:`, err.message);
+    // Dedupe BEFORE the LLM call: a story another outlet already covered
+    // used to cost a full summarization call and was then thrown away
+    // (e.g. 10 of 19 new tuttomercatoweb items in one run). Only leagues
+    // where the article is genuinely new need a summary at all.
+    const duplicateByLeague = new Map();
+    for (const leagueId of leagueIds) {
+      duplicateByLeague.set(
+        leagueId,
+        await findDuplicateArticle(supabase, { leagueId, title: item.title, publishedAt: item.publishedAt })
+      );
     }
+    const needsSummary = leagueIds.some((id) => !duplicateByLeague.get(id));
+    const llmResult = needsSummary ? await summarizeIfBudgetAllows(source.sourceKey, item) : null;
 
     await markSeen(supabase, source.sourceKey, externalId);
 
@@ -119,12 +153,7 @@ async function scrapeSource(supabase, source, allClubs) {
       // which updates the existing row toward the newer/more-complete
       // version -- see dedupeNews.js's header comment for why News's
       // policy is deliberately simpler).
-      const duplicate = await findDuplicateArticle(supabase, {
-        leagueId,
-        title: item.title,
-        publishedAt: item.publishedAt,
-      });
-      if (duplicate) {
+      if (duplicateByLeague.get(leagueId)) {
         deduped += 1;
         continue;
       }
