@@ -130,7 +130,10 @@ async function call(path, params = {}) {
     const body = await res.text();
     if (res.ok) return JSON.parse(body);
 
-    const isRetryable = res.status === 429 || res.status === 502;
+    // 503/504 are the same transient upstream failure as 502 (confirmed
+    // live 2026-10-02: a Cloudflare 504 gateway time-out on
+    // /leagues/:id/teams killed the whole European H2H sync run).
+    const isRetryable = res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
     const isLastAttempt = attempt === RETRY_BACKOFFS_MS.length;
     if (!isRetryable || isLastAttempt) {
       const err = new Error(`GOAL API request failed: ${res.status} ${res.statusText} ${body}`);
