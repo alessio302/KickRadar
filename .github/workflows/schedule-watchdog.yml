@@ -86,6 +86,23 @@ jobs:
           REPO="${{ github.repository }}"
           REF="${{ github.ref_name }}"
 
+          # GitHub's own API intermittently answers 502/504 (confirmed live
+          # 2026-10-03: a bare `gh: ... (HTTP 504)` on one workflow's lookup
+          # aborted the whole run under `set -e`, so every workflow after it
+          # in the list went unchecked). Retry a few times, and if it still
+          # fails, record it and carry on with the remaining workflows
+          # instead of dying on the first one.
+          FAILED_CHECKS=0
+          gh_retry() {
+            local attempt
+            for attempt in 1 2 3; do
+              if "$@"; then return 0; fi
+              echo "gh call failed (attempt $attempt/3): $*" >&2
+              [ "$attempt" -lt 3 ] && sleep $((attempt * 5))
+            done
+            return 1
+          }
+
           check_and_trigger() {
             local workflow="$1"
             local threshold_min="$2"
@@ -97,7 +114,11 @@ jobs:
             # on every single watchdog tick even seconds after this exact
             # function had just dispatched a successful run itself --
             # harmless (syncLineups.js etc. are idempotent) but pointless.
-            last_run=$(gh api "repos/$REPO/actions/workflows/$workflow/runs?status=success&per_page=1" --jq '.workflow_runs[0].created_at // empty')
+            if ! last_run=$(gh_retry gh api "repos/$REPO/actions/workflows/$workflow/runs?status=success&per_page=1" --jq '.workflow_runs[0].created_at // empty'); then
+              echo "$workflow: could not read run history from the GitHub API -- skipping this check."
+              FAILED_CHECKS=$((FAILED_CHECKS + 1))
+              return
+            fi
 
             if [ -z "$last_run" ]; then
               echo "$workflow: no prior successful run found -- skipping."
@@ -112,7 +133,7 @@ jobs:
 
             if [ "$gap_min" -ge "$threshold_min" ]; then
               echo "$workflow: gap exceeds threshold -- dispatching manually."
-              gh workflow run "$workflow" --repo "$REPO" --ref "$REF"
+              gh_retry gh workflow run "$workflow" --repo "$REPO" --ref "$REF" || FAILED_CHECKS=$((FAILED_CHECKS + 1))
             else
               echo "$workflow: gap is within the normal range -- nothing to do."
             fi
@@ -205,3 +226,8 @@ jobs:
           check_and_trigger live-scores-european.yml 13  # same self-loop shape as live-scores.yml
           check_and_trigger fixtures-sync.yml 400   # cadence 360 min (4x/day)
           check_and_trigger highlights-sync.yml 50  # cadence 30 min
+
+          if [ "$FAILED_CHECKS" -gt 0 ]; then
+            echo "$FAILED_CHECKS check(s) could not complete because of GitHub API errors."
+            exit 1
+          fi
