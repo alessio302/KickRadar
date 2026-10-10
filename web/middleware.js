@@ -16,8 +16,8 @@
 // shared, non-per-user secret is to hardcode it directly in the source
 // that owns it (see supabase/functions/goal-api-webhook's WEBHOOK_TOKEN/
 // SIGNING_SECRET). Change both here to rotate.
-const SITE_PASSWORD = 'kickradar-preview-2026';
-const COOKIE_SECRET = 'f3a7c1e9b6d24f0a8c5e7b1d9a3f6c02';
+const SITE_PASSWORD = 'ziUvvwqm4KI8XZqxvDvl';
+const COOKIE_SECRET = '2ead535c7e34857c1b098b5fff6f4c6d';
 const COOKIE_NAME = 'kr_gate';
 const LOGIN_PATH = '/login';
 
