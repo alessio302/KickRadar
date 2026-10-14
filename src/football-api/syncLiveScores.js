@@ -375,6 +375,11 @@ async function pollOnce(supabase, clubById) {
       .update({
         status: newStatus,
         ...(scoreRegressed ? null : { home_score: homeScore, away_score: awayScore }),
+        // A match called off or suspended for good never resumes, so its
+        // last in-play minute (e.g. "27") must not stay behind as if still
+        // live. Confirmed live 2026-10-12: Rayo-Athletic kept live_minute 27
+        // on a 'cancelled' row.
+        ...(newStatus === 'postponed' || newStatus === 'cancelled' ? { live_minute: null } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('external_fixture_id', m.id)

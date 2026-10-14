@@ -134,6 +134,11 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
   let statusLabel;
   if (isFinished) {
     statusLabel = t.fixtures.finished;
+  } else if (fixture.status === 'cancelled' || fixture.status === 'postponed') {
+    // Confirmed live 2026-10-12 (Rayo-Athletic): a match called off or
+    // suspended for good used to fall through to the kickoff time below,
+    // so it read as a match that never started. Shown explicitly instead.
+    statusLabel = fixture.status === 'cancelled' ? t.fixtures.cancelled : t.fixtures.postponed;
   } else if (isLive) {
     statusLabel = fixture.live_minute ? (fixture.live_minute === 'HT' ? fixture.live_minute : `${fixture.live_minute}'`) : t.fixtures.live;
   } else if (fixture.kickoff_confirmed === false) {
