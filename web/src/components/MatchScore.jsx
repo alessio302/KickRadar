@@ -36,5 +36,9 @@ export default function MatchScore({ fixture, t, theme, style }) {
     return <span style={style}>{scoreText}</span>;
   }
 
+  if (fixture.status === 'cancelled' || fixture.status === 'postponed') {
+    return <span style={{ ...style, fontSize: '9px', fontWeight: 800, letterSpacing: '0.03em' }}>{fixture.status === 'cancelled' ? t.fixtures.cancelled : t.fixtures.postponed}</span>;
+  }
+
   return <span style={style}>{t.common.vs}</span>;
 }
