@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { refreshGoalApiProfileById } from './playerProfileResolver.js';
+import { hasGoalApiBudgetRemaining } from '../lineups/goalApiClient.js';
 
 // Player profiles were previously a permanent one-time snapshot: once
 // resolveGoalApiProfile() succeeded for a player, nothing ever asked GOAL
@@ -46,6 +47,12 @@ const BATCH_SIZE = 15;
 const CANDIDATE_POOL_SIZE = BATCH_SIZE * 8;
 
 async function main() {
+  // Shared daily GOAL API cap -- skip rather than spend retries on 429s.
+  if (!(await hasGoalApiBudgetRemaining())) {
+    console.error('Refresh player profiles: GOAL API daily budget exhausted, skipping this run.');
+    return;
+  }
+
   const supabase = getSupabaseClient();
 
   const { data: trackedClubs, error: clubsErr } = await supabase.from('clubs').select('name').not('goal_api_id', 'is', null);

@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { getAllLeagueFixtures } from '../lineups/goalApiClient.js';
+import { getAllLeagueFixtures, hasGoalApiBudgetRemaining } from '../lineups/goalApiClient.js';
 import { sleep } from './client.js';
 import { extractStatus, extractScore } from './syncEuropeanFixtures.js';
 
@@ -57,24 +57,33 @@ const RECENT_KICKOFF_WINDOW_MS = 15 * 60 * 1000;
 // (this run's own earlier poll, or a previous run) needs to keep being
 // gated in too, not just one about to kick off -- the original name/scope
 // (hasFixtureStartingSoon) undersold what this now checks.
-async function hasFixtureNeedingAttention(supabase, uefaLeagueIds) {
+//
+// Returns the set of league ids (not just a boolean) so pollOnce() can skip
+// any single competition with nothing live and nothing about to kick off --
+// confirmed live (2026-10-14, a Champions League matchday): this job polled
+// all three UEFA competitions every 2 minutes whenever ANY one of them had
+// something on, using 1730 requests that day against the 1000/day budget,
+// most of them for competitions with no match in play at all.
+async function leaguesNeedingAttention(supabase, uefaLeagueIds) {
   const now = new Date();
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from('fixtures')
-    .select('id', { count: 'exact', head: true })
+    .select('league_id')
     .in('league_id', uefaLeagueIds)
     .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
-  return (count ?? 0) > 0;
+  return new Set((data ?? []).map((r) => r.league_id));
 }
 
-async function pollOnce(supabase) {
+async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
   let updated = 0;
   let stillLive = false;
 
   for (const comp of UEFA_COMPETITIONS) {
+    if (!activeLeagueIds.has(leagueIdBySlug.get(comp.slug))) continue;
+
     let apiFixtures;
     try {
       // Confirmed live (2026-09-18): getLeagueFixtures(id, date)'s own
@@ -134,28 +143,39 @@ export async function syncEuropeanLiveScores() {
 
   const { data: dbLeagues, error: leagueErr } = await supabase
     .from('leagues')
-    .select('id')
+    .select('id, slug')
     .in('slug', UEFA_COMPETITIONS.map((c) => c.slug));
   if (leagueErr) throw leagueErr;
   const uefaLeagueIds = dbLeagues.map((l) => l.id);
   if (uefaLeagueIds.length === 0) return { polls: 0, totalUpdated: 0 };
+  const leagueIdBySlug = new Map(dbLeagues.map((l) => [l.slug, l.id]));
 
   // Gate before the very first poll, not just between polls -- see
-  // hasFixtureNeedingAttention()'s own comment for why this was missing.
-  if (!(await hasFixtureNeedingAttention(supabase, uefaLeagueIds))) {
-    return { polls: 0, totalUpdated: 0 };
-  }
+  // leaguesNeedingAttention()'s own comment for why this was missing.
+  let active = await leaguesNeedingAttention(supabase, uefaLeagueIds);
+  if (active.size === 0) return { polls: 0, totalUpdated: 0 };
 
   const deadline = Date.now() + JOB_BUDGET_MS;
   let polls = 0;
   let totalUpdated = 0;
 
   while (Date.now() < deadline) {
-    const { updated, stillLive } = await pollOnce(supabase);
+    // Checked before every poll, not just once up front: a single 14-minute
+    // run can span the whole day's remaining budget. Confirmed live
+    // (2026-10-14): this job ignored the shared daily cap entirely and
+    // spent it by midday, leaving syncLiveEvents.js and the lineup sync
+    // with nothing for the rest of the evening.
+    if (!(await hasGoalApiBudgetRemaining())) {
+      console.error('European live scores: GOAL API daily budget exhausted, stopping this run.');
+      break;
+    }
+
+    const { updated, stillLive } = await pollOnce(supabase, active, leagueIdBySlug);
     polls += 1;
     totalUpdated += updated;
 
-    const keepGoing = stillLive || (await hasFixtureNeedingAttention(supabase, uefaLeagueIds));
+    active = await leaguesNeedingAttention(supabase, uefaLeagueIds);
+    const keepGoing = stillLive || active.size > 0;
     if (!keepGoing) break;
 
     await sleep(POLL_INTERVAL_MS);
