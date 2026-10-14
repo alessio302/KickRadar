@@ -30,7 +30,7 @@
 // clubs like Real Madrid aren't in that table either.
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
-import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
+import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { normalize } from '../util/normalize.js';
 import { buildEventRowsFromRest } from './eventRows.js';
@@ -75,6 +75,14 @@ export function namesLooselyMatch(a, b) {
 }
 
 export async function syncEuropeanLineups() {
+  // Same shared daily GOAL API cap as syncLiveEvents.js -- every lineup/
+  // event/card/substitution fetch here 429s once it's spent, retries count
+  // against it too, and no lineup gets written. Skip the whole run instead.
+  if (!(await hasGoalApiBudgetRemaining())) {
+    console.error('European lineups: GOAL API daily budget exhausted, skipping this run.');
+    return { checked: 0, confirmed: 0, eventsFetched: 0, skippedBudget: true };
+  }
+
   const supabase = getSupabaseClient();
   const now = new Date();
   const windowStart = new Date(now.getTime() - LOOKBACK_MIN * 60000).toISOString();

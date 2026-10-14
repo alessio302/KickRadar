@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
-import { getTeamSquad, searchPlayers, getPlayer } from './goalApiClient.js';
+import { getTeamSquad, searchPlayers, getPlayer, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { normalize } from '../util/normalize.js';
 import { POSITION_SINGULAR, STAT_FIELDS, extractStats, pickBestMatch, buildProfileFields } from '../news/playerProfileResolver.js';
 
@@ -178,6 +178,13 @@ function buildFieldsFromSquadEntry(p, club) {
 }
 
 export async function syncPlayerProfiles() {
+  // Shared daily GOAL API cap -- see syncEuropeanLineups.js for why a run
+  // that starts with nothing left should exit now rather than burn retries.
+  if (!(await hasGoalApiBudgetRemaining())) {
+    console.error('Player profiles: GOAL API daily budget exhausted, skipping this run.');
+    return { skippedBudget: true };
+  }
+
   const supabase = getSupabaseClient();
 
   const { data: clubs, error: clubsErr } = await supabase
