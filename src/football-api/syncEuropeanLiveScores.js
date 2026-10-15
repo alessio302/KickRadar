@@ -148,6 +148,7 @@ async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
     }
 
     const unresolved = await loadUnresolvedCandidates(supabase, leagueIdBySlug.get(comp.slug));
+    const unmatchedGoal = [];
 
     for (const f of apiFixtures) {
       const fetchedStatus = extractStatus(f);
@@ -181,7 +182,10 @@ async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
       }
 
       const match = findUnresolvedMatch(f, unresolved);
-      if (!match) continue;
+      if (!match) {
+        unmatchedGoal.push(`${f.homeTeam?.name ?? f.homeTeamName} vs ${f.awayTeam?.name ?? f.awayTeamName} (${fetchedStatus})`);
+        continue;
+      }
       const { error: resolveErr } = await supabase
         .from('fixtures')
         .update({ ...values, goal_api_id: goalApiId })
@@ -193,6 +197,16 @@ async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
       console.log(`Resolved goal_api_id ${goalApiId} onto fixture ${match.id} by team names`);
       unresolved.splice(unresolved.indexOf(match), 1);
       updated += 1;
+    }
+
+    // Logged, not silent: a GOAL fixture that matched no row, while rows for
+    // the same competition are still missing a goal_api_id, is the exact
+    // shape of the 14.10. problem. Printing both lists lets the next run show
+    // which name pairing failed to match, instead of guessing at an alias.
+    if (unmatchedGoal.length > 0 && unresolved.length > 0) {
+      console.warn(
+        `${comp.slug}: unmatched GOAL fixtures: ${JSON.stringify(unmatchedGoal)} | rows without goal_api_id: ${JSON.stringify(unresolved.map((r) => `${r.home_team_name} vs ${r.away_team_name}`))}`
+      );
     }
 
     await sleep(500); // stay well inside GOAL API's 15-min sliding budget, same spacing syncEuropeanFixtures.js uses

@@ -190,6 +190,11 @@ const TEAM_PHRASE_ALIASES = {
   'man city': 'manchester city',
   'man utd': 'manchester united',
   'man united': 'manchester united',
+  // Our stored name for AEK Athens is its official legal form "PAE AEK".
+  // Assumed (not yet confirmed from GOAL's own name) to be the same club
+  // GOAL lists as "AEK Athens" -- the live-score poller now logs any GOAL
+  // fixture it could not match, so a wrong guess shows up in the next run.
+  'pae aek': 'aek athens',
 };
 const TEAM_TOKEN_ALIASES = {
   inter: 'internazionale',
