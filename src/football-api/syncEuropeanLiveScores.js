@@ -25,7 +25,7 @@ import { extractStatus, extractScore } from './syncEuropeanFixtures.js';
 // fixture that missed one poll's write (or every poll before this job
 // even started) still gets caught on the very next tick, and a stuck
 // fixture that fell out of syncLiveEvents.js's own 15-minute
-// RECENT_KICKOFF_WINDOW_MS candidate window forever still gets fixed here
+// candidate window forever still gets fixed here
 // on this job's own next scheduled run regardless.
 //
 // No live_minute here -- GOAL API's fixtures-by-date response has no
@@ -37,7 +37,12 @@ const POLL_INTERVAL_MS = 120_000;
 const JOB_BUDGET_MS = 13 * 60 * 1000;
 
 const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
-const RECENT_KICKOFF_WINDOW_MS = 15 * 60 * 1000;
+// How far back a fixture still sitting on 'scheduled' is polled for.
+// Confirmed live (2026-10-14/15): Champions League matches that kicked off
+// while the budget was spent stayed 'scheduled' forever -- a 15-min
+// window had already closed on them, so no poller looked at them again.
+// Three hours covers a full match with stoppage time and a delayed finish.
+const STALE_SCHEDULED_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 // Decides both whether this run should poll AT ALL (called once up front,
 // before pollOnce() ever spends any GOAL API budget) and whether its own
@@ -66,13 +71,13 @@ const RECENT_KICKOFF_WINDOW_MS = 15 * 60 * 1000;
 // most of them for competitions with no match in play at all.
 async function leaguesNeedingAttention(supabase, uefaLeagueIds) {
   const now = new Date();
-  const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
+  const sinceKickoff = new Date(now.getTime() - STALE_SCHEDULED_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
   const { data, error } = await supabase
     .from('fixtures')
     .select('league_id')
     .in('league_id', uefaLeagueIds)
-    .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
+    .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${sinceKickoff},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return new Set((data ?? []).map((r) => r.league_id));
 }
