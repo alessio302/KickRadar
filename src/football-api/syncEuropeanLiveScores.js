@@ -3,6 +3,7 @@ import { UEFA_COMPETITIONS } from '../config/leagues.js';
 import { getAllLeagueFixtures, hasGoalApiBudgetRemaining } from '../lineups/goalApiClient.js';
 import { sleep } from './client.js';
 import { extractStatus, extractScore } from './syncEuropeanFixtures.js';
+import { teamNamesMatch } from '../lineups/syncEuropeanHighlights.js';
 
 // REST poll backstop for the 3 UEFA competitions' status/home_score/
 // away_score, same relationship syncLiveScores.js has to the
@@ -39,10 +40,12 @@ const JOB_BUDGET_MS = 13 * 60 * 1000;
 const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
 // How far back a fixture still sitting on 'scheduled' is polled for.
 // Confirmed live (2026-10-14/15): Champions League matches that kicked off
-// while the budget was spent stayed 'scheduled' forever -- a 15-min
-// window had already closed on them, so no poller looked at them again.
-// Three hours covers a full match with stoppage time and a delayed finish.
-const STALE_SCHEDULED_WINDOW_MS = 3 * 60 * 60 * 1000;
+// while the budget was spent stayed 'scheduled' forever. A 3-hour window
+// fixed the going-forward case but still missed them once they were a day
+// old -- the 14.10. matches were already 20+ hours past kickoff when that
+// landed, so nothing polled them. 48 hours covers them with room for a
+// postponed or delayed finish; rows that get a status drop out automatically.
+const STALE_SCHEDULED_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 // Decides both whether this run should poll AT ALL (called once up front,
 // before pollOnce() ever spends any GOAL API budget) and whether its own
@@ -82,6 +85,43 @@ async function leaguesNeedingAttention(supabase, uefaLeagueIds) {
   return new Set((data ?? []).map((r) => r.league_id));
 }
 
+// Fixtures whose goal_api_id was never resolved. Confirmed live (2026-10-15):
+// all 9 Champions League matches of 2026-10-14 had goal_api_id = NULL, and
+// the poll below only ever matches by goal_api_id -- so even inside the
+// window these rows were invisible to it. syncLiveEvents.js's
+// resolveGoalApiIds() is the normal way that id gets filled, but it needs
+// budget near kickoff, and that was exhausted on those evenings.
+async function loadUnresolvedCandidates(supabase, leagueId) {
+  const now = Date.now();
+  const since = new Date(now - STALE_SCHEDULED_WINDOW_MS).toISOString();
+  const until = new Date(now + UPCOMING_WINDOW_MS).toISOString();
+  const { data, error } = await supabase
+    .from('fixtures')
+    .select('id, home_team_name, away_team_name')
+    .eq('league_id', leagueId)
+    .is('goal_api_id', null)
+    .in('status', ['scheduled', 'live'])
+    .gte('kickoff_at', since)
+    .lte('kickoff_at', until);
+  if (error) throw error;
+  return (data ?? []).filter((r) => r.home_team_name && r.away_team_name);
+}
+
+// Matches a GOAL API fixture to exactly one unresolved row by team names,
+// using the same order-independent matcher the highlight sync uses (GOAL's
+// names and ours differ in wording: "FC Bayern München" vs "Bayern"). Only
+// accepts a unique match -- two rows matching is treated as no match rather
+// than guessing which one to tag with the id.
+function findUnresolvedMatch(apiFixture, candidates) {
+  const home = apiFixture.homeTeam?.name ?? apiFixture.homeTeamName;
+  const away = apiFixture.awayTeam?.name ?? apiFixture.awayTeamName;
+  if (!home || !away) return null;
+  const matches = candidates.filter(
+    (c) => teamNamesMatch(c.home_team_name, home) && teamNamesMatch(c.away_team_name, away)
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
 async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
   let updated = 0;
   let stillLive = false;
@@ -107,6 +147,8 @@ async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
       continue;
     }
 
+    const unresolved = await loadUnresolvedCandidates(supabase, leagueIdBySlug.get(comp.slug));
+
     for (const f of apiFixtures) {
       const fetchedStatus = extractStatus(f);
       if (fetchedStatus === 'live') stillLive = true;
@@ -114,27 +156,43 @@ async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
 
       const score = extractScore(f);
       const goalApiId = String(f.id);
-      // Matches by goal_api_id alone, never upserts -- the row already
-      // exists (created by syncEuropeanFixtures.js for EL/UECL always, or
-      // for UCL once syncLiveEvents.js's own resolveGoalApiIds() has
-      // cached it near kickoff, same as this file's WS counterpart relies
-      // on). A goalApiId with no matching row yet simply updates 0 rows,
-      // same as domestic's own equivalent no-op case.
+      const values = {
+        status: fetchedStatus,
+        home_score: score.home,
+        away_score: score.away,
+        updated_at: new Date().toISOString(),
+      };
+      // Matches by goal_api_id first. A goalApiId with no matching row yet
+      // updates 0 rows and falls through to the name match below -- that's
+      // how a row whose id never got resolved gets both its status and the
+      // id itself, so later polls find it by goal_api_id directly.
       const { data: updatedRows, error } = await supabase
         .from('fixtures')
-        .update({
-          status: fetchedStatus,
-          home_score: score.home,
-          away_score: score.away,
-          updated_at: new Date().toISOString(),
-        })
+        .update(values)
         .eq('goal_api_id', goalApiId)
         .select('id');
       if (error) {
         console.error(`Failed to update live score for GOAL API fixture ${goalApiId}:`, error.message);
         continue;
       }
-      if (updatedRows?.length) updated += 1;
+      if (updatedRows?.length) {
+        updated += 1;
+        continue;
+      }
+
+      const match = findUnresolvedMatch(f, unresolved);
+      if (!match) continue;
+      const { error: resolveErr } = await supabase
+        .from('fixtures')
+        .update({ ...values, goal_api_id: goalApiId })
+        .eq('id', match.id);
+      if (resolveErr) {
+        console.error(`Failed to resolve goal_api_id ${goalApiId} for fixture ${match.id}:`, resolveErr.message);
+        continue;
+      }
+      console.log(`Resolved goal_api_id ${goalApiId} onto fixture ${match.id} by team names`);
+      unresolved.splice(unresolved.indexOf(match), 1);
+      updated += 1;
     }
 
     await sleep(500); // stay well inside GOAL API's 15-min sliding budget, same spacing syncEuropeanFixtures.js uses

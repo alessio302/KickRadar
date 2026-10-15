@@ -234,7 +234,7 @@ function tokenSet(rawName) {
 // title sometimes carries MORE words than our stored name, e.g. matching
 // against a club's full name, and sometimes FEWER, e.g. a short colloquial
 // title), just at the word level instead of the character-substring level.
-function teamNamesMatch(a, b) {
+export function teamNamesMatch(a, b) {
   const setA = tokenSet(a);
   const setB = tokenSet(b);
   if (setA.size === 0 || setB.size === 0) return false;
@@ -321,6 +321,25 @@ const YOUTUBE_SOURCE_BY_COMPETITION_SLUG = {
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const RECHECK_INTERVAL_MS = 30 * 60 * 1000;
+
+// A title match alone doesn't mean the clip plays: the uploader can disable
+// embedding (confirmed live 2026-10-15: several 13.10. fixtures' clips were
+// stored and then refused by the player). YouTube's oEmbed endpoint answers
+// 200 for an embeddable video and 401 when the owner disabled embedding, so
+// that's checked before a clip is stored. A transient request failure counts
+// as "not embeddable" for this run -- the fixture stays unchecked and gets
+// retried on the next recheck window instead of being stored blind.
+async function isEmbeddable(videoId) {
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    return res.status === 200;
+  } catch (err) {
+    console.warn(`oEmbed check failed for ${videoId}:`, err.message);
+    return false;
+  }
+}
 
 async function fetchFeedEntries(feedUrl) {
   const res = await fetch(feedUrl, {
@@ -434,6 +453,10 @@ export async function syncEuropeanHighlights() {
         const teams = source.parseTeams(entry.title);
         if (!teams) continue;
         if (teamNamesMatch(teams.home, fixture.home_team_name) && teamNamesMatch(teams.away, fixture.away_team_name)) {
+          if (!(await isEmbeddable(entry.videoId))) {
+            console.warn(`Skipping non-embeddable clip ${entry.videoId} for fixture ${fixture.id}`);
+            continue;
+          }
           url = `https://www.youtube.com/embed/${entry.videoId}`;
           break;
         }
