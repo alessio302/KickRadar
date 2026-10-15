@@ -15,8 +15,11 @@ function videoIdFromEmbedUrl(url) {
   return m ? m[1] : null;
 }
 
+// Every request gets a hard timeout -- a silently stalled connection
+// otherwise hangs the whole run until the workflow itself is killed.
 async function fetchText(url) {
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
     headers: {
       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
       'Accept-Language': 'en-US,en;q=0.9',
@@ -73,6 +76,7 @@ async function main() {
       owner = parseOwner(watch.body);
     }
     results.push({ vid, league: info.league, fixtures: info.fixtures.length, http: embed.status, ...play, owner });
+    if (results.length % 25 === 0) console.log(`checked ${results.length}/${byVideo.size}`);
     await sleep(DELAY_MS);
   }
 
