@@ -9,6 +9,10 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 
 const PAST_WINDOW_DAYS = 60;
 const DELAY_MS = 300;
+// Bounded so the run always finishes inside its workflow timeout: at most
+// this many distinct videos per league, and a hard overall deadline.
+const PER_LEAGUE_LIMIT = 4;
+const DEADLINE_MS = 8 * 60 * 1000;
 
 function videoIdFromEmbedUrl(url) {
   const m = /\/embed\/([A-Za-z0-9_-]{11})/.exec(url ?? '');
@@ -65,8 +69,22 @@ async function main() {
   }
   console.log(`Checking ${byVideo.size} distinct videos across ${rows.length} fixtures (last ${PAST_WINDOW_DAYS} days)`);
 
+  // Keep only the first PER_LEAGUE_LIMIT videos of each league, so a slow
+  // response can't stretch one league's share of the run.
+  const perLeague = {};
+  const sample = [...byVideo].filter(([, info]) => {
+    perLeague[info.league] = (perLeague[info.league] ?? 0) + 1;
+    return perLeague[info.league] <= PER_LEAGUE_LIMIT;
+  });
+  const started = Date.now();
+  console.log(`Sampling ${sample.length} videos (max ${PER_LEAGUE_LIMIT} per league)`);
+
   const results = [];
-  for (const [vid, info] of byVideo) {
+  for (const [vid, info] of sample) {
+    if (Date.now() - started > DEADLINE_MS) {
+      console.log("Deadline reached, stopping early");
+      break;
+    }
     const embed = await fetchText(`https://www.youtube.com/embed/${vid}`);
     const play = parsePlayability(embed.body);
     let owner = null;
@@ -76,7 +94,7 @@ async function main() {
       owner = parseOwner(watch.body);
     }
     results.push({ vid, league: info.league, fixtures: info.fixtures.length, http: embed.status, ...play, owner });
-    if (results.length % 25 === 0) console.log(`checked ${results.length}/${byVideo.size}`);
+    console.log(JSON.stringify({ league: info.league, vid, http: embed.status, status: play.status, reason: play.reason, owner }));
     await sleep(DELAY_MS);
   }
 
