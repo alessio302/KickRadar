@@ -6,11 +6,16 @@
 // the app. Runs in GitHub Actions because the agent sandbox has no outbound
 // route to youtube.com.
 const CANDIDATES = [
-  { name: 'current: Sky Sport Premier League (DE)', channelId: 'UC_VsQmcsFWUhGn3DTwiO8bg' },
-  { name: 'Premier League official', channelId: 'UCG5qGWdu8nIRZqJ_GgDwQ-w' },
-  { name: 'Sky Sports Premier League (UK)', channelId: 'UCNAf1k0yIjyGu3k9BwAg3lg' },
+  { name: 'current PL: Sky Sport Premier League (DE)', channelId: 'UC_VsQmcsFWUhGn3DTwiO8bg' },
+  { name: 'PL: Premier League official', channelId: 'UCG5qGWdu8nIRZqJ_GgDwQ-w' },
+  { name: 'PL: Sky Sports Premier League (UK)', channelId: 'UCNAf1k0yIjyGu3k9BwAg3lg' },
+  { name: 'DE: Sportschau (ID from third-party stats site, unverified)', channelId: 'UCRFsyeKu07-LnHDG44O6uCA' },
+  { name: 'DE: RTL Sport (EL/ECL source today)', channelId: 'UC8WYi3XQXsf-6FNvqoEvxag' },
+  { name: 'DE: ZDFsportstudio (CL source today)', channelId: 'UClCIWcZNvq15p0Y-E4ToGOw' },
+  { name: 'DE: Prime Video Sport Deutschland (CL source today)', channelId: 'UCK2izXoHvraUFaPMU5B7vMQ' },
 ];
 const ENTRIES_PER_CHANNEL = 15;
+const HIGHLIGHT_TITLE = /Champions League|Europa League|Conference League|UEFA|Premier League|Highlights/i;
 const DELAY_MS = 300;
 const REQUEST_TIMEOUT_MS = 15_000;
 const USER_AGENT =
@@ -61,13 +66,17 @@ async function main() {
     }
     console.log(`=== ${candidate.name} (${candidate.channelId}) -- ${entries.length} recent entries ===`);
     const counts = {};
+    const highlightCounts = {};
     for (const e of entries) {
       const verdict = await checkEmbeddable(e.videoId);
       counts[verdict] = (counts[verdict] ?? 0) + 1;
+      // Title looks like a match highlight (competition name or "Highlights"),
+      // so the verdict counts above can be read for match clips only.
+      if (HIGHLIGHT_TITLE.test(e.title)) highlightCounts[verdict] = (highlightCounts[verdict] ?? 0) + 1;
       console.log(JSON.stringify({ verdict, published: e.published, videoId: e.videoId, title: e.title }));
       await sleep(DELAY_MS);
     }
-    summary.push({ name: candidate.name, channelId: candidate.channelId, counts });
+    summary.push({ name: candidate.name, channelId: candidate.channelId, counts, highlightCounts });
   }
   console.log('--- summary ---');
   console.log(JSON.stringify(summary, null, 2));
