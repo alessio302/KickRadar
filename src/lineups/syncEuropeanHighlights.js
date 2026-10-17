@@ -281,9 +281,13 @@ function parseZdfSportstudioTeams(title) {
   return { home, away };
 }
 
-// Title pattern confirmed live against RTL Sport's own channel feed,
+// Title patterns confirmed live against RTL Sport's own channel feed:
 // 2026-09-18: "<home> vs. <away> | Highlights | UEFA Europa League | RTL
-// Sport" -- deliberately not anchored on the competition name (unlike
+// Sport", and from 2026-10-15 also "<home> vs. <away> - die Highlights |
+// UEFA Conference League | RTL Sport" (the "- die Highlights" form
+// dropped the pipe before "Highlights" and was silently skipped until now,
+// which is why no Conference League fixture had a clip). Deliberately not
+// anchored on the competition name (unlike
 // parsePrimeVideoTeams/parseZdfSportstudioTeams above, both scoped to a
 // single competition's own source list), so the same parser covers a
 // future UEFA Conference League upload from this channel without a
@@ -292,7 +296,7 @@ function parseZdfSportstudioTeams(title) {
 // non-football clips (NFL, MMA, ...) simply don't match "vs." followed by
 // "| Highlights |" and are skipped for free.
 function parseRtlSportTeams(title) {
-  const m = title.match(/^(.+?)\s+vs\.\s+(.+?)\s*\|\s*Highlights\s*\|/);
+  const m = title.match(/^(.+?)\s+vs\.\s+(.+?)\s*(?:-\s*die\s+Highlights|\|\s*Highlights)\s*\|/i);
   if (!m) return null;
   const home = m[1].trim();
   const away = m[2].trim();
