@@ -61,6 +61,7 @@ import { getLiveLeagueFixtures, getWsToken, GOAL_API_WS_URL, hasGoalApiBudgetRem
 import { resolveClub } from '../news/clubMatch.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
 import { insertNewMatchEvents } from './matchEventsReconciler.js';
+import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 
 // Same anti-regression guard syncFixtures.js/syncEuropeanFixtures.js/
 // syncLiveScores.js already use everywhere else a fixture's status gets
@@ -182,13 +183,20 @@ async function findCandidateFixtures(supabase) {
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
 
-  // No league_id filter -- deliberately covers every tracked league
-  // (domestic and UEFA alike), same as it always has; home_team_name/
-  // away_team_name are only ever populated (and only ever read) for the
-  // European ones.
+  // Only fixtures some subscription favorited get live coverage at all --
+  // GOAL API's daily budget is shared across every league, and subscribing
+  // to matches nobody follows burned it for no benefit. Empty favorites
+  // means no candidates, so this run makes no GOAL API call at all.
+  const favoritedIds = await getFavoritedFixtureIds(supabase);
+  if (favoritedIds.size === 0) return [];
+
+  // No league_id filter -- a favorite can be in any tracked league (domestic
+  // or UEFA alike); home_team_name/away_team_name are only ever populated
+  // (and only ever read) for the European ones.
   const { data, error } = await supabase
     .from('fixtures')
     .select('id, league_id, home_club_id, away_club_id, home_team_name, away_team_name, kickoff_at, status, goal_api_id')
+    .in('id', [...favoritedIds])
     .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return data;
