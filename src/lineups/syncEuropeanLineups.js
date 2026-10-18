@@ -35,6 +35,7 @@ import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { normalize } from '../util/normalize.js';
 import { buildEventRowsFromRest } from './eventRows.js';
 import { reconcileMatchEvents } from './matchEventsReconciler.js';
+import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 
 const LOOKAHEAD_MIN = 45;
 const LOOKBACK_MIN = 90;
@@ -155,7 +156,10 @@ export async function syncEuropeanLineups() {
   // comment for the full rationale (a 'live' fixture refreshed every run,
   // unconditionally, since there's no cheap signal to know in advance
   // whether anything changed for a match still being played).
-  const eventsNeeded = (f) => f.status === 'live' || (f.status === 'finished' && !f.events_synced_at);
+  // Live refresh limited to favorited fixtures, same as syncLineups.js --
+  // GOAL API's daily budget is shared across every league.
+  const favoritedIds = await getFavoritedFixtureIds(supabase);
+  const eventsNeeded = (f) => (f.status === 'live' && favoritedIds.has(f.id)) || (f.status === 'finished' && !f.events_synced_at);
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
   // checked: 0, not candidates.length -- see syncLineups.js's own comment

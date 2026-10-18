@@ -9,6 +9,7 @@ import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 import { buildEventRowsFromRest } from './eventRows.js';
 import { reconcileMatchEvents } from './matchEventsReconciler.js';
+import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 
 // Confirmed live (Kazakhstan Premier League, 2026-08-25, still true after
 // switching providers from Highlightly to GOAL API): a real lineup becomes
@@ -142,7 +143,12 @@ export async function syncLineups() {
   // "however long until full-time" -- unconditional (no finished-count-style
   // guard) since there's no cheap signal to know in advance whether
   // anything changed for a match still being played.
-  const eventsNeeded = (f) => f.status === 'live' || (f.status === 'finished' && !f.events_synced_at);
+  // Live refresh is limited to fixtures someone favorited -- GOAL API's
+  // daily budget is shared across every league, and events for a match
+  // nobody follows were being fetched for nothing. Finished fixtures still
+  // get their one-time events fetch regardless.
+  const favoritedIds = await getFavoritedFixtureIds(supabase);
+  const eventsNeeded = (f) => (f.status === 'live' && favoritedIds.has(f.id)) || (f.status === 'finished' && !f.events_synced_at);
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
   // checked: 0, not candidates.length -- candidates is the raw DB query
