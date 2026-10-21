@@ -39,14 +39,21 @@ const POLL_INTERVAL_MS = 120_000;
 const JOB_BUDGET_MS = 13 * 60 * 1000;
 
 const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
-// How far back a fixture still sitting on 'scheduled' is polled for.
+// How far back a fixture still sitting on 'scheduled' keeps this job polling.
 // Confirmed live (2026-10-14/15): Champions League matches that kicked off
-// while the budget was spent stayed 'scheduled' forever. A 3-hour window
-// fixed the going-forward case but still missed them once they were a day
-// old -- the 14.10. matches were already 20+ hours past kickoff when that
-// landed, so nothing polled them. 48 hours covers them with room for a
-// postponed or delayed finish; rows that get a status drop out automatically.
+// while the budget was spent stayed 'scheduled' forever, and a 3-hour window
+// alone missed them once they were a day old. That is why the nightly sweep
+// below looks back 48 hours.
+const RECENT_SCHEDULED_WINDOW_MS = 4 * 60 * 60 * 1000;
 const STALE_SCHEDULED_WINDOW_MS = 48 * 60 * 60 * 1000;
+// Confirmed live (2026-10-21): rows whose goal_api_id never resolved kept
+// this job polling for their whole 48-hour window, every run, and the
+// European poll alone used 682 GOAL requests that day -- the budget ran out
+// before the evening matches. Old 'scheduled' rows are now only swept once a
+// day (at this UTC hour, when the 15-minute cron fires at :13/:28) and that
+// sweep doesn't keep polling afterwards; live matches are unaffected.
+const STALE_SWEEP_HOUR_UTC = 4;
+const isStaleSweepRun = (now) => now.getUTCHours() === STALE_SWEEP_HOUR_UTC;
 
 
 // Decides both whether this run should poll AT ALL (called once up front,
@@ -76,7 +83,8 @@ const STALE_SCHEDULED_WINDOW_MS = 48 * 60 * 60 * 1000;
 // most of them for competitions with no match in play at all.
 async function leaguesNeedingAttention(supabase, uefaLeagueIds) {
   const now = new Date();
-  const sinceKickoff = new Date(now.getTime() - STALE_SCHEDULED_WINDOW_MS).toISOString();
+  const scheduledWindow = isStaleSweepRun(now) ? STALE_SCHEDULED_WINDOW_MS : RECENT_SCHEDULED_WINDOW_MS;
+  const sinceKickoff = new Date(now.getTime() - scheduledWindow).toISOString();
   const liveSince = new Date(now.getTime() - STALE_LIVE_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
   const { data, error } = await supabase
@@ -256,7 +264,8 @@ export async function syncEuropeanLiveScores() {
     totalUpdated += updated;
 
     active = await leaguesNeedingAttention(supabase, uefaLeagueIds);
-    const keepGoing = stillLive || active.size > 0;
+    // The nightly sweep gets one pass. Only genuinely live matches keep it looping.
+    const keepGoing = stillLive || (active.size > 0 && !isStaleSweepRun(new Date()));
     if (!keepGoing) break;
 
     await sleep(POLL_INTERVAL_MS);
