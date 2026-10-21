@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { refreshGoalApiProfileById } from './playerProfileResolver.js';
 import { hasGoalApiBudgetRemaining } from '../lineups/goalApiClient.js';
+import { isMatchWindowOpen } from '../db/matchWindow.js';
 
 // Player profiles were previously a permanent one-time snapshot: once
 // resolveGoalApiProfile() succeeded for a player, nothing ever asked GOAL
@@ -54,6 +55,12 @@ async function main() {
   }
 
   const supabase = getSupabaseClient();
+
+  // Stand down while a match is on -- the budget is for live coverage then.
+  if (await isMatchWindowOpen(supabase)) {
+    console.log('Refresh player profiles: a match is live or about to start, skipping this run.');
+    return;
+  }
 
   const { data: trackedClubs, error: clubsErr } = await supabase.from('clubs').select('name').not('goal_api_id', 'is', null);
   if (clubsErr) throw clubsErr;

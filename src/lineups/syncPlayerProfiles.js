@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
 import { getTeamSquad, searchPlayers, getPlayer, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { normalize } from '../util/normalize.js';
+import { isMatchWindowOpen } from '../db/matchWindow.js';
 import { POSITION_SINGULAR, STAT_FIELDS, extractStats, pickBestMatch, buildProfileFields } from '../news/playerProfileResolver.js';
 
 const FOOTBALL_DATA_BASE_URL = process.env.FOOTBALL_DATA_BASE_URL || 'https://api.football-data.org/v4';
@@ -186,6 +187,12 @@ export async function syncPlayerProfiles() {
   }
 
   const supabase = getSupabaseClient();
+
+  // Stand down while a match is on -- the budget is for live coverage then.
+  if (await isMatchWindowOpen(supabase)) {
+    console.log('Player profiles: a match is live or about to start, skipping this run.');
+    return { skippedMatchWindow: true };
+  }
 
   const { data: clubs, error: clubsErr } = await supabase
     .from('clubs')
