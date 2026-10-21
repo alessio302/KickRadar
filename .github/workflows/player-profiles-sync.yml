@@ -16,7 +16,12 @@ on:
     # freshness; once daily still refreshes every tracked club's data at
     # least once every 24h, at a quarter of the previous cost (up to
     # ~156/day instead of ~624/day).
-    - cron: '25 5 * * *'
+    #
+    # Monthly now (1st of the month), not daily: the profiles are already
+    # nearly complete, and this job's only real job is picking up players
+    # GOAL API added late. That isn't worth GOAL budget that live coverage
+    # needs on match days. Runs once a month, or on workflow_dispatch.
+    - cron: '25 5 1 * *'
   workflow_dispatch: {}
 
 jobs:
