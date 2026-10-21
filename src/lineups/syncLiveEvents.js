@@ -61,7 +61,6 @@ import { getLiveLeagueFixtures, getWsToken, GOAL_API_WS_URL, hasGoalApiBudgetRem
 import { resolveClub } from '../news/clubMatch.js';
 import { namesLooselyMatch } from './syncEuropeanLineups.js';
 import { insertNewMatchEvents } from './matchEventsReconciler.js';
-import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 
 // Same anti-regression guard syncFixtures.js/syncEuropeanFixtures.js/
 // syncLiveScores.js already use everywhere else a fixture's status gets
@@ -183,20 +182,17 @@ async function findCandidateFixtures(supabase) {
   const recently = new Date(now.getTime() - RECENT_KICKOFF_WINDOW_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
 
-  // Only fixtures some subscription favorited get live coverage at all --
-  // GOAL API's daily budget is shared across every league, and subscribing
-  // to matches nobody follows burned it for no benefit. Empty favorites
-  // means no candidates, so this run makes no GOAL API call at all.
-  const favoritedIds = await getFavoritedFixtureIds(supabase);
-  if (favoritedIds.size === 0) return [];
-
-  // No league_id filter -- a favorite can be in any tracked league (domestic
-  // or UEFA alike); home_team_name/away_team_name are only ever populated
-  // (and only ever read) for the European ones.
+  // Every live or about-to-kick-off fixture, favorited or not. The live
+  // minute (live_minute) only comes from this WebSocket: football-data.org's
+  // match object has no minute field (confirmed live 2026-10-21, 7 CL matches
+  // in play), so restricting subscriptions to favorites left unfollowed
+  // matches without a minute. Events for non-favorites still aren't pushed
+  // (matchEventNotifier only notifies favoriters).
+  // No league_id filter -- every tracked league; home_team_name/away_team_name
+  // are only ever populated (and only ever read) for the European ones.
   const { data, error } = await supabase
     .from('fixtures')
     .select('id, league_id, home_club_id, away_club_id, home_team_name, away_team_name, kickoff_at, status, goal_api_id')
-    .in('id', [...favoritedIds])
     .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${recently},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return data;
@@ -577,17 +573,6 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
           try {
             const freshCandidates = await findCandidateFixtures(supabase);
             const freshResolved = await resolveGoalApiIds(supabase, freshCandidates);
-            // Stop tracking matches whose favorite was removed mid-run. Only
-            // favorites decide this, not candidate status: a favorited match
-            // that finishes during the run still needs its final status/score
-            // write from this connection. Its match_update messages are then
-            // ignored by the `if (!info) return` guard below, so no DB writes
-            // happen for it. GOAL's side of the subscription isn't closed here
-            // -- there's no verified unsubscribe message for it in this repo.
-            const favoritedIds = await getFavoritedFixtureIds(supabase);
-            for (const [goalApiId, info] of byGoalApiId) {
-              if (!favoritedIds.has(info.fixtureId)) byGoalApiId.delete(goalApiId);
-            }
             let droppedForCapacity = 0;
             for (const [fixtureId, info] of freshResolved) {
               if (byGoalApiId.has(info.goalApiId)) continue;
