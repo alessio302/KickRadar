@@ -415,7 +415,7 @@ export default function App() {
             <LiveTab theme={theme} t={t} language={language} onFavoriteToast={setToast} />
           )}
           {tab === 'europa' && (
-            <EuropaTab theme={theme} t={t} language={language} />
+            <EuropaTab theme={theme} t={t} language={language} onFavoriteToast={setToast} />
           )}
           {tab === 'einstellungen' && (
             <SettingsTab

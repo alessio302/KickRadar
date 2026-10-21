@@ -10,6 +10,41 @@ import { PROVIDER_INFO } from '../lib/broadcasters.js';
 // use their own fixed colors rather than theme tokens.
 const FAVORITE_STAR_COLOR = '#FFC107';
 
+// The tappable favorite star, shared by every tab that lists favoritable
+// fixtures (domestic FixtureRow, EuropaTab.jsx's EuropaFixtureRow and
+// LiveTab.jsx's EuropaLiveRow). Unlike the team rows, which read different
+// data shapes per side and so stay separate copies, the star takes nothing
+// but a toggle callback -- one definition keeps the tap target and icon
+// identical everywhere. The 24px box with -3px horizontal margin enlarges
+// the tap target without widening the row's layout footprint.
+export function FavoriteStar({ theme, t, isFavorite, onToggle }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      aria-label={isFavorite ? t.fixtures.unfavoriteAria : t.fixtures.favoriteAria}
+      style={{
+        flex: '0 0 auto',
+        width: '24px',
+        height: '24px',
+        margin: '0 -3px',
+        border: 'none',
+        background: 'transparent',
+        padding: 0,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
+      }}
+    >
+      <Star size={15} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
+    </button>
+  );
+}
+
 // One team's badge/name (left) and score (right, only while live or
 // finished -- a scheduled fixture has no score yet). Split out of the main
 // row body since it's rendered twice, identically, once per side. The
@@ -115,11 +150,6 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
   const isFinished = fixture.status === 'finished';
   const showScore = isLive || isFinished;
 
-  const handleStarClick = (e) => {
-    e.stopPropagation();
-    onToggleFavorite(fixture);
-  };
-
   // live_minute lags status by however long syncLiveEvents.js's WS takes to
   // push a first tick for this match (or never arrives at all -- confirmed
   // live 2026-09-10 GOAL API's WS doesn't reliably push for every
@@ -198,26 +228,7 @@ export default function FixtureRow({ theme, t, locale, formatTime, clubsById, fi
           target over the score numbers above/below it (confirmed live --
           see this file's own git history for that specific regression). */}
       {favoritable ? (
-        <button
-          onClick={handleStarClick}
-          aria-label={isFavorite ? t.fixtures.unfavoriteAria : t.fixtures.favoriteAria}
-          style={{
-            flex: '0 0 auto',
-            width: '24px',
-            height: '24px',
-            margin: '0 -3px',
-            border: 'none',
-            background: 'transparent',
-            padding: 0,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            alignSelf: 'center',
-          }}
-        >
-          <Star size={15} fill={isFavorite ? FAVORITE_STAR_COLOR : 'none'} color={isFavorite ? FAVORITE_STAR_COLOR : theme.textMuted} />
-        </button>
+        <FavoriteStar theme={theme} t={t} isFavorite={isFavorite} onToggle={() => onToggleFavorite(fixture)} />
       ) : (
         // margin matches the star button's own (horizontal-only) negative
         // margin -- there to enlarge its tap target without widening its

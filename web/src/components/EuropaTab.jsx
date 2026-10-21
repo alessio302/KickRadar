@@ -1,13 +1,16 @@
 import { useState, useMemo, useRef } from 'react';
 import { useEuropaFixtures } from '../hooks/useEuropaFixtures.js';
+import { useFavoriteFixtures } from '../hooks/useFavoriteFixtures.js';
 import { PROVIDER_INFO } from '../lib/broadcasters.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import LeagueCarousel from './LeagueCarousel.jsx';
 import { UEFA_COMPETITIONS, adjacentCompetition } from '../lib/leagues.js';
 import { DATE_LOCALES } from '../i18n/languages.js';
 import { computeStandings } from '../lib/europaStandings.js';
+import { NOTIFICATIONS_DENIED } from '../lib/ensurePushSubscription.js';
 import PullToRefreshIndicator from './PullToRefreshIndicator.jsx';
 import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
+import { FavoriteStar } from './FixtureRow.jsx';
 
 // Zone thresholds for the UEFA League Phase (all three competitions use
 // an identical 36-team single-table format since 2024/25):
@@ -333,11 +336,13 @@ function BroadcasterLogos({ providers }) {
 // width all match FixtureRow.jsx (domestic, now the Ligen tab) exactly, not
 // just its layout shape -- user-reported (2026-09-14) the two tabs' cards
 // were still visibly different sizes despite sharing this same design.
-// No favorite star here though (unlike FixtureRow.jsx): European fixtures
-// aren't favoritable anywhere else in the app either (LiveTab.jsx's own
-// EuropaLiveRow has none), so there's no same-width spacer needed in its
-// place -- the row just ends after the team-row block.
-function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
+// Favorite star at the end matches FixtureRow.jsx's own: a finished match
+// never goes live again, so it gets the same same-width blank spacer
+// instead of a star (see FixtureRow.jsx's own comment). European favorites
+// feed the same live-event pipeline as domestic ones (syncLiveEvents.js and
+// syncEuropeanLineups.js both read favorite_fixtures for live refreshes),
+// so the toggle means the same thing here.
+function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture, isFavorite, onToggleFavorite }) {
   const isLive = fixture.status === 'live';
   const isFinished = fixture.status === 'finished';
   const showScore = isLive || isFinished;
@@ -398,6 +403,11 @@ function EuropaFixtureRow({ fixture, theme, t, locale, onSelectFixture }) {
           isLive={isLive}
         />
       </div>
+      {!isFinished ? (
+        <FavoriteStar theme={theme} t={t} isFavorite={isFavorite} onToggle={() => onToggleFavorite?.(fixture)} />
+      ) : (
+        <span style={{ width: '24px', margin: '0 -3px', flex: '0 0 auto' }} aria-hidden="true" />
+      )}
     </div>
   );
 }
@@ -422,7 +432,7 @@ function pickActiveMatchday(fixtures) {
 // instance (see LeagueCarousel.jsx's own comment on why the preview one
 // stays non-interactive) -- EuropaFixtureRow's onClick already guards
 // against it being undefined.
-function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, todayOnly, refetch, onSelectFixture, scrollRef, refetchRef }) {
+function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchdayOnly, liveOnly, todayOnly, refetch, onSelectFixture, scrollRef, refetchRef, favoriteIds, onToggleFavorite }) {
   // Plain assignment during render, same idiom as usePullToRefresh.js's own
   // onRefreshRef -- EuropaTab's own tab-level pull-to-refresh hook reads
   // this later, from an event handler, well after this render has
@@ -491,7 +501,16 @@ function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchd
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {dayFixtures.map((f) => (
-                <EuropaFixtureRow key={f.id} fixture={f} theme={theme} t={t} locale={locale} onSelectFixture={onSelectFixture} />
+                <EuropaFixtureRow
+                  key={f.id}
+                  fixture={f}
+                  theme={theme}
+                  t={t}
+                  locale={locale}
+                  onSelectFixture={onSelectFixture}
+                  isFavorite={favoriteIds?.has(f.id) ?? false}
+                  onToggleFavorite={onToggleFavorite}
+                />
               ))}
             </div>
           </div>
@@ -500,9 +519,21 @@ function EuropaFixturesList({ theme, t, locale, fixtures, loading, currentMatchd
   );
 }
 
-export default function EuropaTab({ theme, t, language }) {
+export default function EuropaTab({ theme, t, language, onFavoriteToast }) {
   const { data, loading, refetch } = useEuropaFixtures();
+  const { favoriteIds, toggleFavorite } = useFavoriteFixtures(language);
   const locale = DATE_LOCALES[language];
+
+  // Same toast contract as LigenTab.jsx's/LiveTab.jsx's own handlers --
+  // see useFavoriteFixtures.js for why toggling can throw.
+  const handleToggleFavorite = async (fixture) => {
+    try {
+      const result = await toggleFavorite(fixture.id);
+      onFavoriteToast(result === 'added' ? t.fixtures.favoritedToast : t.fixtures.unfavoritedToast);
+    } catch (err) {
+      onFavoriteToast(err.message === NOTIFICATIONS_DENIED ? t.errors.notificationsDenied : err.message);
+    }
+  };
   const [selectedComp, setSelectedComp] = useState(UEFA_COMPETITIONS[0].slug);
   const [activeSubTab, setActiveSubTab] = useState('spiele');
   const [currentMatchdayOnly, setCurrentMatchdayOnly] = useState(true);
@@ -704,6 +735,8 @@ export default function EuropaTab({ theme, t, language }) {
               onSelectFixture={slug === selectedComp ? setSelectedFixture : undefined}
               scrollRef={slug === selectedComp ? pullScrollRef : undefined}
               refetchRef={slug === selectedComp ? refetchRef : undefined}
+              favoriteIds={favoriteIds}
+              onToggleFavorite={slug === selectedComp ? handleToggleFavorite : undefined}
             />
           )}
         />

@@ -12,11 +12,12 @@
 //    namesLooselyMatch()), instead of resolveClub() against a clubs table
 //    row.
 //  - No push-notification step, unlike syncHighlights.js's own (it pushes
-//    to favorite_fixtures and clears them once a clip lands) -- confirmed
-//    live EuropaTab.jsx has no favoriting/star feature at all (zero
-//    favorite_fixtures references anywhere in that file), so there is no
-//    European analog to that trigger to port. Left out entirely rather
-//    than ported as dead code.
+//    to favorite_fixtures and clears them once a clip lands). European
+//    fixtures can be favorited now (EuropaTab.jsx / LiveTab.jsx), but
+//    their clip isn't pushed to those favoriters yet -- a favorite on a
+//    European match just ages out via favorite_fixtures_finished_cleanup
+//    (sql/036). Porting the push would mean copying syncHighlights.js's
+//    favorites step here; not done in this change.
 //
 // Source history -- THREE candidates tried before landing on one that
 // actually works, each rejected for a different reason a simple feed fetch
