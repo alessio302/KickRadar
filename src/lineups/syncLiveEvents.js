@@ -577,6 +577,17 @@ async function connectAndTrack({ supabase, deadline, byGoalApiId, lastCounts, la
           try {
             const freshCandidates = await findCandidateFixtures(supabase);
             const freshResolved = await resolveGoalApiIds(supabase, freshCandidates);
+            // Stop tracking matches whose favorite was removed mid-run. Only
+            // favorites decide this, not candidate status: a favorited match
+            // that finishes during the run still needs its final status/score
+            // write from this connection. Its match_update messages are then
+            // ignored by the `if (!info) return` guard below, so no DB writes
+            // happen for it. GOAL's side of the subscription isn't closed here
+            // -- there's no verified unsubscribe message for it in this repo.
+            const favoritedIds = await getFavoritedFixtureIds(supabase);
+            for (const [goalApiId, info] of byGoalApiId) {
+              if (!favoritedIds.has(info.fixtureId)) byGoalApiId.delete(goalApiId);
+            }
             let droppedForCapacity = 0;
             for (const [fixtureId, info] of freshResolved) {
               if (byGoalApiId.has(info.goalApiId)) continue;
