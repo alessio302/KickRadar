@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Radio } from 'lucide-react';
-import FixtureRow from './FixtureRow.jsx';
+import FixtureRow, { FavoriteStar } from './FixtureRow.jsx';
 import { PROVIDER_INFO } from '../lib/broadcasters.js';
 import FixtureDetailOverlay from './FixtureDetailOverlay.jsx';
 import EuropaFixtureDetailOverlay from './EuropaFixtureDetailOverlay.jsx';
@@ -57,7 +57,7 @@ function BroadcasterLogos({ providers }) {
 // component for the exact same reason as its own TeamRow (team_name-keyed
 // fields, no shared import), so it needed its own copy of the badge too,
 // not just the domestic side's.
-function EuropaLiveRow({ theme, fixture, onSelectFixture }) {
+function EuropaLiveRow({ theme, t, fixture, onSelectFixture, isFavorite, onToggleFavorite }) {
   return (
     <div
       onClick={() => onSelectFixture(fixture)}
@@ -101,6 +101,10 @@ function EuropaLiveRow({ theme, fixture, onSelectFixture }) {
           </div>
         ))}
       </div>
+      {/* Only live matches land in this list (see useAllLiveFixtures.js), so
+          the star is always offered here -- same tap target and toggle as
+          EuropaTab.jsx's and FixtureRow.jsx's own. */}
+      <FavoriteStar theme={theme} t={t} isFavorite={isFavorite} onToggle={() => onToggleFavorite?.(fixture)} />
     </div>
   );
 }
@@ -249,7 +253,15 @@ export default function LiveTab({ theme, t, language, onFavoriteToast }) {
                             onToggleFavorite={handleToggleFavorite}
                           />
                         ) : (
-                          <EuropaLiveRow key={f.id} theme={theme} fixture={f} onSelectFixture={setSelectedEuropa} />
+                          <EuropaLiveRow
+                            key={f.id}
+                            theme={theme}
+                            t={t}
+                            fixture={f}
+                            onSelectFixture={setSelectedEuropa}
+                            isFavorite={favoriteIds?.has(f.id) ?? false}
+                            onToggleFavorite={handleToggleFavorite}
+                          />
                         )
                       )}
                     </div>
