@@ -11,8 +11,9 @@ const PAST_WINDOW_DAYS = 60;
 const DELAY_MS = 300;
 // Bounded so the run always finishes inside its workflow timeout: at most
 // this many distinct videos per league, and a hard overall deadline.
-const PER_LEAGUE_LIMIT = 4;
-const DEADLINE_MS = 8 * 60 * 1000;
+const PER_LEAGUE_LIMIT = 1;
+const DEADLINE_MS = 5 * 60 * 1000;
+const DB_TIMEOUT_MS = 60 * 1000;
 
 function videoIdFromEmbedUrl(url) {
   const m = /\/embed\/([A-Za-z0-9_-]{11})/.exec(url ?? '');
@@ -49,15 +50,22 @@ function parseOwner(html) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
+  console.log("step: querying fixtures");
   const supabase = getSupabaseClient();
   const since = new Date(Date.now() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  const { data: rows, error } = await supabase
+  const query = supabase
     .from('fixtures')
     .select('id, kickoff_at, highlight_video_url, league_id, leagues(slug)')
     .not('highlight_video_url', 'is', null)
     .gte('kickoff_at', since)
     .order('kickoff_at', { ascending: false });
+  // A stalled query otherwise hangs the whole run with no output.
+  const { data: rows, error } = await Promise.race([
+    query,
+    sleep(DB_TIMEOUT_MS).then(() => { throw new Error('fixtures query timed out'); }),
+  ]);
   if (error) throw error;
+  console.log(`step: ${rows.length} fixture rows loaded`);
 
   // One check per distinct video, however many fixtures point at it.
   const byVideo = new Map();
