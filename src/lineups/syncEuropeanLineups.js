@@ -29,13 +29,13 @@
 // team name instead of resolveClub() against a clubs table row, since UCL
 // clubs like Real Madrid aren't in that table either.
 import { getSupabaseClient } from '../db/supabaseClient.js';
+import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 import { UEFA_COMPETITIONS } from '../config/leagues.js';
 import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { normalize } from '../util/normalize.js';
 import { buildEventRowsFromRest } from './eventRows.js';
 import { reconcileMatchEvents } from './matchEventsReconciler.js';
-import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 
 const LOOKAHEAD_MIN = 45;
 const LOOKBACK_MIN = 90;
@@ -132,7 +132,9 @@ export async function syncEuropeanLineups() {
 
   const fixturesById = new Map();
   for (const f of [...nearKickoff, ...finishedRecent, ...currentlyLive]) fixturesById.set(f.id, f);
-  const candidates = [...fixturesById.values()];
+  // Only fixtures somebody favorited -- same budget reasoning as syncLineups.js.
+  const favoritedIds = await getFavoritedFixtureIds(supabase);
+  const candidates = [...fixturesById.values()].filter((f) => favoritedIds.has(f.id));
   if (candidates.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
   const { data: existingLineups, error: existingErr } = await supabase
@@ -158,7 +160,6 @@ export async function syncEuropeanLineups() {
   // whether anything changed for a match still being played).
   // Live refresh limited to favorited fixtures, same as syncLineups.js --
   // GOAL API's daily budget is shared across every league.
-  const favoritedIds = await getFavoritedFixtureIds(supabase);
   const eventsNeeded = (f) => (f.status === 'live' && favoritedIds.has(f.id)) || (f.status === 'finished' && !f.events_synced_at);
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));

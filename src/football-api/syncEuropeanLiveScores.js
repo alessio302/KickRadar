@@ -3,6 +3,7 @@ import { UEFA_COMPETITIONS } from '../config/leagues.js';
 import { getAllLeagueFixtures, hasGoalApiBudgetRemaining } from '../lineups/goalApiClient.js';
 import { sleep } from './client.js';
 import { extractStatus, extractScore } from './syncEuropeanFixtures.js';
+import { STALE_LIVE_MS, closeStaleLiveFixtures } from '../db/staleLiveFixtures.js';
 import { teamNamesMatch } from '../lineups/syncEuropeanHighlights.js';
 
 // REST poll backstop for the 3 UEFA competitions' status/home_score/
@@ -47,11 +48,6 @@ const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
 // postponed or delayed finish; rows that get a status drop out automatically.
 const STALE_SCHEDULED_WINDOW_MS = 48 * 60 * 60 * 1000;
 
-// A fixture still on 'live' this long after kickoff is over, whatever GOAL API
-// says. Confirmed live (2026-10-20): six Champions League fixtures stayed
-// 'live' for a day, and the poller kept asking for them every run because the
-// live clause had no time bound. Past this point they are closed out here.
-const STALE_LIVE_MS = 4 * 60 * 60 * 1000;
 
 // Decides both whether this run should poll AT ALL (called once up front,
 // before pollOnce() ever spends any GOAL API budget) and whether its own
@@ -127,27 +123,6 @@ function findUnresolvedMatch(apiFixture, candidates) {
     (c) => teamNamesMatch(c.home_team_name, home) && teamNamesMatch(c.away_team_name, away)
   );
   return matches.length === 1 ? matches[0] : null;
-}
-
-// Closes out UEFA fixtures that have been 'live' longer than any real match
-// runs. Runs before the attention gate so it still happens on a run that has
-// nothing else to poll. Only touches rows already past the window; no GOAL API
-// calls are made here.
-async function closeStaleLiveFixtures(supabase, uefaLeagueIds) {
-  const cutoff = new Date(Date.now() - STALE_LIVE_MS).toISOString();
-  const { data, error } = await supabase
-    .from('fixtures')
-    .update({ status: 'finished', updated_at: new Date().toISOString() })
-    .in('league_id', uefaLeagueIds)
-    .eq('status', 'live')
-    .lt('kickoff_at', cutoff)
-    .select('id');
-  if (error) {
-    console.error('Failed to close stale live European fixtures:', error.message);
-    return 0;
-  }
-  if (data?.length) console.log(`Closed ${data.length} stale live European fixture(s) older than ${STALE_LIVE_MS / 3600000}h`);
-  return data?.length ?? 0;
 }
 
 async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {

@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
 import { LEAGUES } from '../config/leagues.js';
 import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions, hasGoalApiBudgetRemaining } from './goalApiClient.js';
+import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { normalize } from '../util/normalize.js';
@@ -9,7 +10,6 @@ import { sendPushToLineupSubscribers } from '../push/sendPush.js';
 import { pushStringsFor, SUPPORTED_PUSH_LANGUAGES } from '../push/pushI18n.js';
 import { buildEventRowsFromRest } from './eventRows.js';
 import { reconcileMatchEvents } from './matchEventsReconciler.js';
-import { getFavoritedFixtureIds } from '../db/favoritedFixtureIds.js';
 
 // Confirmed live (Kazakhstan Premier League, 2026-08-25, still true after
 // switching providers from Highlightly to GOAL API): a real lineup becomes
@@ -108,8 +108,14 @@ export async function syncLineups() {
   if (liveErr) throw liveErr;
 
   const nearKickoffIds = new Set(nearKickoff.map((f) => f.id));
+  // Lineups and events only for fixtures somebody favorited -- GOAL API's
+  // daily budget is shared, and an unfollowed match's lineup burned it for no
+  // one. Status itself is not filtered here; see syncEuropeanLiveScores.js.
+  const favoritedIds = await getFavoritedFixtureIds(supabase);
   const fixturesById = new Map();
-  for (const f of [...nearKickoff, ...finishedRecent, ...currentlyLive]) fixturesById.set(f.id, f);
+  for (const f of [...nearKickoff, ...finishedRecent, ...currentlyLive]) {
+    if (favoritedIds.has(f.id)) fixturesById.set(f.id, f);
+  }
   const candidates = [...fixturesById.values()];
   if (candidates.length === 0) return { checked: 0, confirmed: 0, eventsFetched: 0 };
 
@@ -155,7 +161,6 @@ export async function syncLineups() {
   // daily budget is shared across every league, and events for a match
   // nobody follows were being fetched for nothing. Finished fixtures still
   // get their one-time events fetch regardless.
-  const favoritedIds = await getFavoritedFixtureIds(supabase);
   const eventsNeeded = (f) => (f.status === 'live' && favoritedIds.has(f.id)) || (f.status === 'finished' && !f.events_synced_at);
 
   const pending = candidates.filter((f) => lineupNeeded(f) || eventsNeeded(f));
