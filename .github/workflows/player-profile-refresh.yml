@@ -2,20 +2,12 @@ name: Player profile refresh
 
 on:
   schedule:
-    # Every 6 hours, offset to :49 -- avoids colliding with news-scraper's
-    # :04/:34, lineups-sync's :14/:29/:44/:59, and other workflows' own
-    # minute marks (see news-scraper.yml's schedule comment for why that
-    # matters: GitHub Actions' scheduler throttles hard when multiple
-    # workflows share the exact same minute).
-    #
-    # Deliberately infrequent and small-batched (see refreshPlayerProfiles.js's
-    # own BATCH_SIZE comment) -- this shares the same GOAL API rate limit
-    # as syncLineups.js/syncLiveEvents.js/news-scraper.js's own player
-    # resolution, and that budget is already tight enough to have caused
-    # real outages. A full refresh cycle across every resolved player takes
-    # several days at this pace, which is fine for season stats that don't
-    # need to be real-time.
-    - cron: '49 1,7,13,19 * * *'
+    # Monthly, on the 1st at :49 -- moved down from every 6 hours so this
+    # job stops competing with live coverage for GOAL API budget on match
+    # days. Stats and club changes for already-resolved players are still
+    # picked up, just once a month. See refreshPlayerProfiles.js's own
+    # BATCH_SIZE comment for the batch size per run.
+    - cron: '49 1 1 * *'
   workflow_dispatch: {}
 
 jobs:
