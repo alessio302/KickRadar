@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../db/supabaseClient.js';
 import { fetchAllRows } from '../db/fetchAllRows.js';
 import { LEAGUES } from '../config/leagues.js';
-import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions } from './goalApiClient.js';
+import { findLeagueFixturesByDate, getFixtureLineups, getFixtureEvents, getFixtureCards, getFixtureSubstitutions, hasGoalApiBudgetRemaining } from './goalApiClient.js';
 import { teamIsPopulated, buildLineupTeam } from './lineupShape.js';
 import { resolveClub } from '../news/clubMatch.js';
 import { normalize } from '../util/normalize.js';
@@ -66,6 +66,14 @@ function confirmedKey(fixtureId, clubId) {
 }
 
 export async function syncLineups() {
+  // Shared daily GOAL API cap. Confirmed live (2026-10-18): this job alone made
+  // 1828 requests that day, with no budget check at all, pushing the day past
+  // 1000. Skip the whole run once the cap is spent.
+  if (!(await hasGoalApiBudgetRemaining())) {
+    console.error('Lineups: GOAL API daily budget exhausted, skipping this run.');
+    return { checked: 0, confirmed: 0, eventsFetched: 0, skippedBudget: true };
+  }
+
   const supabase = getSupabaseClient();
   const now = new Date();
   const windowStart = new Date(now.getTime() - LOOKBACK_MIN * 60000).toISOString();
@@ -211,6 +219,12 @@ export async function syncLineups() {
   }
 
   for (const { league, dateStr, fixtures: groupFixtures } of groups.values()) {
+    // Re-checked per league/date group, not just at the start: one run can span
+    // the rest of the day's budget.
+    if (!(await hasGoalApiBudgetRemaining())) {
+      console.error('Lineups: GOAL API daily budget exhausted mid-run, stopping.');
+      break;
+    }
     const leagueClubs = allClubs.filter((c) => c.league_id === groupFixtures[0]?.league_id);
 
     // Cached in fixtures.goal_api_id (048_fixtures_goal_api_id.sql), same

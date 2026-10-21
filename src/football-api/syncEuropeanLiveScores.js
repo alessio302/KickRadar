@@ -47,6 +47,12 @@ const UPCOMING_WINDOW_MS = 10 * 60 * 1000;
 // postponed or delayed finish; rows that get a status drop out automatically.
 const STALE_SCHEDULED_WINDOW_MS = 48 * 60 * 60 * 1000;
 
+// A fixture still on 'live' this long after kickoff is over, whatever GOAL API
+// says. Confirmed live (2026-10-20): six Champions League fixtures stayed
+// 'live' for a day, and the poller kept asking for them every run because the
+// live clause had no time bound. Past this point they are closed out here.
+const STALE_LIVE_MS = 4 * 60 * 60 * 1000;
+
 // Decides both whether this run should poll AT ALL (called once up front,
 // before pollOnce() ever spends any GOAL API budget) and whether its own
 // internal loop keeps sleeping and re-polling once it's started -- NOT
@@ -75,12 +81,13 @@ const STALE_SCHEDULED_WINDOW_MS = 48 * 60 * 60 * 1000;
 async function leaguesNeedingAttention(supabase, uefaLeagueIds) {
   const now = new Date();
   const sinceKickoff = new Date(now.getTime() - STALE_SCHEDULED_WINDOW_MS).toISOString();
+  const liveSince = new Date(now.getTime() - STALE_LIVE_MS).toISOString();
   const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS).toISOString();
   const { data, error } = await supabase
     .from('fixtures')
     .select('league_id')
     .in('league_id', uefaLeagueIds)
-    .or(`status.eq.live,and(status.eq.scheduled,kickoff_at.gte.${sinceKickoff},kickoff_at.lte.${soon})`);
+    .or(`and(status.eq.live,kickoff_at.gte.${liveSince}),and(status.eq.scheduled,kickoff_at.gte.${sinceKickoff},kickoff_at.lte.${soon})`);
   if (error) throw error;
   return new Set((data ?? []).map((r) => r.league_id));
 }
@@ -120,6 +127,27 @@ function findUnresolvedMatch(apiFixture, candidates) {
     (c) => teamNamesMatch(c.home_team_name, home) && teamNamesMatch(c.away_team_name, away)
   );
   return matches.length === 1 ? matches[0] : null;
+}
+
+// Closes out UEFA fixtures that have been 'live' longer than any real match
+// runs. Runs before the attention gate so it still happens on a run that has
+// nothing else to poll. Only touches rows already past the window; no GOAL API
+// calls are made here.
+async function closeStaleLiveFixtures(supabase, uefaLeagueIds) {
+  const cutoff = new Date(Date.now() - STALE_LIVE_MS).toISOString();
+  const { data, error } = await supabase
+    .from('fixtures')
+    .update({ status: 'finished', updated_at: new Date().toISOString() })
+    .in('league_id', uefaLeagueIds)
+    .eq('status', 'live')
+    .lt('kickoff_at', cutoff)
+    .select('id');
+  if (error) {
+    console.error('Failed to close stale live European fixtures:', error.message);
+    return 0;
+  }
+  if (data?.length) console.log(`Closed ${data.length} stale live European fixture(s) older than ${STALE_LIVE_MS / 3600000}h`);
+  return data?.length ?? 0;
 }
 
 async function pollOnce(supabase, activeLeagueIds, leagueIdBySlug) {
@@ -225,6 +253,7 @@ export async function syncEuropeanLiveScores() {
   if (leagueErr) throw leagueErr;
   const uefaLeagueIds = dbLeagues.map((l) => l.id);
   if (uefaLeagueIds.length === 0) return { polls: 0, totalUpdated: 0 };
+  await closeStaleLiveFixtures(supabase, uefaLeagueIds);
   const leagueIdBySlug = new Map(dbLeagues.map((l) => [l.slug, l.id]));
 
   // Gate before the very first poll, not just between polls -- see
