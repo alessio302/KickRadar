@@ -1,14 +1,15 @@
 name: European fixtures full sync (weekly)
 
 on:
-  schedule:
-    # Weekly, not daily -- this is the wide ±7d/+60d window
-    # (syncEuropeanFixtures.js's own default before 2026-09-09) that the
-    # daily sync-european-fixtures.yml run no longer covers. Only exists to
-    # catch a matchday reschedule/kickoff-time change further out than the
-    # daily run's narrow window reaches; that's rare enough that once a
-    # week is plenty, rather than paying the full 134-call cost daily.
-    - cron: '0 6 * * 0'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Weekly, not daily -- this is the wide ±7d/+60d window
+  # # (syncEuropeanFixtures.js's own default before 2026-09-09) that the
+  # # daily sync-european-fixtures.yml run no longer covers. Only exists to
+  # # catch a matchday reschedule/kickoff-time change further out than the
+  # # daily run's narrow window reaches; that's rare enough that once a
+  # # week is plenty, rather than paying the full 134-call cost daily.
+  # - cron: '0 6 * * 0'
   workflow_dispatch: {}
 
 jobs:

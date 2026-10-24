@@ -1,12 +1,13 @@
 name: Head-to-head sync
 
 on:
-  schedule:
-    # Same 4x/day cadence as fixtures/standings-sync. Offset another 20 min
-    # off standings-sync's own slots to avoid the scheduler throttling
-    # multiple workflows sharing identical cron minutes (see
-    # news-scraper.yml's history for the confirmed cause).
-    - cron: '40 5,11,17,23 * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Same 4x/day cadence as fixtures/standings-sync. Offset another 20 min
+  # # off standings-sync's own slots to avoid the scheduler throttling
+  # # multiple workflows sharing identical cron minutes (see
+  # # news-scraper.yml's history for the confirmed cause).
+  # - cron: '40 5,11,17,23 * * *'
   workflow_dispatch: {}
 
 jobs:

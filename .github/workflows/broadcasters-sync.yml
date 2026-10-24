@@ -1,23 +1,24 @@
 name: Broadcasters sync
 
 on:
-  schedule:
-    # Cut from twice DAILY (14x/week) to twice WEEKLY (2026-09-30) -- this
-    # file's own original comment already established that goal.com/it's
-    # broadcaster overview only fills in a given matchday's providers "from
-    # the Wednesday before", meaning every one of those 14 weekly runs on a
-    # non-Wednesday/Thursday was provably a no-op against unchanged source
-    # data, regardless of anything else. Confirmed live it's also been
-    # failing outright most days anyway: this shares gemini-3.5-flash-lite's
-    # account-wide free-tier RPD cap with runGeneralNewsScraper.js (News),
-    # which alone routinely spends 700-1200+ requests/day against that
-    # model's 500/day cap (see gemini_usage) -- syncSerieABroadcasters.js's
-    # own single call was landing on an already-exhausted quota on most
-    # runs, for data that hadn't even changed since the last successful one.
-    # Wednesday (the source's own update day) + Thursday (a one-day-late
-    # safety catch, in case Wednesday's own run lost the quota race) at the
-    # same 06:00 UTC slot as before.
-    - cron: '0 6 * * 3,4'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Cut from twice DAILY (14x/week) to twice WEEKLY (2026-09-30) -- this
+  # # file's own original comment already established that goal.com/it's
+  # # broadcaster overview only fills in a given matchday's providers "from
+  # # the Wednesday before", meaning every one of those 14 weekly runs on a
+  # # non-Wednesday/Thursday was provably a no-op against unchanged source
+  # # data, regardless of anything else. Confirmed live it's also been
+  # # failing outright most days anyway: this shares gemini-3.5-flash-lite's
+  # # account-wide free-tier RPD cap with runGeneralNewsScraper.js (News),
+  # # which alone routinely spends 700-1200+ requests/day against that
+  # # model's 500/day cap (see gemini_usage) -- syncSerieABroadcasters.js's
+  # # own single call was landing on an already-exhausted quota on most
+  # # runs, for data that hadn't even changed since the last successful one.
+  # # Wednesday (the source's own update day) + Thursday (a one-day-late
+  # # safety catch, in case Wednesday's own run lost the quota race) at the
+  # # same 06:00 UTC slot as before.
+  # - cron: '0 6 * * 3,4'
   workflow_dispatch: {}
 
 jobs:

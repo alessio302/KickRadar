@@ -1,14 +1,15 @@
 name: Top scorers sync
 
 on:
-  schedule:
-    # Once per day at 02:00 UTC. Aggregates from our own match_events
-    # table (see syncTopScorers.js's own comment on why that replaced
-    # GOAL API's squad-embedded stats) -- no external API budget involved
-    # any more, just DB reads, so this cadence is purely "often enough to
-    # feel current" rather than a rate-limit constraint. Could safely run
-    # more often if that ever matters.
-    - cron: '0 2 * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Once per day at 02:00 UTC. Aggregates from our own match_events
+  # # table (see syncTopScorers.js's own comment on why that replaced
+  # # GOAL API's squad-embedded stats) -- no external API budget involved
+  # # any more, just DB reads, so this cadence is purely "often enough to
+  # # feel current" rather than a rate-limit constraint. Could safely run
+  # # more often if that ever matters.
+  # - cron: '0 2 * * *'
   workflow_dispatch: {}
 
 jobs:

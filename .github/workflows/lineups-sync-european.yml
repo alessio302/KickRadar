@@ -1,15 +1,16 @@
 name: European lineups sync
 
 on:
-  schedule:
-    # Same 15-min cadence as lineups-sync.yml, offset to :10/:25/:40/:55 so
-    # it doesn't share a literal cron pattern with any other workflow --
-    # see lineups-sync.yml's own comment on why that offset matters
-    # (GitHub Actions throttled three workflows sharing "*/15 * * * *"
-    # hard, confirmed live). Cheap on non-matchdays: with no fixture in the
-    # near-kickoff/finished-recent window, the job returns after its
-    # Supabase queries without spending any GOAL API budget.
-    - cron: '10,25,40,55 * * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Same 15-min cadence as lineups-sync.yml, offset to :10/:25/:40/:55 so
+  # # it doesn't share a literal cron pattern with any other workflow --
+  # # see lineups-sync.yml's own comment on why that offset matters
+  # # (GitHub Actions throttled three workflows sharing "*/15 * * * *"
+  # # hard, confirmed live). Cheap on non-matchdays: with no fixture in the
+  # # near-kickoff/finished-recent window, the job returns after its
+  # # Supabase queries without spending any GOAL API budget.
+  # - cron: '10,25,40,55 * * * *'
   workflow_dispatch: {}
 
 jobs:

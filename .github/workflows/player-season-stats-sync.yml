@@ -1,11 +1,12 @@
 name: Player season stats sync
 
 on:
-  schedule:
-    # Once per day, right after the top scorers sync (02:00 UTC) since both
-    # aggregate from the same match_events data -- purely a DB read/write
-    # job, no external API budget involved.
-    - cron: '15 2 * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Once per day, right after the top scorers sync (02:00 UTC) since both
+  # # aggregate from the same match_events data -- purely a DB read/write
+  # # job, no external API budget involved.
+  # - cron: '15 2 * * *'
   workflow_dispatch: {}
 
 jobs:

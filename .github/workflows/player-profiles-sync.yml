@@ -1,27 +1,28 @@
 name: Player profiles sync
 
 on:
-  schedule:
-    # Once daily, not every 6h -- confirmed live (2026-09-09, this
-    # project's own goal_api_usage table) that "well within the shared
-    # 1000/day budget" below was wrong: this run's own cost is up to 156
-    # GOAL API calls (96 clubs' squad fetches, unconditional and with no
-    # per-club staleness check, plus up to MAX_GAP_FILLS_PER_RUN x 2
-    # gap-fill calls) x 4 runs/day = up to 624/day, on a fixed clock with
-    # no connection to whether any tracked league actually has a match in
-    # progress -- confirmed the dominant, day-independent cost against
-    # actual daily totals (several days over the 1000/day cap entirely,
-    # a quiet non-matchday still at 872 by mid-afternoon). Squad rosters
-    # and injury/stat snapshots don't need same-day-multiple-times
-    # freshness; once daily still refreshes every tracked club's data at
-    # least once every 24h, at a quarter of the previous cost (up to
-    # ~156/day instead of ~624/day).
-    #
-    # Monthly now (1st of the month), not daily: the profiles are already
-    # nearly complete, and this job's only real job is picking up players
-    # GOAL API added late. That isn't worth GOAL budget that live coverage
-    # needs on match days. Runs once a month, or on workflow_dispatch.
-    - cron: '25 5 1 * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Once daily, not every 6h -- confirmed live (2026-09-09, this
+  # # project's own goal_api_usage table) that "well within the shared
+  # # 1000/day budget" below was wrong: this run's own cost is up to 156
+  # # GOAL API calls (96 clubs' squad fetches, unconditional and with no
+  # # per-club staleness check, plus up to MAX_GAP_FILLS_PER_RUN x 2
+  # # gap-fill calls) x 4 runs/day = up to 624/day, on a fixed clock with
+  # # no connection to whether any tracked league actually has a match in
+  # # progress -- confirmed the dominant, day-independent cost against
+  # # actual daily totals (several days over the 1000/day cap entirely,
+  # # a quiet non-matchday still at 872 by mid-afternoon). Squad rosters
+  # # and injury/stat snapshots don't need same-day-multiple-times
+  # # freshness; once daily still refreshes every tracked club's data at
+  # # least once every 24h, at a quarter of the previous cost (up to
+  # # ~156/day instead of ~624/day).
+  # #
+  # # Monthly now (1st of the month), not daily: the profiles are already
+  # # nearly complete, and this job's only real job is picking up players
+  # # GOAL API added late. That isn't worth GOAL budget that live coverage
+  # # needs on match days. Runs once a month, or on workflow_dispatch.
+  # - cron: '25 5 1 * *'
   workflow_dispatch: {}
 
 jobs:

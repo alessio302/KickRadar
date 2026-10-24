@@ -6,12 +6,13 @@ name: Live scores (European)
 # syncLiveEvents.js's WebSocket -- see syncEuropeanLiveScores.js's own top
 # comment for why this exists.
 on:
-  schedule:
-    # Offset to :13/:28/:43/:58 -- distinct from every other 4x/hour
-    # workflow's own minutes (see live-scores.yml/live-events.yml/
-    # lineups-sync.yml's own comments on why: several workflows sharing one
-    # cron pattern made GitHub Actions' scheduler throttle all of them).
-    - cron: '13,28,43,58 * * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Offset to :13/:28/:43/:58 -- distinct from every other 4x/hour
+  # # workflow's own minutes (see live-scores.yml/live-events.yml/
+  # # lineups-sync.yml's own comments on why: several workflows sharing one
+  # # cron pattern made GitHub Actions' scheduler throttle all of them).
+  # - cron: '13,28,43,58 * * * *'
   workflow_dispatch: {}
 
 concurrency:

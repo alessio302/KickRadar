@@ -1,20 +1,21 @@
 name: European fixtures sync
 
 on:
-  schedule:
-    # Once daily (07:00 UTC), not 2x/day -- dropped from 2x/day (2026-09-09):
-    # 2 competitions' worth of GOAL API calls per run was a meaningful share
-    # of several days that ran over the shared 1000/day cap, confirmed
-    # against this project's own goal_api_usage table. The 16:00 UTC run
-    # only existed to catch a same-day kickoff-time publication a few hours
-    # earlier than the next morning's run would anyway.
-    #
-    # This run uses the narrow default date window (see
-    # syncEuropeanFixtures.js's own top comment) -- today's results plus the
-    # next couple weeks' schedule, not the full ±7d/+60d range. See
-    # sync-european-fixtures-full.yml for the weekly wide-window run that
-    # still catches a reschedule further out.
-    - cron: '0 7 * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Once daily (07:00 UTC), not 2x/day -- dropped from 2x/day (2026-09-09):
+  # # 2 competitions' worth of GOAL API calls per run was a meaningful share
+  # # of several days that ran over the shared 1000/day cap, confirmed
+  # # against this project's own goal_api_usage table. The 16:00 UTC run
+  # # only existed to catch a same-day kickoff-time publication a few hours
+  # # earlier than the next morning's run would anyway.
+  # #
+  # # This run uses the narrow default date window (see
+  # # syncEuropeanFixtures.js's own top comment) -- today's results plus the
+  # # next couple weeks' schedule, not the full ±7d/+60d range. See
+  # # sync-european-fixtures-full.yml for the weekly wide-window run that
+  # # still catches a reschedule further out.
+  # - cron: '0 7 * * *'
   workflow_dispatch: {}
 
 jobs:
