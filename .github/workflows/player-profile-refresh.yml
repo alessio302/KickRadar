@@ -1,13 +1,14 @@
 name: Player profile refresh
 
 on:
-  schedule:
-    # Monthly, on the 1st at :49 -- moved down from every 6 hours so this
-    # job stops competing with live coverage for GOAL API budget on match
-    # days. Stats and club changes for already-resolved players are still
-    # picked up, just once a month. See refreshPlayerProfiles.js's own
-    # BATCH_SIZE comment for the batch size per run.
-    - cron: '49 1 1 * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Monthly, on the 1st at :49 -- moved down from every 6 hours so this
+  # # job stops competing with live coverage for GOAL API budget on match
+  # # days. Stats and club changes for already-resolved players are still
+  # # picked up, just once a month. See refreshPlayerProfiles.js's own
+  # # BATCH_SIZE comment for the batch size per run.
+  # - cron: '49 1 1 * *'
   workflow_dispatch: {}
 
 jobs:

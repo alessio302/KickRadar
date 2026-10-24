@@ -66,8 +66,9 @@ name: Schedule watchdog
 # Offset to :50 -- doesn't collide with news-scraper's own :04/:34,
 # live-scores' :09/:24/:39/:54, or lineups-sync's :14/:29/:44/:59.
 on:
-  schedule:
-    - cron: '50 * * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # - cron: '50 * * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -75,6 +76,9 @@ permissions:
 
 jobs:
   check:
+    # Paused: scheduled runs are off, so this stays a no-op even when the
+    # external dispatch cron still calls it.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

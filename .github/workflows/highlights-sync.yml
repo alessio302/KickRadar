@@ -1,12 +1,13 @@
 name: Highlights sync
 
 on:
-  schedule:
-    # Offset to :07/:37 -- distinct from news-scraper's 4/34, live-events'
-    # 4/19/34/49, live-scores' 9/24/39/54, and lineups-sync's 14/29/44/59.
-    # See those files' own comments on why several workflows sharing one
-    # cron pattern made GitHub Actions' scheduler throttle all of them hard.
-    - cron: '7,37 * * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Offset to :07/:37 -- distinct from news-scraper's 4/34, live-events'
+  # # 4/19/34/49, live-scores' 9/24/39/54, and lineups-sync's 14/29/44/59.
+  # # See those files' own comments on why several workflows sharing one
+  # # cron pattern made GitHub Actions' scheduler throttle all of them hard.
+  # - cron: '7,37 * * * *'
   workflow_dispatch: {}
 
 jobs:

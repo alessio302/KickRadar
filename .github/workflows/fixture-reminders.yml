@@ -8,8 +8,9 @@ name: Fixture kickoff reminders
 # pushes -- syncLiveScores.js only starts polling within 10 minutes of
 # kickoff, too late for a 30-minute reminder.
 on:
-  schedule:
-    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch: {}
 
 concurrency:

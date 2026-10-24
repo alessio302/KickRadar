@@ -1,16 +1,17 @@
 name: Fixtures sync
 
 on:
-  schedule:
-    # 4x/day, per the briefing ("3-4 Abfragen pro Liga und Tag reichen").
-    #
-    # Referee freshness (briefly chased here at an hourly cadence, then via
-    # a dedicated call in syncLineups.js, 2026-09-06) is now piggybacked
-    # onto syncLiveScores.js's own already-frequent per-league polling (see
-    # that file's own pollOnce() comment) at zero extra football-data.org
-    # requests -- this job's own cadence only needs to matter for matchday/
-    # status/score drift outside syncLiveScores.js's live-window polling.
-    - cron: '0 5,11,17,23 * * *'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # 4x/day, per the briefing ("3-4 Abfragen pro Liga und Tag reichen").
+  # #
+  # # Referee freshness (briefly chased here at an hourly cadence, then via
+  # # a dedicated call in syncLineups.js, 2026-09-06) is now piggybacked
+  # # onto syncLiveScores.js's own already-frequent per-league polling (see
+  # # that file's own pollOnce() comment) at zero extra football-data.org
+  # # requests -- this job's own cadence only needs to matter for matchday/
+  # # status/score drift outside syncLiveScores.js's live-window polling.
+  # - cron: '0 5,11,17,23 * * *'
   workflow_dispatch: {}
 
 jobs:

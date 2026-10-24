@@ -1,11 +1,12 @@
 name: Club GOAL API ids sync
 
 on:
-  schedule:
-    # Weekly -- a club's GOAL API id, founding year, and venue capacity
-    # essentially never change mid-season (see syncClubGoalApiIds.js's own
-    # comment). Offset to :17 Sunday, distinct from every other cron here.
-    - cron: '17 3 * * 0'
+  # Paused 2026-10-24: scheduled runs disabled. Uncomment to re-enable.
+  # schedule:
+  # # Weekly -- a club's GOAL API id, founding year, and venue capacity
+  # # essentially never change mid-season (see syncClubGoalApiIds.js's own
+  # # comment). Offset to :17 Sunday, distinct from every other cron here.
+  # - cron: '17 3 * * 0'
   workflow_dispatch: {}
 
 jobs:
